@@ -56,5 +56,5 @@ export function BookReader({ session, id, onExit }: { session: Session; id: stri
   }
   if (stage.format === 'epub') return <EpubReader data={stage.data} bookId={id} title={stage.title} onExit={onExit} />
   if (stage.format === 'cbz') return <ComicReader data={stage.data} bookId={id} title={stage.title} onExit={onExit} />
-  return <PdfReader data={stage.data} title={stage.title} onExit={onExit} />
+  return <PdfReader data={stage.data} bookId={id} title={stage.title} onExit={onExit} />
 }

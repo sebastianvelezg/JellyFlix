@@ -31,6 +31,49 @@ export interface Channel {
   now?: Program
 }
 
+/** A channel's name without what playlists put in it (their quality and notes), and those parts apart. */
+export interface ChannelName {
+  title: string
+  /** "1080p", "Geo-blocked", "Not 24/7": what was in brackets or in parentheses at the end of the name. */
+  tags: string[]
+}
+
+const QUALITY_TAG = /^(\d{3,4}[pi]|[248]K|UHD|FHD|HD|SD)$/i
+
+/**
+ * Channel lists from the internet name their channels like "Canal 1 (Colombia) (1080p) [Not 24/7]". The name is the part that says
+ * what the channel is; the quality in parentheses at the end and the notes in brackets are tags. A name that is only tags is kept whole.
+ */
+export function splitChannelName(raw: string): ChannelName {
+  let title = raw.trim()
+  const tags: string[] = []
+  for (;;) {
+    const note = /\s*\[([^\]]+)\]\s*$/.exec(title)
+    if (note) {
+      tags.unshift((note[1] ?? '').trim())
+      title = title.slice(0, note.index)
+      continue
+    }
+    const quality = /\s*\(([^()]*)\)\s*$/.exec(title)
+    const label = (quality?.[1] ?? '').trim()
+    if (quality && QUALITY_TAG.test(label)) {
+      tags.unshift(label)
+      title = title.slice(0, quality.index)
+      continue
+    }
+    break
+  }
+  title = title.trim()
+  return title ? { title, tags } : { title: raw.trim(), tags: [] }
+}
+
+/** Whether a channel is the one being looked for: its name (as the server has it) or its number has the text in it. */
+export function matchesChannel(channel: Pick<Channel, 'name' | 'number'>, text: string): boolean {
+  const wanted = text.trim().toLowerCase()
+  if (!wanted) return true
+  return channel.name.toLowerCase().includes(wanted) || (channel.number ?? '').toLowerCase().includes(wanted)
+}
+
 function toTime(value: string | null | undefined): number | undefined {
   const ms = value ? Date.parse(value) : NaN
   return Number.isNaN(ms) ? undefined : ms
@@ -81,6 +124,9 @@ export interface ChannelPage {
 }
 
 export const CHANNEL_PAGE_SIZE = 60
+
+/** Looking for a channel reads this many (the server cannot search them), which is more than any list has. */
+export const CHANNEL_SEARCH_LIMIT = 2000
 
 /** One page of the user's channels in the order the server keeps them, each with what is on now. */
 export async function getChannels(session: Session, opts: { startIndex?: number; limit?: number; favorites?: boolean } = {}): Promise<ChannelPage> {

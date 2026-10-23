@@ -59,6 +59,39 @@ test('theme: a colour of your own keeps its text readable, even a very light one
   expect(accent).not.toBe('#112233')
 })
 
+test('menu buttons: icons and names, icons only, or names only; the buttons keep their names for a screen reader', async ({ page }) => {
+  mock = await startMock({ ...everything, musicVideos: 2, books: 2, liveTv: 3 })
+  await page.setViewportSize({ width: 1700, height: 900 })
+  await signIn(page, mock, { start: '/', keep: true })
+  const menu = page.getByRole('navigation', { name: 'Sections' })
+  const movies = menu.getByRole('button', { name: 'Movies' })
+  // Eight sections: with names and icons they would not all fit in 1700 pixels beside the search, so the icons stay and the names go.
+  await expect(menu.getByRole('button')).toHaveCount(8)
+  await expect(movies.locator('svg')).toBeVisible()
+  const widest = await movies.evaluate((el) => (el.parentElement as HTMLElement).scrollWidth <= (el.parentElement as HTMLElement).clientWidth + 1)
+  expect(widest).toBe(true)
+
+  await openAppearance(page)
+  await page.getByRole('radio', { name: 'Names only' }).check({ force: true })
+  await expect(page.locator('html')).toHaveAttribute('data-nav', 'text')
+  await expect(movies).toHaveText('Movies')
+  await expect(movies.locator('svg')).toHaveCount(0)
+
+  await page.getByRole('radio', { name: 'Icons only' }).check({ force: true })
+  await expect(page.locator('html')).toHaveAttribute('data-nav', 'icons')
+  await expect(movies).toHaveText('')
+  await expect(movies.locator('svg')).toBeVisible()
+  await expect(movies).toHaveAttribute('title', 'Movies')
+
+  // It is kept, and goes back with the rest.
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('data-nav', 'icons')
+  await openAppearance(page)
+  await page.getByRole('button', { name: 'Reset all appearance' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-nav', 'full')
+})
+
 test('posters: the size setting changes the width of the cards in the rows', async ({ page }) => {
   mock = await startMock(everything)
   await signIn(page, mock, { start: '/' })

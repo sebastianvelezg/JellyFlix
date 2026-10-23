@@ -56,6 +56,7 @@ import app.jellyflix.tv.data.ACCENTS
 import app.jellyflix.tv.data.CANVASES
 import app.jellyflix.tv.data.FrameRateMode
 import app.jellyflix.tv.data.HomeRow
+import app.jellyflix.tv.data.NavStyle
 import app.jellyflix.tv.data.PosterSize
 import app.jellyflix.tv.data.accentColor
 import app.jellyflix.tv.data.PluginCard
@@ -285,6 +286,13 @@ private fun AppearanceTab(vm: AppViewModel, first: FocusRequester) {
             look.posters.ordinal,
             { vm.choosePosters(PosterSize.entries[it]) },
             note = stringResource(R.string.appearance_posters_note),
+        )
+        Choice(
+            stringResource(R.string.appearance_menu),
+            NavStyle.entries.map { stringResource(it.label) },
+            look.nav.ordinal,
+            { vm.chooseNav(NavStyle.entries[it]) },
+            note = stringResource(R.string.appearance_menu_note),
         )
 
         SectionTitle(stringResource(R.string.appearance_home), Modifier.padding(top = 12.dp), inset = false)

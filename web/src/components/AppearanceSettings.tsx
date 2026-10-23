@@ -12,6 +12,7 @@ import {
   APPEARANCE_DEFAULTS,
   BANNER_SIZES,
   DENSITIES,
+  NAV_STYLES,
   POSTER_SIZES,
   UI_SIZES,
   applyAppearance,
@@ -21,6 +22,7 @@ import {
   type AppearancePrefs,
   type BannerSize,
   type Density,
+  type NavStyle,
   type PosterSize,
   type UiSize,
 } from '../platform/web/appearance'
@@ -35,6 +37,7 @@ const POSTER_DRAW: Record<PosterSize, number> = { compact: 22, comfortable: 28, 
 const UI_SIZE_LABEL: Record<UiSize, string> = { small: 'Small', default: 'Default', large: 'Large' }
 const DENSITY_LABEL: Record<Density, string> = { comfortable: 'Comfortable', compact: 'Compact' }
 const BANNER_LABEL: Record<BannerSize, string> = { large: 'Large', compact: 'Compact' }
+const NAV_LABEL: Record<NavStyle, string> = { full: 'Icons and names', icons: 'Icons only', text: 'Names only' }
 
 /** A short row of pills where exactly one is chosen (radio buttons that look like a segmented control). */
 function Segmented<T extends string>({
@@ -268,6 +271,15 @@ export function AppearanceSettings() {
           labels={BANNER_LABEL}
           value={prefs.banner}
           onChange={(banner) => save({ banner })}
+        />
+        <Segmented
+          name="nav-style"
+          legend={t('Menu buttons')}
+          hint={t('What Home, Movies, Live TV and the other buttons of the menu show. With both, the names give way to the icons when there is no room.')}
+          options={NAV_STYLES}
+          labels={NAV_LABEL}
+          value={prefs.nav}
+          onChange={(nav) => save({ nav })}
         />
       </Card>
 

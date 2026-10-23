@@ -7,6 +7,7 @@ import {
   PlaybackError,
   PlaybackSession,
   programProgress,
+  splitChannelName,
   type Channel,
   type DeviceState,
   type Session,
@@ -14,6 +15,7 @@ import {
 import { reportStopOnPageHide } from '../../platform/web/browser'
 import { detectCapabilities } from '../../platform/web/capabilities'
 import { attachMedia } from '../../platform/web/mediaAttach'
+import { QUALITY_CHOICES, readPlayerPrefs, writePlayerPrefs } from '../../platform/web/prefs'
 import { lockPageScroll } from '../../platform/web/scrollLock'
 import { BackIcon, ChevronLeftIcon, ChevronRightIcon, FullscreenIcon, ExitFullscreenIcon, MuteIcon, PauseIcon, PlayIcon, VolumeIcon } from '../icons'
 import { ReadProgress } from '../reader/ReaderShell'
@@ -44,6 +46,7 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
   const [chrome, setChrome] = useState(true)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [quality, setQuality] = useState(() => readPlayerPrefs().maxBitrateMbps)
 
   // What is on, and the channels to go to from here.
   useEffect(() => {
@@ -76,7 +79,7 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
     const device = (): DeviceState => ({ paused: element.paused, muted: element.muted, volume: element.volume })
     void (async () => {
       try {
-        const plan = await negotiatePlayback(session, id, { live: true, capabilities: detectCapabilities() })
+        const plan = await negotiatePlayback(session, id, { live: true, capabilities: detectCapabilities(), maxBitrate: quality * 1_000_000 })
         if (cancelled) return
         const playback = new PlaybackSession(session, plan, 0)
         const attached = attachMedia({
@@ -118,7 +121,7 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
         }
       } catch (e) {
         if (!cancelled) {
-          setState({ status: 'error', message: t(e instanceof PlaybackError ? e.message : 'Could not start the channel. Check your connection and try again.') })
+          setState({ status: 'error', message: t(e instanceof PlaybackError ? e.message : 'Could not start the channel. It may be off the air or blocked where the server is. Try another one.') })
         }
       }
     })()
@@ -126,7 +129,7 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
       cancelled = true
       cleanup?.()
     }
-  }, [session, id, attempt])
+  }, [session, id, attempt, quality])
 
   const goTo = useCallback((step: 1 | -1) => {
     const next = neighbourChannel(others, id, step)
@@ -185,7 +188,8 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
   }, [])
 
   const program = channel?.now && channel.now.endMs > now ? channel.now : undefined
-  const title = channel ? `${channel.number ? `${channel.number} · ` : ''}${channel.name}` : t('Live TV')
+  const name = channel ? splitChannelName(channel.name) : null
+  const title = name && channel ? `${channel.number ? `${channel.number} · ` : ''}${name.title}` : t('Live TV')
   const canChange = neighbourChannel(others, id, 1) !== null
 
   return (
@@ -232,7 +236,12 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
             <BackIcon /> {t('Back')}
           </button>
           <span className="rounded bg-rose-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white">{t('Live')}</span>
-          <h1 className="min-w-0 truncate text-base font-semibold text-white">{title}</h1>
+          <h1 className="min-w-0 truncate text-base font-semibold text-white" title={channel?.name}>{title}</h1>
+          {name?.tags.map((tag) => (
+            <span key={tag} className="hidden rounded border border-white/20 px-1.5 text-[11px] leading-5 text-neutral-300 sm:inline">
+              {tag}
+            </span>
+          ))}
         </div>
         <div className="absolute inset-x-0 bottom-0 space-y-3 bg-gradient-to-t from-black/85 to-transparent px-4 pb-[max(1rem,var(--safe-bottom))] pt-16">
           {program ? (
@@ -246,9 +255,7 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
               </p>
               <ReadProgress percent={programProgress(program, now) * 100} />
             </div>
-          ) : (
-            <p className="text-sm text-neutral-400">{t('No programme information for this channel.')}</p>
-          )}
+          ) : null}
           <div className="flex items-center gap-2">
             <button type="button" className="btn" aria-label={t('Previous channel')} title={t('Previous channel')} disabled={!canChange} onClick={() => goTo(-1)}>
               <ChevronLeftIcon />
@@ -269,7 +276,27 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
             >
               {muted ? <MuteIcon /> : <VolumeIcon />}
             </button>
-            <button type="button" className="btn ml-auto" aria-label={fullscreen ? t('Exit fullscreen') : t('Fullscreen')} onClick={toggleFullscreen}>
+            <label htmlFor="live-quality" className="sr-only">
+              {t('Quality')}
+            </label>
+            <select
+              id="live-quality"
+              className="select ml-auto max-w-40"
+              value={quality}
+              onChange={(e) => {
+                const mbps = Number(e.target.value)
+                writePlayerPrefs({ maxBitrateMbps: mbps })
+                setState({ status: 'loading' })
+                setQuality(mbps)
+              }}
+            >
+              {QUALITY_CHOICES.map((mbps) => (
+                <option key={mbps} value={mbps}>
+                  {mbps === 0 ? t('Original quality') : t('Up to {mbps} Mbps', { mbps })}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn" aria-label={fullscreen ? t('Exit fullscreen') : t('Fullscreen')} onClick={toggleFullscreen}>
               {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
             </button>
           </div>

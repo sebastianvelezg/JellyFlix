@@ -50,6 +50,14 @@ describe('appearance preferences', () => {
     expect(readAppearance()).toMatchObject({ density: 'comfortable', uiSize: 'default', banner: 'large' })
   })
 
+  it('remembers what the menu buttons show, and falls back to picture and name', () => {
+    applyAppearance(writeAppearance({ nav: 'icons' }))
+    expect(document.documentElement.dataset.nav).toBe('icons')
+    expect(readAppearance().nav).toBe('icons')
+    localStorage.setItem('jellyflix.appearance', JSON.stringify({ nav: 'big' }))
+    expect(readAppearance().nav).toBe('full')
+  })
+
   it('hands out the same object until something changes', () => {
     const first = readAppearance()
     expect(readAppearance()).toBe(first)
@@ -66,7 +74,7 @@ describe('appearance preferences', () => {
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#050813')
     // Kept for the next start, so the page can be painted before the app has loaded.
     const saved = JSON.parse(localStorage.getItem(APPEARANCE_CSS_KEY) as string)
-    expect(saved).toMatchObject({ attrs: { posters: 'compact', density: 'comfortable', size: 'default', banner: 'large' }, bg: '#050813' })
+    expect(saved).toMatchObject({ attrs: { posters: 'compact', density: 'comfortable', size: 'default', banner: 'large', nav: 'full' }, bg: '#050813' })
     expect(saved.vars['--color-accent']).toBe(root.style.getPropertyValue('--color-accent'))
   })
 

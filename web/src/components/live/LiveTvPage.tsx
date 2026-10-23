@@ -2,18 +2,21 @@ import { useEffect, useState } from 'react'
 import {
   channelLogoUrl,
   CHANNEL_PAGE_SIZE,
+  CHANNEL_SEARCH_LIMIT,
   getChannels,
   getGuide,
   guideBlocks,
   guideStart,
   isOnNow,
+  matchesChannel,
   programProgress,
   setFavorite,
+  splitChannelName,
   type Channel,
   type Program,
   type Session,
 } from '../../core'
-import { HeartIcon, PlayIcon } from '../icons'
+import { HeartIcon, PlayIcon, SearchIcon } from '../icons'
 import { Img } from '../Img'
 import { ReadProgress } from '../reader/ReaderShell'
 import { StateMessage } from '../StateMessage'
@@ -31,9 +34,11 @@ const GUIDE_CHANNELS_AT_A_TIME = 20
 type Loaded = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; channels: Channel[]; total: number }
 
 /** The channels of the account, read a page at a time and read again now and then so that "on now" stays true. */
-function useChannels(session: Session, favorites: boolean, wanted: number): { state: Loaded; more: () => void; setFavoriteLocally: (id: string, favorite: boolean) => void } {
+function useChannels(session: Session, favorites: boolean, wanted: number, all: boolean): { state: Loaded; more: () => void; setFavoriteLocally: (id: string, favorite: boolean) => void } {
   const [state, setState] = useState<Loaded>({ status: 'loading' })
-  const [count, setCount] = useState(wanted)
+  const [pages, setPages] = useState(wanted)
+  // Looking for a channel needs all of them, not just the first page.
+  const count = all ? CHANNEL_SEARCH_LIMIT : pages
   const [version, setVersion] = useState(0)
 
   useEffect(() => {
@@ -52,7 +57,7 @@ function useChannels(session: Session, favorites: boolean, wanted: number): { st
 
   return {
     state,
-    more: () => setCount((n) => n + CHANNEL_PAGE_SIZE),
+    more: () => setPages((n) => n + CHANNEL_PAGE_SIZE),
     setFavoriteLocally: (id, favorite) => {
       setState((now) => (now.status === 'ready' ? { ...now, channels: now.channels.map((c) => (c.id === id ? { ...c, favorite } : c)) } : now))
       // Favourites only: a channel taken out of the list leaves it.
@@ -65,7 +70,10 @@ function useChannels(session: Session, favorites: boolean, wanted: number): { st
 export function LiveTvPage({ session, onPlay }: { session: Session; onPlay: (channel: Channel) => void }) {
   const [view, setView] = useState<View>('channels')
   const [favorites, setFavorites] = useState(false)
-  const { state, more, setFavoriteLocally } = useChannels(session, favorites, CHANNEL_PAGE_SIZE)
+  const [filter, setFilter] = useState('')
+  const looking = filter.trim() !== ''
+  const { state, more, setFavoriteLocally } = useChannels(session, favorites, CHANNEL_PAGE_SIZE, looking)
+  const shown = state.status === 'ready' ? state.channels.filter((c) => matchesChannel(c, filter)) : []
 
   const toggleFavorite = (channel: Channel) => {
     const next = !channel.favorite
@@ -80,6 +88,23 @@ export function LiveTvPage({ session, onPlay }: { session: Session; onPlay: (cha
           <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
           {t('Live TV')}
         </h1>
+        <div role="search" className="relative w-full sm:w-56">
+          <label htmlFor="channel-filter" className="sr-only">
+            {t('Find a channel')}
+          </label>
+          <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
+            <SearchIcon />
+          </span>
+          <input
+            id="channel-filter"
+            type="search"
+            className="field rounded-full py-2 pl-9 pr-3 pointer-coarse:py-3"
+            placeholder={t('Find a channel')}
+            autoComplete="off"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        </div>
         <div role="group" aria-label={t('View')} className="flex gap-2">
           {(['channels', 'guide'] as const).map((v) => (
             <button key={v} type="button" className="btn" aria-pressed={view === v} onClick={() => setView(v)}>
@@ -104,14 +129,20 @@ export function LiveTvPage({ session, onPlay }: { session: Session; onPlay: (cha
           message={favorites ? t('You have no favorite channels yet. Use the heart on a channel to add one.') : t('This account has no channels. Add a tuner or a channel list in Jellyfin and they will appear here.')}
         />
       )}
-      {state.status === 'ready' && state.channels.length > 0 && (
+      {state.status === 'ready' && state.channels.length > 0 && shown.length === 0 && (
+        <StateMessage kind="empty" message={t('No channel matches "{text}".', { text: filter.trim() })} />
+      )}
+      {state.status === 'ready' && shown.length > 0 && (
         <>
-          {view === 'channels' ? (
-            <ChannelGrid session={session} channels={state.channels} onPlay={onPlay} onFavorite={toggleFavorite} />
-          ) : (
-            <Guide session={session} channels={state.channels} onPlay={onPlay} />
+          {view === 'channels' && state.channels.every((c) => !c.now) && (
+            <p className="mb-4 max-w-2xl text-sm text-neutral-400">{t('The server has no programme guide for these channels, so only their names are shown.')}</p>
           )}
-          {state.channels.length < state.total && (
+          {view === 'channels' ? (
+            <ChannelGrid session={session} channels={shown} onPlay={onPlay} onFavorite={toggleFavorite} />
+          ) : (
+            <Guide session={session} channels={shown} onPlay={onPlay} />
+          )}
+          {!looking && state.channels.length < state.total && (
             <div className="mt-8 flex justify-center">
               <button type="button" className="btn" onClick={more}>
                 {t('Show more channels')}
@@ -134,7 +165,8 @@ function ChannelGrid({ session, channels, onPlay, onFavorite }: { session: Sessi
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {channels.map((channel) => {
         const program = channel.now && isOnNow(channel.now, now) ? channel.now : undefined
-        const label = [channel.number, channel.name].filter(Boolean).join(' · ')
+        const { title, tags } = splitChannelName(channel.name)
+        const label = [channel.number, title].filter(Boolean).join(' · ')
         return (
           <li key={channel.id} className="group/channel relative">
             <button
@@ -144,7 +176,7 @@ function ChannelGrid({ session, channels, onPlay, onFavorite }: { session: Sessi
               onClick={() => onPlay(channel)}
             >
               <span className="flex items-center gap-3">
-                <span className="flex h-12 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/40">
+                <span className="flex h-12 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/20">
                   <Img
                     session={session}
                     src={channelLogoUrl(session.serverUrl, channel)}
@@ -153,8 +185,17 @@ function ChannelGrid({ session, channels, onPlay, onFavorite }: { session: Sessi
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-neutral-100">{channel.name}</span>
-                  {channel.number && <span className="block text-xs text-neutral-500">{channel.number}</span>}
+                  <span className="block truncate text-sm font-semibold text-neutral-100" title={channel.name}>{title}</span>
+                  {(channel.number || tags.length > 0) && (
+                    <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-neutral-500">
+                      {channel.number && <span>{channel.number}</span>}
+                      {tags.map((tag) => (
+                        <span key={tag} className="rounded border border-white/10 px-1.5 text-[11px] leading-5 text-neutral-400">
+                          {tag}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </span>
                 <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-accent-strong)] pl-0.5 text-[var(--color-accent-ink)] opacity-0 transition group-hover/channel:opacity-100 group-focus-within/channel:opacity-100">
                   <PlayIcon />
@@ -168,9 +209,7 @@ function ChannelGrid({ session, channels, onPlay, onFavorite }: { session: Sessi
                   </span>
                   <ReadProgress percent={programProgress(program, now) * 100} />
                 </span>
-              ) : (
-                <span className="block text-sm text-neutral-500">{t('No programme information')}</span>
-              )}
+              ) : null}
             </button>
             <button
               type="button"
@@ -241,6 +280,9 @@ function Guide({ session, channels, onPlay }: { session: Session; channels: Chan
         </div>
       )}
       {failed && <p role="alert" className="alert-error max-w-xl">{t('The guide could not be read. Try again in a moment.')}</p>}
+      {programs && !failed && [...programs.values()].every((list) => list.length === 0) && (
+        <p className="max-w-2xl text-sm text-neutral-400">{t('The server has no programme guide for these channels, so only their names are shown.')}</p>
+      )}
       <div className="overflow-x-auto rounded-2xl ring-1 ring-white/[.08]">
         <div style={{ minWidth: `calc(${width} + 9rem)` }}>
           <div className="flex border-b border-white/10 text-xs text-neutral-400">
@@ -264,7 +306,7 @@ function Guide({ session, channels, onPlay }: { session: Session; channels: Chan
                   onClick={() => onPlay(channel)}
                 >
                   {channel.number && <span className="text-xs text-neutral-500">{channel.number}</span>}
-                  <span className="truncate">{channel.name}</span>
+                  <span className="truncate" title={channel.name}>{splitChannelName(channel.name).title}</span>
                 </button>
                 <div className="relative h-14 shrink-0" style={{ width }} role="list" aria-label={channel.name}>
                   {blocks.map((block) => {

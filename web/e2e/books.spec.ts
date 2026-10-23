@@ -110,16 +110,37 @@ test('books: a comic opens page by page, in order, with the arrow keys, and can 
   await expect(reader(page, 'Test Book 003').getByText('Page 1 of 4')).toBeVisible()
 })
 
-test('books: a PDF is shown by the browser, or offered as a file when it cannot', async ({ page }) => {
+test('books: a PDF is read in pages of its own, with the browser viewer one click away', async ({ page }) => {
   mock = await startMock({ movieCount: 3, books: 4 })
   await signIn(page, mock)
   await openBook(page, 'Test Book 002')
   await page.getByRole('button', { name: 'Read', exact: true }).click()
   const shell = reader(page, 'Test Book 002')
   await expect(shell).toBeVisible()
+  // Three pages are laid out, and the first one is drawn.
+  await expect(shell.getByRole('img', { name: 'Page 1 of 3' })).toBeVisible()
+  await expect(shell.getByRole('img', { name: /Page \d of 3/ })).toHaveCount(3)
+  await expect(shell.locator('canvas').first()).toBeVisible()
+  const pageNumber = shell.getByRole('spinbutton', { name: 'Go to page' })
+  await expect(pageNumber).toHaveValue('1')
+  // Turning the page scrolls to the next one, and the place is remembered.
+  await shell.getByRole('button', { name: 'Next page' }).click()
+  await expect(pageNumber).toHaveValue('2')
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.books') ?? '{}').bk0002?.place)).toBe('2')
+  // The colours of the page are the reader's choice, and are kept.
+  await shell.getByLabel('Page colours').selectOption('sepia')
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.reader') ?? '{}').theme)).toBe('sepia')
+  await shell.getByRole('button', { name: 'Zoom in' }).click()
+  await expect(shell.getByRole('button', { name: 'Fit the width' })).toHaveText('125%')
+  // Leaving and coming back opens it where it was.
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: /^Continue reading/ }).click()
+  await expect(reader(page, 'Test Book 002').getByRole('spinbutton', { name: 'Go to page' })).toHaveValue('2')
+  // The browser's own viewer is still there for searching and printing (where the browser can show a PDF at all).
   const canShow = await page.evaluate(() => navigator.pdfViewerEnabled !== false)
-  if (canShow) await expect(shell.locator('iframe[src^="blob:"]')).toBeVisible()
-  else await expect(shell.getByRole('button', { name: 'Download' })).toBeVisible()
+  await reader(page, 'Test Book 002').getByRole('button', { name: 'Browser viewer' }).click()
+  if (canShow) await expect(reader(page, 'Test Book 002').locator('iframe[src^="blob:"]')).toBeVisible()
+  else await expect(reader(page, 'Test Book 002').getByRole('button', { name: 'Download' })).toBeVisible()
 })
 
 test('books: a format with no reader says so and can still be downloaded', async ({ page }) => {

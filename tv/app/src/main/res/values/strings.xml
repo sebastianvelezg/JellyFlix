@@ -63,6 +63,7 @@
     <string name="player_pause">Pause</string>
     <string name="player_play">Play</string>
     <string name="error_play">Could not start playback.</string>
+    <string name="error_channel">This channel did not start. It may be off the air or blocked where the server is. Try another one.</string>
     <string name="error_nothing_to_play">There is nothing to play yet.</string>
 
     <!-- Settings -->
@@ -381,6 +382,11 @@
     <string name="appearance_accent">Accent colour</string>
     <string name="appearance_posters">Poster size</string>
     <string name="appearance_posters_note">Rows and grids follow: smaller posters fit one more column, larger ones one fewer.</string>
+    <string name="appearance_menu">Menu buttons</string>
+    <string name="appearance_menu_note">What Home, Movies, Live TV and the other buttons at the top show. With both, the names give way to the icons when there is no room.</string>
+    <string name="nav_style_full">Icons and names</string>
+    <string name="nav_style_icons">Icons only</string>
+    <string name="nav_style_text">Names only</string>
     <string name="appearance_home">Home</string>
     <string name="appearance_banner">Show the banner at the top of Home, Movies and Series</string>
     <string name="appearance_rows_note">Turn each row on or off and move it. A row your libraries have nothing for is left out anyway.</string>

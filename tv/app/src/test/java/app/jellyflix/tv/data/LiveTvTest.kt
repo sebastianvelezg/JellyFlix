@@ -24,6 +24,18 @@ class LiveTvTest {
     private fun channel(number: String? = "4", now: TvProgram? = null) = TvChannel(item(), number, now)
 
     @Test
+    fun `the quality and the notes of a playlist name become tags`() {
+        assertEquals(ChannelName("A&E Latin America", listOf("1080p")), splitChannelName("A&E Latin America (1080p)"))
+        assertEquals(ChannelName("Alerta Bogota", listOf("720p", "Geo-blocked")), splitChannelName("Alerta Bogota (720p) [Geo-blocked]"))
+        assertEquals(ChannelName("Canal 1 (Colombia)", listOf("1080p")), splitChannelName("Canal 1 (Colombia) (1080p)"))
+        assertEquals(ChannelName("BUM Television", listOf("720p", "Not 24/7")), splitChannelName("BUM Television (720p) [Not 24/7]"))
+        // Nothing to take out, or a name that would be left empty, stays whole.
+        assertEquals(ChannelName("Canal 9 Cosmos", emptyList()), splitChannelName("Canal 9 Cosmos"))
+        assertEquals(ChannelName("(1080p)", emptyList()), splitChannelName("(1080p)"))
+        assertEquals("4 · News", TvChannel(item(title = "News (HD)"), "4", null).label)
+    }
+
+    @Test
     fun `a programme knows when it is on and how far it is`() {
         val p = program(10, 12)
         assertFalse(p.isOn(10 * hour - 1))

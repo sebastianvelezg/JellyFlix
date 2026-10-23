@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.style.TextAlign
+import app.jellyflix.tv.data.splitChannelName
 import app.jellyflix.tv.data.TrickplayPictures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -384,7 +385,10 @@ fun PlayerScreen(
                     // With a "Skip" button on screen, OK presses it.
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                         if (active != null || nextShown) return@onPreviewKeyEvent false
-                        if (player.isPlaying) player.pause() else player.play()
+                        // OK on a live channel only shows the controls (pausing live TV by accident leaves the picture behind); the Pause button pauses.
+                        if (plan.liveStreamId == null) {
+                            if (player.isPlaying) player.pause() else player.play()
+                        }
                         showControls()
                         true
                     }
@@ -546,7 +550,10 @@ private fun Controls(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 48.dp, vertical = 36.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(plan.item.title, fontSize = 24.sp, color = Color.White)
+            // A channel is named without the quality and notes playlists put in its name; those go beneath.
+            val channelName = remember(plan.item.id) { if (plan.item.isChannel) splitChannelName(plan.item.title) else null }
+            Text(channelName?.title ?: plan.item.title, fontSize = 24.sp, color = Color.White)
+            channelName?.tags?.takeIf { it.isNotEmpty() }?.let { Text(it.joinToString(" · "), fontSize = 15.sp, color = Palette.TextDim) }
             plan.item.subtitle?.takeIf { plan.item.isEpisodeLike() }?.let { Text(it, fontSize = 15.sp, color = Palette.TextDim) }
             if (plan.transcoding) Text(stringResource(R.string.player_converting), fontSize = 13.sp, color = Palette.TextDim)
             currentChapter?.let { chapter ->

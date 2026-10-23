@@ -277,12 +277,46 @@ data class HomeLayout(
     }
 }
 
+// ---- Top bar buttons ------------------------------------------------------------------------------------------------------
+
+/** What the buttons of the top bar show. [id] is the web client's word for it, so a look saved on one can be loaded on the other. */
+enum class NavStyle(val id: String, @StringRes val label: Int) {
+    Full("full", R.string.nav_style_full),
+    Icons("icons", R.string.nav_style_icons),
+    Text("text", R.string.nav_style_text);
+
+    companion object {
+        fun of(id: String?): NavStyle = entries.firstOrNull { it.id == id } ?: Full
+    }
+}
+
+/** About how wide (dp) a top bar button is: its padding, the picture, the gap and roughly 8.5dp a letter. */
+fun navButtonWidth(name: String, style: NavStyle): Float = when (style) {
+    NavStyle.Icons -> 44f
+    NavStyle.Text -> 36f + name.length * 8.5f
+    NavStyle.Full -> 36f + 22f + 8f + name.length * 8.5f
+}
+
+/** The gap between the buttons of the top bar (dp). */
+const val NAV_GAP = 8f
+
+/**
+ * What the buttons really show: what was chosen, except that pictures with names make way for the pictures alone when the names
+ * do not fit in [availableDp]. With only the names, the bar scrolls instead.
+ */
+fun navStyleFor(chosen: NavStyle, names: List<String>, availableDp: Float): NavStyle {
+    if (chosen != NavStyle.Full) return chosen
+    val need = names.sumOf { navButtonWidth(it, NavStyle.Full).toDouble() } + NAV_GAP * (names.size - 1).coerceAtLeast(0)
+    return if (need <= availableDp) NavStyle.Full else NavStyle.Icons
+}
+
 // ---- Everything together --------------------------------------------------------------------------------------------------
 
 data class Appearance(
     val theme: ThemeChoice = ThemeChoice(),
     val posters: PosterSize = PosterSize.Comfortable,
     val home: HomeLayout = HomeLayout(),
+    val nav: NavStyle = NavStyle.Full,
 ) {
     /** The values as text, to be stored; [decode] reads them back and ignores anything it does not know. */
     fun encode(): Map<String, String> = mapOf(
@@ -292,6 +326,7 @@ data class Appearance(
         "banner" to home.banner.toString(),
         "rows" to home.order.joinToString(",") { it.id },
         "hidden" to home.hidden.joinToString(",") { it.id },
+        "nav" to nav.id,
     )
 
     companion object {
@@ -301,6 +336,7 @@ data class Appearance(
                 theme = sanitizeTheme(read("canvas"), read("accent")),
                 posters = PosterSize.entries.firstOrNull { it.name == read("posters") } ?: PosterSize.Comfortable,
                 home = HomeLayout.sanitized(read("banner")?.let { it == "true" }, list("rows"), list("hidden")),
+                nav = NavStyle.of(read("nav")),
             )
         }
     }

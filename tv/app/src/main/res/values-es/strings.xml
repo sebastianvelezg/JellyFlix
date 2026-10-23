@@ -63,6 +63,7 @@
     <string name="player_pause">Pausar</string>
     <string name="player_play">Reproducir</string>
     <string name="error_play">No se pudo iniciar la reproducción.</string>
+    <string name="error_channel">Este canal no arrancó. Puede estar fuera del aire o bloqueado donde está el servidor. Prueba con otro.</string>
     <string name="error_nothing_to_play">Aún no hay nada que reproducir.</string>
 
     <!-- Settings -->
@@ -381,6 +382,11 @@
     <string name="appearance_accent">Color de acento</string>
     <string name="appearance_posters">Tamaño de los pósters</string>
     <string name="appearance_posters_note">Las filas y cuadrículas se ajustan: con pósters más pequeños cabe una columna más; con más grandes, una menos.</string>
+    <string name="appearance_menu">Botones del menú</string>
+    <string name="appearance_menu_note">Lo que muestran Inicio, Películas, TV en vivo y los demás botones de arriba. Con las dos cosas, los nombres dejan su sitio a los iconos cuando no hay espacio.</string>
+    <string name="nav_style_full">Iconos y nombres</string>
+    <string name="nav_style_icons">Solo iconos</string>
+    <string name="nav_style_text">Solo nombres</string>
     <string name="appearance_home">Inicio</string>
     <string name="appearance_banner">Mostrar el banner de arriba en Inicio, Películas y Series</string>
     <string name="appearance_rows_note">Activa o desactiva cada fila y muévela. Una fila para la que tus bibliotecas no tienen nada se omite de todos modos.</string>

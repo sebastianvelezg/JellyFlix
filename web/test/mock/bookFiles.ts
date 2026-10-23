@@ -66,9 +66,16 @@ export function cbzBytes(): Uint8Array {
   })
 }
 
-/** The smallest PDF that opens: one empty page. */
+/** A small PDF that opens: three empty pages (no tables of offsets: readers rebuild them). */
 export function pdfBytes(): Uint8Array {
+  const page = (n: number) => `${n} 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 300]>>endobj
+`
   return strToU8(
-    '%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R/Size 4>>\n%%EOF\n',
+    `%PDF-1.1
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R 4 0 R 5 0 R]/Count 3>>endobj
+${page(3)}${page(4)}${page(5)}trailer<</Root 1 0 R/Size 6>>
+%%EOF
+`,
   )
 }

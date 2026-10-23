@@ -1,6 +1,7 @@
 package app.jellyflix.tv
 
 import android.app.Application
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -42,6 +43,7 @@ import app.jellyflix.tv.data.HomeSnapshot
 import app.jellyflix.tv.data.JellyfinRepository
 import app.jellyflix.tv.data.Lib
 import app.jellyflix.tv.data.Libraries
+import app.jellyflix.tv.data.NavStyle
 import app.jellyflix.tv.data.TvChannel
 import app.jellyflix.tv.data.TvProgram
 import app.jellyflix.tv.data.neighbourChannel
@@ -79,18 +81,18 @@ import java.io.IOException
 import java.util.UUID
 
 /** The sections of the top bar. Only those the account has are shown (see [AppViewModel.tabs]). */
-enum class Tab(@StringRes val label: Int) {
-    Home(R.string.nav_home),
-    Movies(R.string.nav_movies),
-    Series(R.string.nav_series),
-    Anime(R.string.nav_anime),
-    MusicVideos(R.string.nav_music_videos),
-    Books(R.string.nav_books),
-    LiveTv(R.string.nav_live_tv),
-    Music(R.string.nav_music),
-    Collections(R.string.nav_collections),
-    Search(R.string.nav_search),
-    Settings(R.string.nav_settings),
+enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
+    Home(R.string.nav_home, R.drawable.ic_nav_home),
+    Movies(R.string.nav_movies, R.drawable.ic_nav_movies),
+    Series(R.string.nav_series, R.drawable.ic_nav_series),
+    Anime(R.string.nav_anime, R.drawable.ic_nav_anime),
+    MusicVideos(R.string.nav_music_videos, R.drawable.ic_nav_music_videos),
+    Books(R.string.nav_books, R.drawable.ic_nav_books),
+    LiveTv(R.string.nav_live_tv, R.drawable.ic_nav_live_tv),
+    Music(R.string.nav_music, R.drawable.ic_nav_music),
+    Collections(R.string.nav_collections, R.drawable.ic_nav_collections),
+    Search(R.string.nav_search, R.drawable.ic_nav_search),
+    Settings(R.string.nav_settings, R.drawable.ic_nav_settings),
 }
 
 /** Pages that sit on top of the tabs; Back pops them. */
@@ -389,6 +391,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun chooseCanvas(id: String) = updateAppearance { it.copy(theme = it.theme.copy(canvas = id)) }
     fun chooseAccent(id: String) = updateAppearance { it.copy(theme = ThemeChoice(it.theme.canvas, id)) }
     fun choosePosters(size: PosterSize) = updateAppearance { it.copy(posters = size) }
+    fun chooseNav(style: NavStyle) = updateAppearance { it.copy(nav = style) }
     fun updateHome(change: (HomeLayout) -> HomeLayout) = updateAppearance { it.copy(home = change(it.home)) }
 
     /** The server's plugins, read for Settings; null until the first answer. */
@@ -1765,7 +1768,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 errorRes = R.string.error_direct_only
             } catch (e: Exception) {
                 fail(e)
-                errorRes = if (e.message.isNullOrBlank()) R.string.error_play else null
+                // Say what could not be played: a channel that is off the air is not a failure of the app.
+                if (errorRes == R.string.error_generic) errorRes = if (item.isChannel) R.string.error_channel else R.string.error_play
             } finally {
                 busy = false
             }

@@ -22,6 +22,10 @@ export const UI_SIZES: readonly UiSize[] = ['small', 'default', 'large']
 export type BannerSize = 'large' | 'compact'
 export const BANNER_SIZES: readonly BannerSize[] = ['large', 'compact']
 
+/** What the buttons of the menu (Home, Movies, Live TV...) show: a picture and the name, only the picture, or only the name. */
+export type NavStyle = 'full' | 'icons' | 'text'
+export const NAV_STYLES: readonly NavStyle[] = ['full', 'icons', 'text']
+
 export interface AppearancePrefs {
   theme: ThemeChoice
   posterSize: PosterSize
@@ -29,6 +33,7 @@ export interface AppearancePrefs {
   density: Density
   uiSize: UiSize
   banner: BannerSize
+  nav: NavStyle
 }
 
 export const APPEARANCE_DEFAULTS: AppearancePrefs = {
@@ -38,6 +43,7 @@ export const APPEARANCE_DEFAULTS: AppearancePrefs = {
   density: 'comfortable',
   uiSize: 'default',
   banner: 'large',
+  nav: 'full',
 }
 
 export const KEY = 'jellyflix.appearance'
@@ -54,6 +60,7 @@ export function sanitizeAppearance(value: unknown): AppearancePrefs {
     density: DENSITIES.includes(p.density as Density) ? (p.density as Density) : 'comfortable',
     uiSize: UI_SIZES.includes(p.uiSize as UiSize) ? (p.uiSize as UiSize) : 'default',
     banner: BANNER_SIZES.includes(p.banner as BannerSize) ? (p.banner as BannerSize) : 'large',
+    nav: NAV_STYLES.includes(p.nav as NavStyle) ? (p.nav as NavStyle) : 'full',
   }
 }
 
@@ -123,11 +130,12 @@ export function useAppearance(): AppearancePrefs {
 export function applyAppearance(prefs: AppearancePrefs = readAppearance(), root: HTMLElement = document.documentElement): void {
   const vars = themeVariables(prefs.theme)
   for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value)
-  const attrs = { posters: prefs.posterSize, density: prefs.density, size: prefs.uiSize, banner: prefs.banner }
+  const attrs = { posters: prefs.posterSize, density: prefs.density, size: prefs.uiSize, banner: prefs.banner, nav: prefs.nav }
   root.dataset.posters = attrs.posters
   root.dataset.density = attrs.density
   root.dataset.size = attrs.size
   root.dataset.banner = attrs.banner
+  root.dataset.nav = attrs.nav
   // The browser's own bars (Android address bar, the iPhone status area) follow the page.
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', canvasOf(prefs.theme.canvas).bg)
   try {

@@ -7,11 +7,15 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ### Web app
 - **Books:** a library of type "Books" gets its own tab (books and audiobooks together, with the same sort, filters and A–Z jump), a page for each book (author, description, Read / Listen, Download, mark as read, favorite), "New books" on Home and in search.
-  A reader opens **EPUB** (chapter by chapter, with a table of contents, text size and three page colours; the book runs no scripts and reaches no network), **comics (CBZ)** (page by page, fit width or height, right to left for manga) and **PDF** (with the browser's own viewer, or the file where the browser cannot show one).
+  A reader opens **EPUB** (chapter by chapter, with a table of contents, text size and three page colours; the book runs no scripts and reaches no network), **comics (CBZ)** (page by page, fit width or height, right to left for manga) and **PDF** (drawn by the reader itself on dark, light or sepia pages with zoom, a table of contents and a jump to any page; the browser's own viewer is one click away for searching, selecting text and printing).
   Where you stopped is remembered in this browser ("Continue reading"). **Audiobooks** play in the music player and go on from where they were left.
   Other formats (Mobi, RAR comics) can be downloaded. Reading and downloading need an account that may download files.
 
 ### Both apps
+- **Menu buttons:** Appearance has a new choice for the buttons at the top (Home, Movies, Live TV…): icons and names, icons only, or names only. With both, the names give way to the icons by themselves when they do not fit, so nothing is cut off.
+  On the TV the bar scrolls with the remote, and Search and Settings stay at the right end so Settings is always there. On a phone the bottom bar does the same. The choice goes into the look backup.
+- **Live TV, tidied:** playlist names like "Canal 1 (Colombia) (1080p) [Not 24/7]" show the name and keep the quality and notes as small tags, logos are shown whole (not cropped), and "No programme information" is not repeated on every channel when the server has no guide (the web app says so once).
+  The web app can look for a channel by name or number, shows a quality choice while you watch a channel, and Settings → Playback has a **Maximum quality** (the same limit as in the player).
 - **Live TV:** the Live TV tab lists your channels with what is on each, and a guide (a time grid of the next hours on the web, "now and next" for each channel on the TV).
   Choosing a channel opens the stream the server provides: no seek bar (it is live), the channel before and after on the arrow keys (the TV remote's channel keys too), and the usual reports to the server.
   Favorites work for channels. Recording and timers come later.

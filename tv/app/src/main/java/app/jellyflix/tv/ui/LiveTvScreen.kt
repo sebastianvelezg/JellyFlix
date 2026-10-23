@@ -115,8 +115,10 @@ private fun ChannelGrid(vm: AppViewModel, now: Long) {
                 item = channel.item,
                 landscape = true,
                 fillWidth = true,
+                contain = true,
                 title = channel.label,
-                subtitle = program?.let { "${it.title} · ${clock(it.startMs)} – ${clock(it.endMs)}" } ?: stringResource(R.string.live_no_info),
+                // What is on, or else the notes of the name ("1080p · Not 24/7"); nothing when the server has neither.
+                subtitle = program?.let { "${it.title} · ${clock(it.startMs)} – ${clock(it.endMs)}" } ?: channel.name.tags.joinToString(" · ").ifEmpty { null },
                 onClick = { vm.watch(channel) },
                 restoreFocusTo = vm.restoreTarget,
                 onRestored = { vm.restoreTarget = null },
@@ -178,7 +180,7 @@ private fun GuideRow(channel: TvChannel, current: TvProgram?, next: TvProgram?, 
                         Box(Modifier.fillMaxWidth(current.progressAt(now)).height(4.dp).background(Palette.Accent))
                     }
                 } else {
-                    Text(stringResource(R.string.live_no_info), fontSize = 15.sp, color = Palette.TextDim)
+                    Text(channel.name.tags.joinToString(" · "), fontSize = 15.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Text(

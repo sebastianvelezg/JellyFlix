@@ -41,7 +41,7 @@ export interface BrowsePrefs {
 }
 
 /** The limits the player offers, in megabits per second (0 = original quality). */
-export const QUALITY_CHOICES = [0, 20, 8, 4, 2] as const
+export const QUALITY_CHOICES = [0, 40, 20, 10, 8, 4, 2] as const
 
 const PLAYER_KEY = 'jellyflix.player'
 const BROWSE_KEY = 'jellyflix.browse'

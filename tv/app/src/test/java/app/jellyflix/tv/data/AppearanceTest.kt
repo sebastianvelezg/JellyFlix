@@ -111,6 +111,7 @@ class AppearanceTest {
             theme = ThemeChoice("cocoa", "amber"),
             posters = PosterSize.Large,
             home = HomeLayout(banner = false, order = HomeRow.entries.reversed(), hidden = setOf(HomeRow.Because, HomeRow.NewAnime)),
+            nav = NavStyle.Icons,
         )
         val stored = look.encode()
         assertEquals(look, Appearance.decode { stored[it] })
@@ -121,6 +122,24 @@ class AppearanceTest {
         assertEquals(PosterSize.Comfortable, decoded.posters)
         assertEquals(HomeRow.Continue, decoded.home.order.first())
         assertFalse(decoded.home.banner)
+        assertEquals(NavStyle.Full, decoded.nav)
+    }
+
+    @Test
+    fun theMenuShowsNamesOnlyWhileTheyFit() {
+        val names = listOf("Home", "Movies", "Series", "Music videos", "Books", "Live TV", "Music", "Collections", "Search", "Settings")
+        // A wide screen keeps the names; a narrow one keeps the pictures.
+        assertEquals(NavStyle.Full, navStyleFor(NavStyle.Full, names, 1400f))
+        assertEquals(NavStyle.Icons, navStyleFor(NavStyle.Full, names, 700f))
+        // Few sections fit where many do not.
+        assertEquals(NavStyle.Full, navStyleFor(NavStyle.Full, names.take(4), 700f))
+        // What was chosen is never changed by the room: names alone scroll, pictures alone always fit.
+        assertEquals(NavStyle.Text, navStyleFor(NavStyle.Text, names, 100f))
+        assertEquals(NavStyle.Icons, navStyleFor(NavStyle.Icons, names, 5000f))
+        assertTrue(navButtonWidth("Movies", NavStyle.Icons) < navButtonWidth("Movies", NavStyle.Text))
+        assertTrue(navButtonWidth("Movies", NavStyle.Text) < navButtonWidth("Movies", NavStyle.Full))
+        assertEquals(NavStyle.Full, NavStyle.of("nonsense"))
+        assertEquals(NavStyle.Text, NavStyle.of("text"))
     }
 
     @Test

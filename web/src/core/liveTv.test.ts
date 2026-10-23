@@ -4,7 +4,7 @@ import { chromeLikeCapabilities } from '../../test/fixtures'
 import { startMockJellyfin, type MockServer } from '../../test/mock/mockJellyfin'
 import { connect } from './auth'
 import type { Session } from './jellyfin'
-import { getChannel, getChannels, getGuide, guideBlocks, guideStart, isOnNow, neighbourChannel, programProgress, toChannel, toProgram } from './liveTv'
+import { getChannel, getChannels, getGuide, guideBlocks, guideStart, isOnNow, matchesChannel, neighbourChannel, programProgress, splitChannelName, toChannel, toProgram } from './liveTv'
 import { getLibrarySections } from './library'
 import { negotiatePlayback } from './playback'
 
@@ -65,6 +65,29 @@ describe('programmes and the guide, as numbers', () => {
     expect(neighbourChannel(list, 'a', -1)).toBe('c')
     expect(neighbourChannel([{ id: 'a' }], 'a', 1)).toBeNull()
     expect(neighbourChannel(list, 'zzz', 1)).toBeNull()
+  })
+})
+
+describe('the names of channels from a playlist', () => {
+  it('takes the quality and the notes out of the name and keeps them as tags', () => {
+    expect(splitChannelName('A&E Latin America (1080p)')).toEqual({ title: 'A&E Latin America', tags: ['1080p'] })
+    expect(splitChannelName('Alerta Bogota (720p) [Geo-blocked]')).toEqual({ title: 'Alerta Bogota', tags: ['720p', 'Geo-blocked'] })
+    expect(splitChannelName('BUM Television (720p) [Not 24/7]')).toEqual({ title: 'BUM Television', tags: ['720p', 'Not 24/7'] })
+    expect(splitChannelName('Canal 1 (Colombia) (1080p)')).toEqual({ title: 'Canal 1 (Colombia)', tags: ['1080p'] })
+  })
+
+  it('leaves a name that has nothing to take out, and a name that would be left empty', () => {
+    expect(splitChannelName('Canal 9 Cosmos')).toEqual({ title: 'Canal 9 Cosmos', tags: [] })
+    expect(splitChannelName('Canal (Colombia)')).toEqual({ title: 'Canal (Colombia)', tags: [] })
+    expect(splitChannelName('(1080p)')).toEqual({ title: '(1080p)', tags: [] })
+    expect(splitChannelName('  Tele 5 [HD]  ')).toEqual({ title: 'Tele 5', tags: ['HD'] })
+  })
+
+  it('finds a channel by a part of its name or of its number, in any case', () => {
+    expect(matchesChannel({ name: 'Canal CNC Medellin (1080p)', number: '12' }, 'cnc')).toBe(true)
+    expect(matchesChannel({ name: 'Canal CNC', number: '12' }, '12')).toBe(true)
+    expect(matchesChannel({ name: 'Canal CNC' }, 'bum')).toBe(false)
+    expect(matchesChannel({ name: 'Canal CNC' }, '  ')).toBe(true)
   })
 })
 

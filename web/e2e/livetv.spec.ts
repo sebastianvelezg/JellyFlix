@@ -40,6 +40,20 @@ test('live tv: a tab with the channels, what is on each, and favorites', async (
   await expect(page.getByRole('button', { name: 'Watch 1 · Test Channel 01' })).toHaveCount(0)
 })
 
+test('live tv: a channel can be found by a part of its name or number, and nothing found says so', async ({ page }) => {
+  mock = await startMock({ movieCount: 3, liveTv: 12 })
+  await signIn(page, mock)
+  await openLiveTv(page)
+  const finder = page.getByRole('searchbox', { name: 'Find a channel' })
+  await finder.fill('channel 07')
+  await expect(page.getByRole('button', { name: 'Watch 7 · Test Channel 07' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Watch/ })).toHaveCount(1)
+  await finder.fill('zzz')
+  await expect(page.getByText('No channel matches "zzz".')).toBeVisible()
+  await finder.fill('')
+  await expect(page.getByRole('button', { name: /^Watch/ }).first()).toBeVisible()
+})
+
 test('live tv: the guide shows the programmes of each channel and what is chosen can be watched', async ({ page }) => {
   mock = await startMock({ movieCount: 3, liveTv: 3 })
   await signIn(page, mock)

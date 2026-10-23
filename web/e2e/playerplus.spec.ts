@@ -48,6 +48,29 @@ test('trickplay: a server without the pictures just shows the time', async ({ pa
   expect(mock.requests.some((r) => r.path.includes('/Trickplay/'))).toBe(false)
 })
 
+test('quality: the limit can be chosen in Settings before anything plays, and a live channel asks with it too', async ({ page }) => {
+  mock = await startMock({ ...everything, liveTv: 3 })
+  await signIn(page, mock, { keep: true })
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('tab', { name: 'Playback' }).click()
+  await page.getByLabel('Maximum quality').selectOption({ label: 'Up to 4 Mbps' })
+  await page.goto('/#/play/m0001')
+  await waitPlaying(page)
+  const asked = mock.requests.filter((r) => r.method === 'POST' && r.path === '/Items/m0001/PlaybackInfo')
+  expect((asked.at(-1)?.body as { MaxStreamingBitrate?: number }).MaxStreamingBitrate).toBe(4_000_000)
+
+  await page.goto('/#/live/ch0001')
+  await expect.poll(() => mock.requests.filter((r) => r.method === 'POST' && r.path === '/Items/ch0001/PlaybackInfo').length).toBeGreaterThan(0)
+  const live = mock.requests.filter((r) => r.method === 'POST' && r.path === '/Items/ch0001/PlaybackInfo')
+  expect((live.at(-1)?.body as { MaxStreamingBitrate?: number }).MaxStreamingBitrate).toBe(4_000_000)
+  // Changing it while watching tunes the channel again with the new limit.
+  const before = live.length
+  await page.getByLabel('Quality').selectOption({ label: 'Original quality' })
+  await expect.poll(() => mock.requests.filter((r) => r.method === 'POST' && r.path === '/Items/ch0001/PlaybackInfo').length).toBeGreaterThan(before)
+  const after = mock.requests.filter((r) => r.method === 'POST' && r.path === '/Items/ch0001/PlaybackInfo')
+  expect((after.at(-1)?.body as { MaxStreamingBitrate?: number }).MaxStreamingBitrate).toBe(120_000_000)
+})
+
 test('quality: a lower limit makes the server convert the video, says why, and is remembered', async ({ page }) => {
   mock = await startMock(everything)
   await signIn(page, mock, { keep: true })

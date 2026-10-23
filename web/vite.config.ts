@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -28,10 +28,33 @@ function serviceWorker(): Plugin {
   }
 }
 
+/**
+ * The files the PDF reader's library needs next to it (the decoders for JPEG 2000 images and colour profiles). They are served from
+ * `pdfjs/wasm/` in development and written there in the build, where the reader asks for them.
+ */
+function pdfjsFiles(): Plugin {
+  const dir = new URL('./node_modules/pdfjs-dist/wasm/', import.meta.url)
+  const names = ['openjpeg.wasm', 'openjpeg_nowasm_fallback.js', 'qcms_bg.wasm']
+  return {
+    name: 'jellyflix-pdfjs-files',
+    configureServer(server) {
+      server.middlewares.use('/pdfjs/wasm/', (req, res, next) => {
+        const name = (req.url ?? '').split('?')[0]?.replace(/^\//, '') ?? ''
+        if (!names.includes(name) || !existsSync(new URL(name, dir))) return next()
+        res.setHeader('Content-Type', name.endsWith('.wasm') ? 'application/wasm' : 'text/javascript')
+        createReadStream(new URL(name, dir)).pipe(res)
+      })
+    },
+    generateBundle() {
+      for (const name of names) this.emitFile({ type: 'asset', fileName: `pdfjs/wasm/${name}`, source: readFileSync(new URL(name, dir)) })
+    },
+  }
+}
+
 export default defineConfig({
   // Relative file addresses, so the app works from any folder or sub-path it is put in (its routes live after the #).
   base: './',
-  plugins: [react(), tailwindcss(), serviceWorker()],
+  plugins: [react(), tailwindcss(), serviceWorker(), pdfjsFiles()],
   server: { host: 'localhost', port: 5173 },
   // hls.js (~570 kB) is a lazily loaded chunk, only fetched when a stream needs HLS.
   build: {
