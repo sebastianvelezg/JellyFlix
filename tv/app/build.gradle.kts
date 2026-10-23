@@ -65,7 +65,7 @@ android {
 dependencies {
     testImplementation("junit:junit:4.13.2")
     // The real org.json, because the one inside the Android jar only throws when run on a computer.
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.tvprovider) // the "Continue watching" row on the Google TV home screen
