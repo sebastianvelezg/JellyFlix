@@ -10,7 +10,8 @@ You can expect an answer within about a week. This is a volunteer project, so th
 ## What is in scope
 
 - Anything that could leak a user's session token, password or server address (logs, URLs, storage, the service worker, the Docker image).
-- Cross-site scripting or injection in the web app, including through titles, subtitles or other data a Jellyfin server returns.
+- Cross-site scripting or injection in the web app, including through titles, subtitles, books (EPUB, PDF, comic archives) or other data a Jellyfin server returns.
+- The book reader: a book is untrusted data. EPUB chapters are shown in a frame without scripts and with a policy that blocks the network, and a file that unpacks to something absurdly big is refused; pdf.js runs without `eval` and in a worker made from the app's own files.
 - The web app or TV app contacting anything other than the user's own Jellyfin server.
 - Problems in the Docker image or `npm run serve` (path traversal, wrong headers).
 

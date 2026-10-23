@@ -3,27 +3,30 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 Jellyflix Web and Jellyflix TV are released together and share one version number.
 
-## [Unreleased]
+## [1.1.0] - 2026-10-23
 
-### Web app
-- **Books:** a library of type "Books" gets its own tab (books and audiobooks together, with the same sort, filters and A–Z jump), a page for each book (author, description, Read / Listen, Download, mark as read, favorite), "New books" on Home and in search.
-  A reader opens **EPUB** (chapter by chapter, with a table of contents, text size and three page colours; the book runs no scripts and reaches no network), **comics (CBZ)** (page by page, fit width or height, right to left for manga) and **PDF** (drawn by the reader itself on dark, light or sepia pages with zoom, a table of contents and a jump to any page; the browser's own viewer is one click away for searching, selecting text and printing).
-  Where you stopped is remembered in this browser ("Continue reading"). **Audiobooks** play in the music player and go on from where they were left.
-  Other formats (Mobi, RAR comics) can be downloaded. Reading and downloading need an account that may download files.
-
-### Both apps (menu order)
-- **Top menu order:** Appearance → Top menu lets you move the buttons at the top (Home, Movies, Series, Live TV…) and turn some off. Home always stays; a button for a library you do not have is left out anyway. On the TV, Search and Settings always stay at the right end. It goes into the look backup, so it can be loaded on the other app.
+Three new kinds of library (music videos, books and Live TV), a menu you can arrange, and a tidier look. Web and TV get all of it together.
 
 ### Both apps
-- **Menu buttons:** Appearance has a new choice for the buttons at the top (Home, Movies, Live TV…): icons and names, icons only, or names only. With both, the names give way to the icons by themselves when they do not fit, so nothing is cut off.
-  On the TV the bar scrolls with the remote, and Search and Settings stay at the right end so Settings is always there. On a phone the bottom bar does the same. The choice goes into the look backup.
-- **Live TV, tidied:** playlist names like "Canal 1 (Colombia) (1080p) [Not 24/7]" show the name and keep the quality and notes as small tags, logos are shown whole (not cropped), and "No programme information" is not repeated on every channel when the server has no guide (the web app says so once).
-  The web app can look for a channel by name or number, shows a quality choice while you watch a channel, and Settings → Playback has a **Maximum quality** (the same limit as in the player).
-- **Live TV:** the Live TV tab lists your channels with what is on each, and a guide (a time grid of the next hours on the web, "now and next" for each channel on the TV).
-  Choosing a channel opens the stream the server provides: no seek bar (it is live), the channel before and after on the arrow keys (the TV remote's channel keys too), and the usual reports to the server.
-  Favorites work for channels. Recording and timers come later.
-- **Books on the TV:** the Books tab lists books and audiobooks; audiobooks play in the music player (from where they were left) and the TV says that books to read are for the web app or a phone.
 - **Music videos:** a library of type "Music videos" gets its own tab with wide cards (the artist under the title), a title page with the artist, playback with the usual player, search, a "New music videos" row on Home (which can be moved or hidden in Appearance) and a place in "Continue watching".
+- **Books:** a library of type "Books" gets its own tab (books and audiobooks together, with the same sort, filters and A-Z jump), a page for each book, "New books" on Home and in search. **Audiobooks** play in the music player and go on from where they were left. On the TV, books to read are for the web app or a phone, and the TV says so.
+- **Live TV:** the Live TV tab lists your channels with what is on each, and a guide (a time grid of the next hours on the web, "now and next" for each channel on the TV). Choosing a channel opens the stream the server provides: no seek bar (it is live), the channel before and after on the arrow keys (the TV remote's channel keys too), favorites, and the usual reports to the server.
+  Playlist names like "Canal 1 (Colombia) (1080p) [Not 24/7]" show the name and keep the quality and notes as small tags, logos are shown whole, and "no programme information" is said once when the server has no guide. A channel that cannot be played says so.
+- **Menu buttons:** Appearance has a new choice for the buttons at the top: icons and names, icons only, or names only. With both, the names give way to the icons by themselves when they do not fit. On the TV the bar scrolls with the remote and Search and Settings stay at the right end; on a phone the bottom bar does the same.
+- **Top menu order:** Appearance -> Top menu lets you move the buttons at the top and turn some off. Home always stays; a button for a library you do not have is left out anyway.
+  Both choices go into the look backup, so it can be loaded on the other app.
+- **Maximum quality** in Settings -> Playback (the same limit as in the player), with more steps than before (up to 40 Mbps).
+
+### Web app
+- **A reader for books:** **EPUB** (chapter by chapter, with a table of contents, text size and three page colours; the book runs no scripts and reaches no network), **comics (CBZ)** (page by page, fit width or height, right to left for manga) and **PDF** (drawn by the reader itself on dark, light or sepia pages with zoom, a table of contents and a jump to any page; the browser's own viewer is one click away for searching, selecting text and printing).
+  Where you stopped is remembered in this browser ("Continue reading"). Other formats (Mobi, RAR comics) can be downloaded. Reading and downloading need an account that may download files.
+- **Live TV on the web:** look for a channel by name or number, and choose the quality while you watch.
+- **Settings look:** Layout is chosen from drawn cards like Theme and Posters, and the tabs of Settings and of Administration take the accent of the theme.
+
+### Fixed
+- A library toolbar (sort, filters, Surprise me) no longer makes the page wider than the screen on medium widths.
+- The PDF reader lets go of its worker when closed before the file opened or when the file cannot be opened; a channel left before it was tuned no longer keeps a stream open on the server; a contents entry inside the open EPUB chapter scrolls to it.
+- Smaller: the web service worker no longer downloads the PDF library when it installs, book downloads need less memory, and the channel list does not poll while a channel is being watched.
 
 ## [1.0.0] - 2026-10-23
 
