@@ -1,6 +1,6 @@
 import { t } from '../i18n'
 
-export type SearchKind = 'all' | 'movies' | 'series' | 'musicvideos' | 'music'
+export type SearchKind = 'all' | 'movies' | 'series' | 'musicvideos' | 'books' | 'music'
 
 /** Narrows the search results to one kind: everything, movies (and their collections), series (and episodes) music videos or music. */
 export function SearchFilters({
@@ -8,17 +8,20 @@ export function SearchFilters({
   onChange,
   hasMusic,
   hasMusicVideos = false,
+  hasBooks = false,
 }: {
   value: SearchKind
   onChange: (kind: SearchKind) => void
   hasMusic: boolean
   hasMusicVideos?: boolean
+  hasBooks?: boolean
 }) {
   const kinds: Array<[SearchKind, string]> = [
     ['all', t('All')],
     ['movies', t('Movies')],
     ['series', t('Series')],
     ...(hasMusicVideos ? ([['musicvideos', t('Music videos')]] as Array<[SearchKind, string]>) : []),
+    ...(hasBooks ? ([['books', t('Books')]] as Array<[SearchKind, string]>) : []),
     ...(hasMusic ? ([['music', t('Music')]] as Array<[SearchKind, string]>) : []),
   ]
   return (

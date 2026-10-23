@@ -37,7 +37,7 @@ val TopBarHeight = 76.dp
 val ContentTop = TopBarHeight + 8.dp
 
 /** The sections that draw under the top bar themselves (a banner at the top, or their own spacing). */
-private val OwnTop = setOf(Tab.Home, Tab.Movies, Tab.Series, Tab.Anime, Tab.MusicVideos, Tab.Collections)
+private val OwnTop = setOf(Tab.Home, Tab.Movies, Tab.Series, Tab.Anime, Tab.MusicVideos, Tab.Books, Tab.Collections)
 
 /** The section, with the top bar floating over it (over the banner on Home, which reaches the top of the screen). */
 @Composable
@@ -49,7 +49,7 @@ fun MainScreen(vm: AppViewModel) {
         Box(Modifier.fillMaxSize().then(padding).then(bar)) {
             when (vm.tab) {
                 Tab.Home -> HomeScreen(vm)
-                Tab.Movies, Tab.Series, Tab.Anime, Tab.MusicVideos, Tab.Collections -> vm.libraryOf(vm.tab)?.let { LibraryScreen(vm, it) }
+                Tab.Movies, Tab.Series, Tab.Anime, Tab.MusicVideos, Tab.Books, Tab.Collections -> vm.libraryOf(vm.tab)?.let { LibraryScreen(vm, it) }
                 Tab.Music -> MusicScreen(vm)
                 Tab.Search -> SearchScreen(vm)
                 Tab.Settings -> SettingsScreen(vm)

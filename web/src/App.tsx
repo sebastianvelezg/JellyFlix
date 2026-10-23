@@ -20,6 +20,8 @@ import { SearchPage } from './components/SearchPage'
 import { useLanguage } from './components/useLanguage'
 import { clearSwr, swrKey, swrScope, useSwr } from './components/useSwr'
 import {
+  audiobookStart,
+  audiobookTrack,
   getLibrarySections,
   getNextEpisode,
   getPlayable,
@@ -52,6 +54,8 @@ const AdminPage = lazy(() => import('./components/admin/AdminPage').then((m) => 
 const StatsPage = lazy(() => import('./components/StatsPage').then((m) => ({ default: m.StatsPage })))
 const ListsPage = lazy(() => import('./components/ListsPage').then((m) => ({ default: m.ListsPage })))
 const ListPage = lazy(() => import('./components/ListsPage').then((m) => ({ default: m.ListPage })))
+const BookPage = lazy(() => import('./components/BookPage').then((m) => ({ default: m.BookPage })))
+const BookReader = lazy(() => import('./components/reader/BookReader').then((m) => ({ default: m.BookReader })))
 const MusicPage = lazy(() => import('./components/music/MusicPage').then((m) => ({ default: m.MusicPage })))
 const AlbumPage = lazy(() => import('./components/music/MusicDetails').then((m) => ({ default: m.AlbumPage })))
 const ArtistPage = lazy(() => import('./components/music/MusicDetails').then((m) => ({ default: m.ArtistPage })))
@@ -138,6 +142,13 @@ export default function App() {
     }
   }, [route, session])
 
+  // When the book reader closes, "Continue reading" is read again (what it shows comes from the places the reader saved).
+  const [reading, setReading] = useState(false)
+  if ((route.page === 'read') !== reading) {
+    setReading(route.page === 'read')
+    if (reading) setPlaybackVersion((v) => v + 1)
+  }
+
   // The home pages are hidden (not unmounted) while a title page or the player is open, which
   // collapses the document and loses the scroll position. Remember it on the way out, put it back on
   // the way in, and start title pages at the top.
@@ -213,7 +224,7 @@ export default function App() {
   )
 }
 
-const SECTIONS: Section[] = ['movies', 'series', 'anime', 'musicvideos', 'music']
+const SECTIONS: Section[] = ['movies', 'series', 'anime', 'musicvideos', 'books', 'music']
 
 const MUSIC_ROUTES = new Set(['music', 'album', 'artist', 'playlist'])
 
@@ -224,7 +235,7 @@ const SIMPLE_TITLES: Partial<Record<Route['page'], string>> = {
   collections: tr('Collections'),
   settings: tr('Settings'),
 }
-const SECTION_TITLES = { series: tr('Series'), anime: tr('Anime'), musicvideos: tr('Music videos') } as const
+const SECTION_TITLES = { series: tr('Series'), anime: tr('Anime'), musicvideos: tr('Music videos'), books: tr('Books') } as const
 
 /** Changes when the page changes, but not when only what is typed in the search box does. */
 function routeKeyForFocus(route: Route): string {
@@ -267,7 +278,9 @@ function Shell({
           ? route.section
           : MUSIC_ROUTES.has(route.page)
             ? 'music'
-            : null
+            : route.page === 'book' || route.page === 'read'
+              ? 'books'
+              : null
 
   // With two or more tabs the phone layout needs a second header row for them.
   const hasTabs = tabs.length >= 2
@@ -370,6 +383,10 @@ function Shell({
   const openMovie = (movie: Movie) => go({ page: 'movie', id: movie.id })
   const openShow = (show: Movie) => go({ page: 'show', id: show.id })
   const openSeries = (id: string) => go({ page: 'show', id })
+  const openBook = (book: Movie) => go({ page: 'book', id: book.id })
+  /** An audiobook goes to the music player (from where you stopped); the rest of the books open on their page. */
+  const listen = (book: Movie, startSeconds: number) => music.play([audiobookTrack(book)], 0, { startSeconds })
+  const playOrOpenBook = (book: Movie) => (book.book === 'audiobook' ? listen(book, audiobookStart(book)) : openBook(book))
   const play = (item: Movie, startOver = false) => go({ page: 'play', id: item.id, startOver })
   /** The Play button of a series: its next (or first) episode. */
   const playShow = (show: Movie) => {
@@ -430,6 +447,7 @@ function Shell({
               onPlay={play}
               onPlayShow={playShow}
               onOpenMovie={openMovie}
+              onOpenBook={openBook}
               onOpenShow={openShow}
               onOpenSeries={openSeries}
               onOpenAlbum={openAlbum}
@@ -447,11 +465,16 @@ function Shell({
             <CatalogPage section="movies" onOpen={openMovie} {...catalog} />
           </div>
         )}
-        {(['series', 'anime', 'musicvideos'] as const)
+        {(['series', 'anime', 'musicvideos', 'books'] as const)
           .filter((x) => seen.includes(x))
           .map((x) => (
             <div key={x} hidden={!(route.page === 'section' && route.section === x)}>
-              <CatalogPage section={x} onOpen={x === 'musicvideos' ? openMovie : openShow} {...catalog} />
+              <CatalogPage
+                section={x}
+                onOpen={x === 'musicvideos' ? openMovie : x === 'books' ? openBook : openShow}
+                {...catalog}
+                {...(x === 'books' ? { onPlay: playOrOpenBook } : {})}
+              />
             </div>
           ))}
         {musicSeen && musicLibraries.length > 0 && (
@@ -543,6 +566,8 @@ function Shell({
             overrides={overrides}
             hasMusic={musicLibraries.length > 0}
             hasMusicVideos={sections.status === 'ready' && sections.data.musicvideos.length > 0}
+            hasBooks={sections.status === 'ready' && sections.data.books.length > 0}
+            onOpenBook={openBook}
             onOpenMovie={openMovie}
             onOpenShow={openShow}
             onOpenCollection={openCollection}
@@ -577,6 +602,19 @@ function Shell({
             />
           </Suspense>
         )}
+        {route.page === 'book' && (
+          <Suspense fallback={<PageLoading />}>
+            <BookPage
+              key={route.id}
+              session={session}
+              id={route.id}
+              onRead={(book) => go({ page: 'read', id: book.id })}
+              onListen={listen}
+              onBack={() => back({ page: 'section', section: 'books' })}
+              onChanged={remember}
+            />
+          </Suspense>
+        )}
         {route.page === 'settings' && (
           <Suspense fallback={<PageLoading />}>
             <SettingsPage session={session} onBack={() => back(homeRoute)} onSignOut={onSignOut} onStats={() => go({ page: 'stats' })} onAdmin={() => go({ page: 'admin' })} />
@@ -606,6 +644,11 @@ function Shell({
         }
       />
       <MiniPlayer session={session} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
+      {route.page === 'read' && (
+        <Suspense fallback={<PlayerLoading />}>
+          <BookReader key={route.id} session={session} id={route.id} onExit={() => back({ page: 'book', id: route.id })} />
+        </Suspense>
+      )}
       {route.page === 'play' && (
         <Suspense fallback={<PlayerLoading />}>
           <PlayerRoute

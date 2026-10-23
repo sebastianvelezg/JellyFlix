@@ -291,6 +291,28 @@ export const MusicVideoIcon = () => (
     <circle cx="13.6" cy="14.3" r="1.4" fill="currentColor" stroke="none" />
   </Icon>
 )
+
+/** An open book: books and audiobooks. */
+export const BookIcon = () => (
+  <Icon>
+    <path d="M12 6.5C10.4 5.2 8.2 4.5 4.5 4.5v13c3.7 0 5.9.7 7.5 2 1.6-1.3 3.8-2 7.5-2v-13c-3.7 0-5.9.7-7.5 2z" />
+    <path d="M12 6.5v13" />
+  </Icon>
+)
+export const DownloadIcon = () => (
+  <Icon>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </Icon>
+)
+
+export const HeadphonesIcon = () => (
+  <Icon>
+    <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+    <rect x="3.5" y="14" width="4" height="6" rx="1.5" fill="currentColor" stroke="none" />
+    <rect x="16.5" y="14" width="4" height="6" rx="1.5" fill="currentColor" stroke="none" />
+  </Icon>
+)
+
 export const PencilIcon = () => (
   <Icon>
     <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z" />

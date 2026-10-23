@@ -221,22 +221,24 @@ class JellyfinRepository(context: Context) {
         val anime = ArrayList<Lib>()
         val music = ArrayList<Lib>()
         val musicVideos = ArrayList<Lib>()
+        val books = ArrayList<Lib>()
         for (view in views) {
             val lib = Lib(view.id, view.name.orEmpty())
             when (view.collectionType) {
                 CollectionType.MOVIES -> movies.add(lib)
                 CollectionType.MUSIC -> music.add(lib)
                 CollectionType.MUSICVIDEOS -> musicVideos.add(lib)
+                CollectionType.BOOKS -> books.add(lib)
                 CollectionType.TVSHOWS -> if (animeName.containsMatchIn(lib.name)) anime.add(lib) else series.add(lib)
                 else -> Unit
             }
         }
-        return Libraries(movies, series, anime, music, musicVideos)
+        return Libraries(movies, series, anime, music, musicVideos, books)
     }
 
     private val richFields = listOf(ItemFields.OVERVIEW, ItemFields.GENRES)
 
-    private suspend fun listRecent(api: ApiClient, userId: UUID, kind: BaseItemKind, libs: List<Lib>, limit: Int, rich: Boolean) =
+    private suspend fun listRecent(api: ApiClient, userId: UUID, kinds: List<BaseItemKind>, libs: List<Lib>, limit: Int, rich: Boolean) =
         interleave(
             coroutineScope {
                 libs.map { lib ->
@@ -245,7 +247,7 @@ class JellyfinRepository(context: Context) {
                             api.libraryApi.getItems(
                                 userId = userId,
                                 parentId = lib.id,
-                                includeItemTypes = listOf(kind),
+                                includeItemTypes = kinds,
                                 recursive = true,
                                 sortBy = listOf(ItemSortBy.DATE_CREATED),
                                 sortOrder = listOf(SortOrder.DESCENDING),
@@ -253,7 +255,7 @@ class JellyfinRepository(context: Context) {
                                 fields = if (rich) richFields else null,
                                 enableTotalRecordCount = false,
                             ).content.items.map { toItem(api, it) }
-                        }.onFailure { Log.w(TAG, "Could not load the newest $kind", it) }.getOrDefault(emptyList())
+                        }.onFailure { Log.w(TAG, "Could not load the newest $kinds", it) }.getOrDefault(emptyList())
                     }
                 }.map { it.await() }
             },
@@ -302,11 +304,15 @@ class JellyfinRepository(context: Context) {
     private val recents = InFlight<Triple<UUID, BaseItemKind, List<Lib>>, List<MediaItem>>()
 
     private suspend fun recent(api: ApiClient, userId: UUID, kind: BaseItemKind, libs: List<Lib>): List<MediaItem> =
-        recents.share(Triple(userId, kind, libs)) { listRecent(api, userId, kind, libs, RECENT_LIMIT, rich = true) }
+        recents.share(Triple(userId, kind, libs)) { listRecent(api, userId, listOf(kind), libs, RECENT_LIMIT, rich = true) }
 
     suspend fun latest(session: Session, kind: BaseItemKind, libs: List<Lib>, limit: Int = RECENT_LIMIT): List<MediaItem> =
         if (limit <= RECENT_LIMIT) recent(api(session), userId(session), kind, libs).take(limit)
-        else listRecent(api(session), userId(session), kind, libs, limit, rich = false)
+        else listRecent(api(session), userId(session), listOf(kind), libs, limit, rich = false)
+
+    /** The newest books and audiobooks, for the Home row. */
+    suspend fun latestBooks(session: Session, libs: List<Lib>): List<MediaItem> =
+        listRecent(api(session), userId(session), listOf(BaseItemKind.BOOK, BaseItemKind.AUDIO_BOOK), libs, RECENT_LIMIT, rich = false)
 
     /**
      * Movies and episodes (and music videos, when the account has a library of them) you stopped half-way, most recently watched
@@ -382,7 +388,16 @@ class JellyfinRepository(context: Context) {
         return null
     }
 
-    /** One page of a library list (movies, series, anime or collections) in the chosen order. */
+    /** The kinds of item a library list of this section holds (a Books library holds books and audiobooks). */
+    private fun kindsOf(section: Section): List<BaseItemKind> = when (section) {
+        Section.Movies -> listOf(BaseItemKind.MOVIE)
+        Section.Collections -> listOf(BaseItemKind.BOX_SET)
+        Section.MusicVideos -> listOf(BaseItemKind.MUSIC_VIDEO)
+        Section.Books -> listOf(BaseItemKind.BOOK, BaseItemKind.AUDIO_BOOK)
+        Section.Series, Section.Anime -> listOf(BaseItemKind.SERIES)
+    }
+
+    /** One page of a library list (movies, series, anime, music videos, books or collections) in the chosen order. */
     suspend fun library(
         session: Session,
         section: Section,
@@ -400,17 +415,11 @@ class JellyfinRepository(context: Context) {
             SortOption.Year -> listOf(ItemSortBy.PRODUCTION_YEAR, ItemSortBy.SORT_NAME) to SortOrder.DESCENDING
             SortOption.Rating -> listOf(ItemSortBy.COMMUNITY_RATING, ItemSortBy.SORT_NAME) to SortOrder.DESCENDING
         }
-        val kind = when (section) {
-            Section.Movies -> BaseItemKind.MOVIE
-            Section.Collections -> BaseItemKind.BOX_SET
-            Section.MusicVideos -> BaseItemKind.MUSIC_VIDEO
-            else -> BaseItemKind.SERIES
-        }
         val result = api.libraryApi.getItems(
             userId = userId(session),
             // With one library of this kind ask for it; with several (or collections, which have a hidden library) ask everywhere.
             parentId = libs.singleOrNull()?.id,
-            includeItemTypes = listOf(kind),
+            includeItemTypes = kindsOf(section),
             recursive = true,
             sortBy = sortBy,
             sortOrder = listOf(order),
@@ -430,16 +439,10 @@ class JellyfinRepository(context: Context) {
 
     /** How many titles sort before [letter] ("B" counts every title that starts with A, a digit or a symbol): where that letter starts. */
     suspend fun libraryCountBefore(session: Session, section: Section, libs: List<Lib>, letter: String, narrowedBy: LibraryFilters = LibraryFilters()): Int {
-        val kind = when (section) {
-            Section.Movies -> BaseItemKind.MOVIE
-            Section.Collections -> BaseItemKind.BOX_SET
-            Section.MusicVideos -> BaseItemKind.MUSIC_VIDEO
-            else -> BaseItemKind.SERIES
-        }
         return api(session).libraryApi.getItems(
             userId = userId(session),
             parentId = libs.singleOrNull()?.id,
-            includeItemTypes = listOf(kind),
+            includeItemTypes = kindsOf(section),
             recursive = true,
             nameLessThan = letter,
             limit = 0,
@@ -464,16 +467,10 @@ class JellyfinRepository(context: Context) {
 
     /** The genres and age ratings the titles of a library have, from one scan of the library (slow on a big one, so asked for last). */
     suspend fun filterOptions(session: Session, section: Section, libs: List<Lib>): FilterOptions {
-        val kind = when (section) {
-            Section.Movies -> BaseItemKind.MOVIE
-            Section.Collections -> BaseItemKind.BOX_SET
-            Section.MusicVideos -> BaseItemKind.MUSIC_VIDEO
-            else -> BaseItemKind.SERIES
-        }
         val found = api(session).filterApi.getQueryFiltersLegacy(
             userId = userId(session),
             parentId = libs.singleOrNull()?.id,
-            includeItemTypes = listOf(kind),
+            includeItemTypes = kindsOf(section),
         ).content
         return FilterOptions(
             genres = found.genres.orEmpty().filter { it.isNotBlank() }.sortedBy { it.lowercase() },
@@ -688,7 +685,7 @@ class JellyfinRepository(context: Context) {
         return api.libraryApi.getItems(
             userId = userId(session),
             searchTerm = term,
-            includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES, BaseItemKind.BOX_SET, BaseItemKind.MUSIC_VIDEO),
+            includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES, BaseItemKind.BOX_SET, BaseItemKind.MUSIC_VIDEO, BaseItemKind.BOOK, BaseItemKind.AUDIO_BOOK),
             recursive = true,
             limit = 40,
             enableTotalRecordCount = false,
@@ -1508,12 +1505,16 @@ class JellyfinRepository(context: Context) {
         fun backdrop(width: Int): String? = dto.backdropImageTags?.firstOrNull()?.let {
             api.imageApi.getItemImageUrl(itemId = dto.id, imageType = ImageType.BACKDROP, maxWidth = width, tag = it)
         }
-        val artist = if (dto.type == BaseItemKind.MUSIC_VIDEO) dto.artists.orEmpty().filter { it.isNotBlank() }.joinToString(", ").ifBlank { null } else null
+        val isBook = dto.type == BaseItemKind.BOOK || dto.type == BaseItemKind.AUDIO_BOOK
+        val artist = if (dto.type == BaseItemKind.MUSIC_VIDEO || isBook) dto.artists.orEmpty().filter { it.isNotBlank() }.joinToString(", ").ifBlank { dto.albumArtist } else null
+        val format = if (dto.type == BaseItemKind.BOOK) (dto.container?.substringBefore(',')?.trim()?.lowercase()?.ifBlank { null }) else null
         val label = if (isEpisode) {
             val season = dto.parentIndexNumber
             val number = dto.indexNumber
             val code = if (season != null && number != null) "S$season E$number" else null
             listOfNotNull(code, dto.name).joinToString(" · ")
+        } else if (isBook) {
+            listOfNotNull(if (dto.type == BaseItemKind.AUDIO_BOOK) artist else format?.uppercase(), dto.productionYear?.toString()).joinToString(" · ")
         } else if (artist != null) {
             listOfNotNull(artist, dto.productionYear?.toString()).joinToString(" · ")
         } else {
@@ -1549,6 +1550,8 @@ class JellyfinRepository(context: Context) {
             playsAs = playsAsBySource(dto),
             tmdbCollection = dto.providerIds?.get("TmdbCollection")?.takeIf { it.isNotBlank() },
             artist = artist,
+            format = format,
+            runtimeMs = dto.runTimeTicks?.div(10_000),
             cast = dto.people.orEmpty().filter { it.type == PersonKind.ACTOR || it.type == PersonKind.GUEST_STAR }.take(24).map {
                 CastMember(
                     id = it.id,

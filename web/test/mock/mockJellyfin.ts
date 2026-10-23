@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import type { Duplex } from 'node:stream'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { cbzBytes, epubBytes, pdfBytes } from './bookFiles.ts'
 import {
   MUSIC_LIBRARY,
   musicDto,
@@ -44,6 +45,12 @@ export interface MockOptions {
   animeCount?: number
   /** Videos in a "Music videos" library (each by one of three artists). 0 = no such library. */
   musicVideos?: number
+  /** Books in a "Books" library: bk0001 is an EPUB, then a PDF, a comic (CBZ) and a Mobi file, and so on. 0 = none. */
+  books?: number
+  /** Audiobooks in the same library (the 30 seconds of audio of the test media). */
+  audiobooks?: number
+  /** Answer the download of a book's file with "not allowed" (an account that may not download). */
+  noDownload?: boolean
   /** Make /Sessions/Playing* fail, to prove reporting errors do not break playback. */
   failReporting?: boolean
   /**
@@ -371,8 +378,10 @@ function episodeDto(show: string, season: number, episode: number, user: UserSta
 }
 
 /** The DTO for any id the mock knows (movie, series, season or episode), or undefined. */
-function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; trickplay?: boolean }, full = false) {
+function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; books?: number; audiobooks?: number; trickplay?: boolean }, full = false) {
   const { movieCount } = counts
+  if (BOOK_ID.test(id)) return Number(id.slice(2)) <= (counts.books ?? 0) ? bookDto(Number(id.slice(2)), user, full) : undefined
+  if (AUDIOBOOK_ID.test(id)) return Number(id.slice(2)) <= (counts.audiobooks ?? 0) ? audiobookDto(Number(id.slice(2)), user, full) : undefined
   if (MUSIC_VIDEO_ID.test(id)) {
     const at = Number(id.slice(2))
     return at >= 1 && at <= (counts.musicVideos ?? 0) ? musicVideoDto(at, user, full) : undefined
@@ -462,6 +471,67 @@ function musicVideoDto(n: number, user: UserState, full = false) {
   }
 }
 
+// ---- books: "bk0001"... and audiobooks: "ab0001"... in the "Books" library ------------------------------
+
+const BOOK_ID = /^bk\d{4}$/
+const AUDIOBOOK_ID = /^ab\d{4}$/
+const bookId = (n: number) => `bk${String(n).padStart(4, '0')}`
+const audiobookId = (n: number) => `ab${String(n).padStart(4, '0')}`
+const BOOK_FORMATS = ['epub', 'pdf', 'cbz', 'mobi'] as const
+const bookFormat = (n: number) => BOOK_FORMATS[(n - 1) % BOOK_FORMATS.length] as (typeof BOOK_FORMATS)[number]
+const bookName = (n: number) => `Test Book ${String(n).padStart(3, '0')}`
+const audiobookName = (n: number) => `Test Audiobook ${String(n).padStart(3, '0')}`
+
+function bookFile(n: number): { bytes: Uint8Array; type: string } {
+  const format = bookFormat(n)
+  if (format === 'epub') return { bytes: epubBytes(bookName(n)), type: 'application/epub+zip' }
+  if (format === 'pdf') return { bytes: pdfBytes(), type: 'application/pdf' }
+  if (format === 'cbz') return { bytes: cbzBytes(), type: 'application/vnd.comicbook+zip' }
+  return { bytes: new TextEncoder().encode('not a book we can read'), type: 'application/x-mobipocket-ebook' }
+}
+
+function bookDto(n: number, user: UserState, full = false) {
+  const id = bookId(n)
+  return {
+    Id: id,
+    Name: bookName(n),
+    SortName: bookName(n).toLowerCase(),
+    ProductionYear: 1980 + (n % 40),
+    Type: 'Book',
+    Container: bookFormat(n),
+    DateCreated: new Date(Date.UTC(2024, 4, 1) + n * 86_400_000).toISOString(),
+    Genres: [GENRES[n % 3]],
+    ImageTags: { Primary: 'tag1' },
+    UserData: userData(id, user),
+    ...(full
+      ? {
+          Overview: `The story of book ${n}.`,
+          People: [{ Id: 'au1', Name: `Test Author ${(n % 2) + 1}`, Type: 'Author' }],
+          MediaSources: [{ Id: `ms-${id}`, Container: bookFormat(n), Size: 2_400_000 }],
+        }
+      : {}),
+  }
+}
+
+function audiobookDto(n: number, user: UserState, full = false) {
+  const id = audiobookId(n)
+  return {
+    Id: id,
+    Name: audiobookName(n),
+    SortName: audiobookName(n).toLowerCase(),
+    ProductionYear: 2000 + (n % 20),
+    Type: 'AudioBook',
+    Container: 'mp3',
+    Artists: [`Test Author ${(n % 2) + 1}`],
+    RunTimeTicks: 30 * TICKS,
+    DateCreated: new Date(Date.UTC(2024, 5, 1) + n * 86_400_000).toISOString(),
+    Genres: [GENRES[n % 3]],
+    ImageTags: { Primary: 'tag1' },
+    UserData: userData(id, user),
+    ...(full ? { Overview: `The audiobook ${n}, read aloud.`, People: [{ Id: 'au1', Name: `Test Author ${(n % 2) + 1}`, Type: 'Author' }] } : {}),
+  }
+}
+
 function movieDto(n: number, user: UserState) {
   const id = movieId(n)
   return {
@@ -535,8 +605,8 @@ const STREAMS = [
 ]
 
 export async function startMockJellyfin(options: MockOptions = {}): Promise<MockServer> {
-  const opts = { username: 'tester', password: 'secret', movieCount: 130, playMode: 'direct', seriesCount: 0, animeCount: 0, musicVideos: 0, musicArtists: 0, collections: 0, ...options } as Required<
-    Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicVideos' | 'musicArtists' | 'collections'>
+  const opts = { username: 'tester', password: 'secret', movieCount: 130, playMode: 'direct', seriesCount: 0, animeCount: 0, musicVideos: 0, books: 0, audiobooks: 0, musicArtists: 0, collections: 0, ...options } as Required<
+    Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicVideos' | 'books' | 'audiobooks' | 'musicArtists' | 'collections'>
   > &
     MockOptions
   const requests: RecordedRequest[] = []
@@ -690,7 +760,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       Name: dto?.Name ?? id,
       SeriesName: dto?.SeriesName,
       RunTimeTicks: dto?.RunTimeTicks ?? DURATION_SECONDS * TICKS,
-      MediaType: TRACK_ID.test(id) ? 'Audio' : 'Video',
+      MediaType: TRACK_ID.test(id) || AUDIOBOOK_ID.test(id) ? 'Audio' : 'Video',
     }
   }
 
@@ -1012,6 +1082,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         ...(opts.noTvLibrary ? [] : [folder('lib-shows', 'Shows', 'tvshows', '/media/shows')]),
         ...(opts.animeCount > 0 ? [folder('lib-anime', 'Anime', 'tvshows', '/media/anime')] : []),
         ...(opts.musicVideos > 0 ? [folder('lib-musicvideos', 'Music videos', 'musicvideos', '/media/musicvideos')] : []),
+        ...(opts.books + opts.audiobooks > 0 ? [folder('lib-books', 'Books', 'books', '/media/books')] : []),
         ...(opts.musicArtists > 0 ? [folder(MUSIC_LIBRARY, 'Music', 'music', '/media/music')] : []),
       ]
       return json(res, 200, folders)
@@ -1145,6 +1216,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       const items: Array<{ Id: string; Name: string; CollectionType: string }> = opts.noTvLibrary ? [] : [{ Id: 'lib-shows', Name: 'Shows', CollectionType: 'tvshows' }]
       if (opts.animeCount > 0) items.push({ Id: 'lib-anime', Name: 'Anime', CollectionType: 'tvshows' })
       if (opts.musicVideos > 0) items.push({ Id: 'lib-musicvideos', Name: 'Music videos', CollectionType: 'musicvideos' })
+      if (opts.books + opts.audiobooks > 0) items.push({ Id: 'lib-books', Name: 'Books', CollectionType: 'books' })
       if (opts.musicArtists > 0) items.push({ Id: MUSIC_LIBRARY, Name: 'Music', CollectionType: 'music' })
       if (!opts.noMovieLibrary) items.unshift({ Id: 'lib-movies', Name: 'Movies', CollectionType: 'movies' })
       return json(res, 200, { Items: items, TotalRecordCount: items.length, StartIndex: 0 })
@@ -1157,7 +1229,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         return json(res, 200, { Items: found, TotalRecordCount: found.length, StartIndex: 0 })
       }
       // Like Jellyfin: looking items up by id works for every type; browsing needs a type (the client always sends one).
-      const types = list('includeItemTypes') ?? (ids ? ['Movie', 'Series', 'Season', 'Episode', 'MusicVideo'] : ['Movie'])
+      const types = list('includeItemTypes') ?? (ids ? ['Movie', 'Series', 'Season', 'Episode', 'MusicVideo', 'Book', 'AudioBook'] : ['Movie'])
       interface Row {
         id: string
         name: string
@@ -1215,6 +1287,15 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
             backdrop: false,
             people: [],
           })
+        }
+      }
+      for (const [type, count, idOf, nameOf] of [
+        ['Book', opts.books, bookId, bookName],
+        ['AudioBook', opts.audiobooks, audiobookId, audiobookName],
+      ] as const) {
+        if (!types.includes(type)) continue
+        for (let n = 1; n <= count; n += 1) {
+          rows.push({ id: idOf(n), name: nameOf(n).toLowerCase(), lib: 'lib-books', genre: GENRES[n % 3], year: (type === 'Book' ? 1980 : 2000) + (n % (type === 'Book' ? 40 : 20)), created: n, rating: 0, backdrop: false, people: [] })
         }
       }
       if (types.includes('BoxSet')) {
@@ -1352,6 +1433,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         const episode = EPISODE_ID.exec(id)
         if (episode) return wantsEpisodes && (!query.parentId || showLibrary(episode[1] as string) === query.parentId)
         if (MUSIC_VIDEO_ID.test(id)) return types.includes('MusicVideo') && (!query.parentId || query.parentId === 'lib-musicvideos')
+        if (AUDIOBOOK_ID.test(id)) return types.includes('AudioBook') && (!query.parentId || query.parentId === 'lib-books')
         return types.includes('Movie') && (!query.parentId || query.parentId === 'lib-movies')
       })
       const items = ids.slice(0, Number(query.limit ?? 12)).map((id) => dtoFor(id, user, opts))
@@ -1672,11 +1754,11 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       const id = playbackInfo[1] as string
       const dto = (body ?? {}) as { EnableDirectPlay?: boolean; AudioStreamIndex?: number; MediaSourceId?: string; MaxStreamingBitrate?: number }
       // Every video in the mock is a 12 Mbps file: a lower limit means the server has to convert it.
-      const overLimit = !TRACK_ID.test(id) && (dto.MaxStreamingBitrate ?? Infinity) < 12_000_000
+      const overLimit = !TRACK_ID.test(id) && !AUDIOBOOK_ID.test(id) && (dto.MaxStreamingBitrate ?? Infinity) < 12_000_000
       const direct = opts.playMode === 'direct' && dto.EnableDirectPlay !== false && !overLimit
       // Like a real server (verified against Jellyfin 12.2): the audio track is only honoured when the media source is named.
       const audio = dto.MediaSourceId ? (dto.AudioStreamIndex ?? 1) : 1
-      const isTrack = TRACK_ID.test(id)
+      const isTrack = TRACK_ID.test(id) || AUDIOBOOK_ID.test(id)
       const source: Record<string, unknown> = {
         Id: `ms-${id}`,
         ETag: 'etag1',
@@ -1769,6 +1851,17 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         savedLyrics.add(id)
         return json(res, 200, { Metadata: { IsSynced: true }, Lyrics: timedLyrics })
       }
+    }
+    // A book's own file, for reading or saving (an account may be forbidden to download).
+    const download = /^\/Items\/([^/]+)\/Download$/.exec(path)
+    if (download) {
+      if (!needAuth()) return
+      if (opts.noDownload) return void res.writeHead(403).end()
+      const id = download[1] as string
+      const file = BOOK_ID.test(id) && Number(id.slice(2)) <= opts.books ? bookFile(Number(id.slice(2))) : undefined
+      if (!file) return void res.writeHead(404).end()
+      res.writeHead(200, { 'Content-Type': file.type, 'Content-Length': file.bytes.length })
+      return void res.end(Buffer.from(file.bytes))
     }
     const audioStream = /^\/Audio\/([^/]+)\/stream$/.exec(path)
     if (audioStream) {

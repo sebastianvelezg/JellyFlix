@@ -81,6 +81,7 @@ enum class Tab(@StringRes val label: Int) {
     Series(R.string.nav_series),
     Anime(R.string.nav_anime),
     MusicVideos(R.string.nav_music_videos),
+    Books(R.string.nav_books),
     Music(R.string.nav_music),
     Collections(R.string.nav_collections),
     Search(R.string.nav_search),
@@ -245,6 +246,7 @@ class HomeState {
     var newSeries by mutableStateOf<List<MediaItem>>(emptyList())
     var newAnime by mutableStateOf<List<MediaItem>>(emptyList())
     var newMusicVideos by mutableStateOf<List<MediaItem>>(emptyList())
+    var newBooks by mutableStateOf<List<MediaItem>>(emptyList())
     var collections by mutableStateOf<List<MediaItem>>(emptyList())
     var watchLater by mutableStateOf<List<MediaItem>>(emptyList())
     var playlists by mutableStateOf<List<VideoPlaylist>>(emptyList())
@@ -404,6 +406,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (l == null || l.series.isNotEmpty()) add(Tab.Series)
                 if (l != null && l.anime.isNotEmpty()) add(Tab.Anime)
                 if (l != null && l.musicVideos.isNotEmpty()) add(Tab.MusicVideos)
+                if (l != null && l.books.isNotEmpty()) add(Tab.Books)
                 if (l != null && l.music.isNotEmpty()) add(Tab.Music)
                 if (hasCollections) add(Tab.Collections)
                 add(Tab.Search)
@@ -427,6 +430,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val series = LibraryState(Section.Series)
     val anime = LibraryState(Section.Anime)
     val musicVideos = LibraryState(Section.MusicVideos)
+    val books = LibraryState(Section.Books)
     val collectionList = LibraryState(Section.Collections)
 
     // Music
@@ -556,6 +560,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 home.newSeries = cached.newSeries
                 home.newAnime = cached.newAnime
                 home.newMusicVideos = cached.newMusicVideos
+                home.newBooks = cached.newBooks
                 home.collections = cached.collections
             }
         }
@@ -654,7 +659,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         hasCollections = false
         pages.clear()
         resetHome()
-        for (lib in listOf(movies, series, anime, musicVideos, collectionList)) resetLibrary(lib)
+        for (lib in listOf(movies, series, anime, musicVideos, books, collectionList)) resetLibrary(lib)
         results = null
         musicResults = emptyList<Album>() to emptyList()
         query = ""
@@ -671,6 +676,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         home.newSeries = emptyList()
         home.newAnime = emptyList()
         home.newMusicVideos = emptyList()
+        home.newBooks = emptyList()
         home.collections = emptyList()
         home.watchLater = emptyList()
         home.playlists = emptyList()
@@ -725,7 +731,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Section.Movies -> home.newMovies
             Section.Series -> home.newSeries
             Section.Anime -> home.newAnime
-            Section.MusicVideos, Section.Collections -> return emptyList()
+            Section.MusicVideos, Section.Books, Section.Collections -> return emptyList()
         }
         return newest.filter { it.backdropUrl != null }.take(8)
     }
@@ -735,6 +741,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         Tab.Series -> series
         Tab.Anime -> anime
         Tab.MusicVideos -> musicVideos
+        Tab.Books -> books
         Tab.Collections -> collectionList
         else -> null
     }
@@ -746,6 +753,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Section.Series -> l.series
             Section.Anime -> l.anime
             Section.MusicVideos -> l.musicVideos
+            Section.Books -> l.books
             Section.Collections -> emptyList()
         }
     }
@@ -772,7 +780,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }.getOrDefault(false)
                 }
             }
-            if (!l.hasVideo) {
+            if (!l.hasTitles) {
                 home.lineup = emptyList()
                 return@launchSafe
             }
@@ -798,6 +806,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             launchSafe {
                 home.newMusicVideos = if (l.musicVideos.isEmpty()) emptyList() else io { repo.latest(s, BaseItemKind.MUSIC_VIDEO, l.musicVideos) }
+                saveHomeLater()
+            }
+            launchSafe {
+                home.newBooks = if (l.books.isEmpty()) emptyList() else runCatching { io { repo.latestBooks(s, l.books) } }.getOrDefault(home.newBooks)
                 saveHomeLater()
             }
             launchSafe {
@@ -861,7 +873,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             delay(1500)
             val snapshot = HomeSnapshot(
                 l, home.lineup.orEmpty(), home.continueRow, home.nextUp, home.newMovies, home.newSeries, home.newAnime, home.collections,
-                home.newMusicVideos,
+                home.newMusicVideos, home.newBooks,
             )
             io { HomeCache.save(getApplication(), s, snapshot) }
         }
@@ -958,7 +970,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 // A library list needs the libraries first (a restored session reads them on its own).
                 val known = libs ?: io { repo.libraries(s) }.also { libs = it }
-                val where = libsFor(lib.section).takeIf { known.hasVideo } ?: emptyList()
+                val where = libsFor(lib.section).takeIf { known.hasTitles } ?: emptyList()
                 val page = io { repo.library(s, lib.section, where, sort, lib.startIndex + lib.items.size, PAGE_SIZE, narrowedBy = lib.filters) }
                 // The sort may have changed (or a letter been chosen) while this was loading; if so the result belongs to the old list.
                 if (sort == lib.sort && generation == lib.generation) {
@@ -982,7 +994,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (lib.sort != SortOption.Name) return
         lib.letter = letter.takeIf { it != "#" }
         val generation = ++lib.generation
-        val where = libsFor(lib.section).takeIf { known.hasVideo } ?: emptyList()
+        val where = libsFor(lib.section).takeIf { known.hasTitles } ?: emptyList()
         launchSafe {
             try {
                 val index = if (letter == "#") 0 else io { repo.libraryCountBefore(s, lib.section, where, letter, lib.filters) }
@@ -1174,8 +1186,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         nowPlayingPanel = panel
     }
 
-    fun playSongs(songs: List<Song>, start: Int = 0, shuffle: Boolean = false) {
-        ensureMusic()?.play(songs, start, shuffle)
+    fun playSongs(songs: List<Song>, start: Int = 0, shuffle: Boolean = false, startMs: Long = 0L) {
+        ensureMusic()?.play(songs, start, shuffle, startMs)
+    }
+
+    /** Plays an audiobook in the music player, from [startMs] (where it was left by default). */
+    fun listen(book: MediaItem, startMs: Long = book.resumeMs) {
+        if (book.isAudiobook) playSongs(listOf(book.toAudiobookSong()), 0, false, startMs)
     }
 
     fun playAlbum(album: Album, shuffle: Boolean = false) {
@@ -1289,12 +1306,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         home.newSeries = home.newSeries.p()
         home.newAnime = home.newAnime.p()
         home.newMusicVideos = home.newMusicVideos.p()
+        home.newBooks = home.newBooks.p()
         home.collections = home.collections.p()
         home.watchLater = home.watchLater.p()
         home.favorites = home.favorites.p()
         home.sinceVisit = home.sinceVisit.p()
         home.because = home.because?.let { (seed, similar) -> seed to similar.p() }
-        for (lib in listOf(movies, series, anime, musicVideos, collectionList)) {
+        for (lib in listOf(movies, series, anime, musicVideos, books, collectionList)) {
             for (i in lib.items.indices) if (lib.items[i].id == id) lib.items[i] = change(lib.items[i])
         }
         for (page in pages) {
@@ -1309,6 +1327,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val choices = ArrayList<DialogChoice>()
         choices += DialogChoice(str(R.string.menu_open)) { open(item) }
         val watchable = item.kind == BaseItemKind.MOVIE || item.kind == BaseItemKind.SERIES || item.kind == BaseItemKind.EPISODE || item.kind == BaseItemKind.MUSIC_VIDEO
+        val markable = watchable || item.isBook || item.isAudiobook
         if (item.isPlayable && item.resumeMs >= MIN_RESUME_MS) choices += DialogChoice(str(R.string.menu_start_over)) { play(item, 0) }
         if (inList != null) {
             val entries = inList.state.entries.orEmpty()
@@ -1318,7 +1337,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (at > 0) choices += DialogChoice(str(R.string.menu_move_earlier)) { moveInPlaylist(inList.state, inList.entry, -1) }
             if (at in 0 until entries.lastIndex) choices += DialogChoice(str(R.string.menu_move_later)) { moveInPlaylist(inList.state, inList.entry, +1) }
         }
-        if (watchable) {
+        if (markable) {
             choices += DialogChoice(str(if (item.played) R.string.menu_mark_unwatched else R.string.menu_mark_watched)) { markPlayed(item, !item.played) }
         }
         choices += DialogChoice(str(if (item.favorite) R.string.menu_unfavorite else R.string.menu_favorite)) { markFavorite(item, !item.favorite) }

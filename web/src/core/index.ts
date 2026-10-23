@@ -67,6 +67,7 @@ export {
   shuffle,
   posterUrl,
   searchMovies,
+  searchBooks,
   searchMusicVideos,
   searchShows,
   searchTitles,
@@ -430,3 +431,15 @@ export {
 } from './playbackReporting'
 export { MONTHS_SHOWN, STATS_LIMIT, buildStats, getWatchedTitles, type MonthStat, type WatchStats, type WatchedTitle, type WatchedTitles } from './stats'
 export { getTrickplay, pickTrickplay, trickplaySheetUrl, trickplayTile, type TrickplayInfo, type TrickplayTile } from './trickplay'
+export {
+  audiobookStart,
+  audiobookTrack,
+  bookCoverUrl,
+  bookKindLabel,
+  getBooks,
+  downloadBookFile,
+  readableFormat,
+  type ReadableFormat,
+} from './books'
+export { openComic, type ComicPage } from './comic'
+export { textOf, unpack } from './zip'

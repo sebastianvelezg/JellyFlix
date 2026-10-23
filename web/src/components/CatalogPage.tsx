@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react'
 import {
   FILTER_LABELS,
   getContinueEpisodes,
+  getBooks,
   getContinueWatching,
   getFeaturedPool,
   getNextUp,
@@ -27,7 +28,7 @@ import {
   type TitleKind,
   type WatchFilter,
 } from '../core'
-import { readBrowsePrefs, readUiPrefs, writeBrowsePrefs } from '../platform/web/prefs'
+import { BOOK_FINISHED_PERCENT, readAllBookProgress, readBrowsePrefs, readUiPrefs, writeBrowsePrefs } from '../platform/web/prefs'
 import { CollectionsRow } from './CollectionCard'
 import { HeroCarousel, HeroSkeleton } from './Hero'
 import { FiltersButton, FiltersPanel } from './LibraryFilters'
@@ -63,6 +64,14 @@ export interface CatalogCommon {
 
 /** Wording that differs between movies, series and music videos (built when needed, so it follows the language). */
 function copyFor(kind: TitleKind): { all: string; noun: string; surprise: string; nothingToPick: string } {
+  if (kind === 'book') {
+    return {
+      all: t('All books'),
+      noun: t('books'),
+      surprise: t('Open a random book you have not finished yet'),
+      nothingToPick: t('There are no books to pick from.'),
+    }
+  }
   if (kind === 'musicvideo') {
     return {
       all: t('All music videos'),
@@ -89,6 +98,7 @@ function copyFor(kind: TitleKind): { all: string; noun: string; surprise: string
 
 function noLibrariesText(kind: TitleKind, section: Section): string {
   if (kind === 'movie') return t('This account has no movie libraries. Ask the server admin to give it access to one.')
+  if (kind === 'book') return t('This account has no book libraries. Add one in Jellyfin (a library of type Books) and it will appear here.')
   if (kind === 'musicvideo') return t('This account has no music video libraries. Add one in Jellyfin (a library of type Music videos) and it will appear here.')
   return section === 'anime'
     ? t('This account has no anime libraries. Add one in Jellyfin (a TV library with “Anime” in its name) and it will appear here.')
@@ -96,17 +106,19 @@ function noLibrariesText(kind: TitleKind, section: Section): string {
 }
 
 function emptyLibraryText(kind: TitleKind, library: string): string {
-  return kind === 'movie' || kind === 'musicvideo'
+  return kind === 'movie' || kind === 'musicvideo' || kind === 'book'
     ? kind === 'movie'
       ? t('No movies in “{library}” yet.', { library })
-      : t('No music videos in “{library}” yet.', { library })
+      : kind === 'book'
+        ? t('No books in “{library}” yet.', { library })
+        : t('No music videos in “{library}” yet.', { library })
     : t('Nothing in “{library}” yet. If Jellyfin is still scanning this library, titles will appear here as soon as it finds them.', { library })
 }
 
-const kindOf = (section: Section): TitleKind => (section === 'movies' ? 'movie' : section === 'musicvideos' ? 'musicvideo' : 'series')
+const kindOf = (section: Section): TitleKind => (section === 'movies' ? 'movie' : section === 'musicvideos' ? 'musicvideo' : section === 'books' ? 'book' : 'series')
 
 /**
- * The home page of one section (movies, series, anime or music videos): a featured banner, rows, and the full
+ * The home page of one section (movies, series, anime, music videos or books): a featured banner, rows, and the full
  * library with sort/filter controls. Its libraries come from the app (they are needed for the header too).
  */
 export function CatalogPage({
@@ -261,6 +273,7 @@ function LibraryView({
                 onOpenSeries={onOpenSeries}
               />
             )}
+            {kind === 'book' && <ReadingRow key={`reading-${library.id}`} session={session} playbackVersion={playbackVersion} overrides={overrides} onOpen={onOpen} />}
             {recent.status === 'ready' && recent.data.length > 0 && (
               <Row title={t('Recently added')}>
                 {recent.data.map((m) => (
@@ -530,6 +543,30 @@ function GenreRow({
   )
 }
 
+/** "Continue reading": the books you opened in the reader and did not finish, from what this browser remembers (the server keeps no place in a book). */
+function ReadingRow({ session, playbackVersion, overrides, onOpen }: Pick<CatalogCommon, 'session' | 'playbackVersion' | 'overrides' | 'onOpen'>) {
+  // `playbackVersion` is part of the callback identity so the row is read again after the reader is closed.
+  const load = useCallback(async () => {
+    const saved = readAllBookProgress().filter(([, progress]) => progress.percent > 0 && progress.percent < BOOK_FINISHED_PERCENT).slice(0, 12)
+    const found = await getBooks(session, saved.map(([id]) => id))
+    const books = saved.flatMap(([id, progress]) => {
+      const book = found.find((b) => b.id === id)
+      // The picture's bar shows how far you are: the percent stands in for a position in a length of 100 000.
+      return book && book.book === 'book' ? [{ ...book, resumeTicks: progress.percent * 1000, runtimeTicks: 100_000 }] : []
+    })
+    return { books, playbackVersion }
+  }, [session, playbackVersion])
+  const { state } = useSwr(swrKey(swrScope(session), 'reading-books'), load, { fresh: 0 })
+  if (state.status !== 'ready' || state.data.books.length === 0) return null
+  return (
+    <Row title={t('Continue reading')}>
+      {state.data.books.map((m) => (
+        <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} />
+      ))}
+    </Row>
+  )
+}
+
 function ContinueRow({
   kind,
   session,
@@ -537,13 +574,13 @@ function ContinueRow({
   overrides,
   onPlay,
   onOpen,
-}: Pick<CatalogCommon, 'session' | 'playbackVersion' | 'overrides' | 'onPlay' | 'onOpen'> & { kind: 'movie' | 'musicvideo' }) {
+}: Pick<CatalogCommon, 'session' | 'playbackVersion' | 'overrides' | 'onPlay' | 'onOpen'> & { kind: 'movie' | 'musicvideo' | 'book' }) {
   // `playbackVersion` is part of the callback identity so the row reloads after playback ends.
   const load = useCallback(
     () => getContinueWatching(session, undefined, kind).then((rows) => ({ rows, playbackVersion })),
     [session, kind, playbackVersion],
   )
-  const { state } = useSwr(swrKey(swrScope(session), kind === 'movie' ? 'continue-movies' : 'continue-musicvideos'), load, { fresh: 0 })
+  const { state } = useSwr(swrKey(swrScope(session), `continue-${kind}s`), load, { fresh: 0 })
   if (state.status !== 'ready') return null
   const movies = state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0)
   if (movies.length === 0) return null
@@ -618,7 +655,8 @@ function FavoritesRow({
   if (state.status !== 'ready') return null
   // Favorites toggled on a title page show up here (and removed ones disappear) without reloading.
   const known = new Set(state.data.map((m) => m.id))
-  const wantedKind = (m: Movie) => !isEpisode(m) && !!m.isSeries === (kind === 'series') && !!m.musicVideo === (kind === 'musicvideo')
+  const wantedKind = (m: Movie) =>
+    !isEpisode(m) && !!m.isSeries === (kind === 'series') && !!m.musicVideo === (kind === 'musicvideo') && !!m.book === (kind === 'book')
   const added = Object.values(overrides).filter((m) => m.favorite && !known.has(m.id) && wantedKind(m))
   const movies = [...added, ...state.data.map((m) => overrides[m.id] ?? m)].filter((m) => m.favorite)
   if (movies.length === 0) return null

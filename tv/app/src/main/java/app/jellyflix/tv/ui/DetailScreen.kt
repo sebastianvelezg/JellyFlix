@@ -129,6 +129,10 @@ private fun Actions(vm: AppViewModel, state: DetailState, playButton: FocusReque
     val item = state.full
     val isSeries = item.kind == BaseItemKind.SERIES
     val next = state.nextEpisode
+    if (item.isBook || item.isAudiobook) {
+        BookActions(vm, state, playButton)
+        return
+    }
     val playLabel = when {
         isSeries && next != null -> stringResource(R.string.play_next, "S${next.seasonNumber ?: 1} E${next.episodeNumber ?: 1}")
         !isSeries && item.resumeMs > 0 -> stringResource(R.string.resume_from, formatTime(item.resumeMs))
@@ -167,6 +171,42 @@ private fun Actions(vm: AppViewModel, state: DetailState, playButton: FocusReque
         }
     }
     PlaysAsLine(item, version)
+}
+
+/** A book or an audiobook: an audiobook is listened to (the music player takes it up where it was left); a book to read is for the web app or a phone. */
+@Composable
+private fun BookActions(vm: AppViewModel, state: DetailState, firstButton: FocusRequester) {
+    val item = state.full
+    Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (item.isAudiobook) {
+            val label = if (item.resumeMs > 0) stringResource(R.string.resume_from, formatTime(item.resumeMs)) else stringResource(R.string.listen)
+            Pill(label, onClick = { vm.listen(item) }, accent = true, modifier = Modifier.focusRequester(firstButton))
+            if (item.resumeMs > 0) Pill(stringResource(R.string.start_over), onClick = { vm.listen(item, 0) })
+        }
+        Pill(
+            stringResource(
+                when {
+                    item.isAudiobook -> if (item.played) R.string.mark_not_listened else R.string.mark_listened
+                    else -> if (item.played) R.string.mark_book_unread else R.string.mark_book_read
+                },
+            ),
+            onClick = { vm.toggleWatched(state) },
+            accent = item.isBook,
+            modifier = if (item.isBook) Modifier.focusRequester(firstButton) else Modifier,
+        )
+        Pill(
+            stringResource(if (item.favorite) R.string.remove_favorite else R.string.add_favorite),
+            onClick = { vm.toggleFavorite(state) },
+        )
+    }
+    if (item.isBook) {
+        Text(
+            stringResource(R.string.book_hint, item.format?.uppercase() ?: stringResource(R.string.book_kind)),
+            fontSize = 15.sp,
+            color = Palette.TextDim,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
 }
 
 /** One line under the buttons that says what Play will give: the picture, the audio it starts with and how many subtitle tracks there are. */

@@ -119,8 +119,8 @@ class MusicPlayer(
         })
     }
 
-    /** Starts [songs] from [start]; replaces whatever was queued. */
-    fun play(songs: List<Song>, start: Int = 0, shuffle: Boolean = false) {
+    /** Starts [songs] from [start] (the first one from [startMs], to go on with an audiobook); replaces whatever was queued. */
+    fun play(songs: List<Song>, start: Int = 0, shuffle: Boolean = false, startMs: Long = 0L) {
         if (songs.isEmpty()) return
         reported?.let { reporter.stopped(it, positionMs) }
         reported = null
@@ -129,11 +129,11 @@ class MusicPlayer(
         shuffled = shuffle
         val first = start.coerceIn(0, ordered.lastIndex)
         index = first
-        player.setMediaItems(ordered.map { MediaItem.Builder().setUri(urlFor(it)).setMediaId(it.id.toString()).build() }, first, 0L)
+        player.setMediaItems(ordered.map { MediaItem.Builder().setUri(urlFor(it)).setMediaId(it.id.toString()).build() }, first, startMs.coerceAtLeast(0L))
         player.prepare()
         player.play()
         durationMs = ordered[first].durationMs ?: 0L
-        positionMs = 0L
+        positionMs = startMs.coerceAtLeast(0L)
         reported = ordered[first].also { reporter.started(it) }
     }
 

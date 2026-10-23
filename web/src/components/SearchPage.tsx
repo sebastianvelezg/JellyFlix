@@ -7,6 +7,7 @@ import {
   searchCollections,
   searchEpisodes,
   searchMovies,
+  searchBooks,
   searchMusic,
   searchMusicVideos,
   searchShows,
@@ -32,6 +33,8 @@ export function SearchPage({
   onOpenMovie,
   hasMusic,
   hasMusicVideos = false,
+  hasBooks = false,
+  onOpenBook,
   onOpenShow,
   onOpenCollection,
   onOpenAlbum,
@@ -48,11 +51,14 @@ export function SearchPage({
   hasMusic: boolean
   /** Whether the account has a music video library (otherwise they are not searched). */
   hasMusicVideos?: boolean
+  /** Whether the account has a book library (otherwise books are not searched). */
+  hasBooks?: boolean
+  onOpenBook: (book: Movie) => void
   onOpenAlbum: (id: string) => void
   onOpenArtist: (id: string) => void
   onPlay: (episode: Episode) => void
 }) {
-  const [totals, setTotals] = useState<{ movies?: number; series?: number; musicVideos?: number }>({})
+  const [totals, setTotals] = useState<{ movies?: number; series?: number; musicVideos?: number; books?: number }>({})
   const [kind, setKind] = useState<SearchKind>('all')
   const shows = (...kinds: SearchKind[]) => kind === 'all' || kinds.includes(kind)
   const onMovies = useCallback((movies: number) => setTotals((t) => ({ ...t, movies })), [])
@@ -60,6 +66,8 @@ export function SearchPage({
   const loadMovies = useCallback((startIndex: number) => searchMovies(session, term, { startIndex }), [session, term])
   const onMusicVideos = useCallback((musicVideos: number) => setTotals((t) => ({ ...t, musicVideos })), [])
   const loadMusicVideos = useCallback((startIndex: number) => searchMusicVideos(session, term, { startIndex }), [session, term])
+  const onBooks = useCallback((books: number) => setTotals((t) => ({ ...t, books })), [])
+  const loadBooks = useCallback((startIndex: number) => searchBooks(session, term, { startIndex }), [session, term])
   const loadSeries = useCallback((startIndex: number) => searchShows(session, term, { startIndex }), [session, term])
   const loadEpisodes = useCallback(() => searchEpisodes(session, term), [session, term])
   const episodes = useAsync(loadEpisodes).state
@@ -75,7 +83,7 @@ export function SearchPage({
   const noMusic = music.status === 'error' || (music.status === 'ready' && music.data.albums.length + music.data.artists.length + music.data.tracks.length === 0)
   const noCollections = collections.status === 'error' || (collections.status === 'ready' && collections.data.length === 0)
   const nothing =
-    totals.movies === 0 && totals.series === 0 && (!hasMusicVideos || totals.musicVideos === 0) && (episodes.status === 'error' || episodeCount === 0) && noMusic && noCollections
+    totals.movies === 0 && totals.series === 0 && (!hasMusicVideos || totals.musicVideos === 0) && (!hasBooks || totals.books === 0) && (episodes.status === 'error' || episodeCount === 0) && noMusic && noCollections
 
   return (
     <div className="pt-6">
@@ -83,7 +91,7 @@ export function SearchPage({
         {t('Results for “')}<span className="text-[var(--color-accent)]">{term}</span>”
       </h1>
 
-      <SearchFilters value={kind} onChange={setKind} hasMusic={hasMusic} hasMusicVideos={hasMusicVideos} />
+      <SearchFilters value={kind} onChange={setKind} hasMusic={hasMusic} hasMusicVideos={hasMusicVideos} hasBooks={hasBooks} />
 
       {nothing && (
         <StateMessage
@@ -132,6 +140,20 @@ export function SearchPage({
             onTotal={onMusicVideos}
             wide
             summary={(_, total) => (total === 1 ? t('1 music video found') : t('{count} music videos found', { count: total }))}
+          />
+        </section>
+      )}
+
+      {hasBooks && totals.books !== 0 && (
+        <section aria-label={t('Books')} hidden={!shows('books')} className="mb-10">
+          <h2 className="mb-3 text-base font-semibold text-neutral-100">{t('Books')}</h2>
+          <PagedGrid
+            session={session}
+            load={loadBooks}
+            overrides={overrides}
+            onOpen={onOpenBook}
+            onTotal={onBooks}
+            summary={(_, total) => (total === 1 ? t('1 book found') : t('{count} books found', { count: total }))}
           />
         </section>
       )}

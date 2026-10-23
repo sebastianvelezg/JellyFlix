@@ -5,7 +5,14 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+### Web app
+- **Books:** a library of type "Books" gets its own tab (books and audiobooks together, with the same sort, filters and A–Z jump), a page for each book (author, description, Read / Listen, Download, mark as read, favorite), "New books" on Home and in search.
+  A reader opens **EPUB** (chapter by chapter, with a table of contents, text size and three page colours; the book runs no scripts and reaches no network), **comics (CBZ)** (page by page, fit width or height, right to left for manga) and **PDF** (with the browser's own viewer, or the file where the browser cannot show one).
+  Where you stopped is remembered in this browser ("Continue reading"). **Audiobooks** play in the music player and go on from where they were left.
+  Other formats (Mobi, RAR comics) can be downloaded. Reading and downloading need an account that may download files.
+
 ### Both apps
+- **Books on the TV:** the Books tab lists books and audiobooks; audiobooks play in the music player (from where they were left) and the TV says that books to read are for the web app or a phone.
 - **Music videos:** a library of type "Music videos" gets its own tab with wide cards (the artist under the title), a title page with the artist, playback with the usual player, search, a "New music videos" row on Home (which can be moved or hidden in Appearance) and a place in "Continue watching".
 
 ## [1.0.0] - 2026-10-23

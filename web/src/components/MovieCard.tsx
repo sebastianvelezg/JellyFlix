@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import {
+  bookKindLabel,
   episodeCode,
   formatTime,
   getMovieDetails,
@@ -100,13 +101,15 @@ export function MovieCard({
 }) {
   const progress = progressPercent(movie)
   const title = movie.musicVideo && movie.artist ? t('{name} by {artist}', { name: movie.name, artist: movie.artist }) : movie.name
-  const label = `${title}${movie.year ? ` (${movie.year})` : ''}`
+  // A book's card says what kind it is (EPUB, PDF, Audiobook...) and a music video's, who it is by.
+  const kindLabel = movie.book ? t(bookKindLabel(movie)) : undefined
+  const label = `${title}${movie.year || kindLabel ? ` (${[kindLabel, movie.year].filter(Boolean).join(', ')})` : ''}`
   const hover = usePrefetchOnHover(session, movie.id)
   const remember = useCardActions()
   const runtime = movie.runtimeTicks ? formatRuntime(ticksToSeconds(movie.runtimeTicks)) : undefined
   // A music video's picture is a wide frame, not a poster; the artist goes under the title.
   const wide = !!movie.musicVideo
-  const subtext = wide ? [movie.artist, movie.year].filter(Boolean).join(' · ') : movie.year
+  const subtext = wide ? [movie.artist, movie.year].filter(Boolean).join(' · ') : movie.book ? [kindLabel, movie.year].filter(Boolean).join(' · ') : movie.year
 
   return (
     <div className="group/card relative">

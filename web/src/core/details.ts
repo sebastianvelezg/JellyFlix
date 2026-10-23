@@ -49,6 +49,8 @@ export interface MovieDetails extends Movie {
   premiereDate?: string
   cast: Person[]
   directors: string[]
+  /** Books: who wrote it. */
+  authors: string[]
   studios: string[]
   media?: MediaInfo
   /** Series only: "Continuing" or "Ended", and how many seasons the server lists. */
@@ -120,6 +122,7 @@ export function toMovieDetails(dto: BaseItemDto): MovieDetails | null {
         imageTag: p.PrimaryImageTag ?? undefined,
       })),
     directors: people.filter((p) => p.Type === 'Director' && p.Name).map((p) => p.Name as string),
+    authors: people.filter((p) => p.Type === 'Author' && p.Name).map((p) => p.Name as string),
     studios: (dto.Studios ?? []).map((s) => s.Name).filter((n): n is string => !!n),
     media: toMediaInfo(dto),
     status: dto.Status ?? undefined,

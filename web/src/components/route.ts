@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/                  the main page (a bit of everything)
  *   #/movies            the movies home
  *   #/collections       all collections; #/collection/<id> one of them
- *   #/series, #/anime, #/musicvideos   the series / anime / music videos home
+ *   #/series, #/anime, #/musicvideos, #/books   the series / anime / music videos / books home
  *   #/settings          preferences and account
  *   #/stats             what you have watched
  *   #/admin             administration (administrators only)
@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/show/<id>         a series page (seasons and episodes)
  *   #/search/<text>     search results
  *   #/movie/<id>        movie page
+ *   #/book/<id>         book page (read it, listen to it, download it); #/read/<id> the reader
  *   #/person/<id>?name= a person's filmography
  *   #/play/<id>         player (add ?start=0 to start over instead of resuming, or ?start=<seconds> to begin there;
  *                       ?list=<playlist id> goes on to the next title of that playlist when this one ends)
@@ -29,7 +30,7 @@ export type Route =
   | { page: 'collection'; id: string }
   | { page: 'lists' }
   | { page: 'list'; id: string }
-  | { page: 'section'; section: 'series' | 'anime' | 'musicvideos' }
+  | { page: 'section'; section: 'series' | 'anime' | 'musicvideos' | 'books' }
   | { page: 'show'; id: string }
   | { page: 'settings' }
   | { page: 'stats' }
@@ -40,6 +41,8 @@ export type Route =
   | { page: 'playlist'; id: string }
   | { page: 'search'; q: string }
   | { page: 'movie'; id: string }
+  | { page: 'book'; id: string }
+  | { page: 'read'; id: string }
   | { page: 'person'; id: string; name: string }
   | { page: 'play'; id: string; startOver: boolean; startAt?: number; listId?: string }
 
@@ -77,6 +80,9 @@ export function formatRoute(route: Route): string {
       return `#/search/${encodeURIComponent(route.q)}`
     case 'movie':
       return `#/movie/${encodeURIComponent(route.id)}`
+    case 'book':
+    case 'read':
+      return `#/${route.page}/${encodeURIComponent(route.id)}`
     case 'person':
       return `#/person/${encodeURIComponent(route.id)}?name=${encodeURIComponent(route.name)}`
     case 'play':
@@ -99,6 +105,7 @@ export function parseRoute(hash: string): Route {
     const decoded = decodeURIComponent(value)
     if (kind === 'search' && decoded.trim()) return { page: 'search', q: decoded }
     if (kind === 'movie' && decoded) return { page: 'movie', id: decoded }
+    if ((kind === 'book' || kind === 'read') && decoded) return { page: kind, id: decoded }
     if (kind === 'movies' && !decoded) return { page: 'browse' }
     if (kind === 'collections' && !decoded) return { page: 'collections' }
     if (kind === 'collection' && decoded) return { page: 'collection', id: decoded }
@@ -113,7 +120,7 @@ export function parseRoute(hash: string): Route {
     }
     if ((kind === 'album' || kind === 'artist' || kind === 'playlist') && decoded) return { page: kind, id: decoded }
     if (kind === 'show' && decoded) return { page: 'show', id: decoded }
-    if ((kind === 'series' || kind === 'anime' || kind === 'musicvideos') && !decoded) return { page: 'section', section: kind }
+    if ((kind === 'series' || kind === 'anime' || kind === 'musicvideos' || kind === 'books') && !decoded) return { page: 'section', section: kind }
     if (kind === 'person' && decoded) {
       return { page: 'person', id: decoded, name: new URLSearchParams(query).get('name') ?? '' }
     }

@@ -41,17 +41,39 @@ data class MediaItem(
     val playsAs: Map<String, PlaysAs> = emptyMap(),
     /** A movie: the id of the TMDb collection it belongs to, when the server knows it (only filled in when the full title is loaded). */
     val tmdbCollection: String? = null,
-    /** A music video: who performs it. */
+    /** A music video: who performs it. A book or an audiobook: who wrote it, when the server says. */
     val artist: String? = null,
+    /** A book: the format of its file in lower case ("epub", "pdf"), when the server says. */
+    val format: String? = null,
+    /** How long it runs, in milliseconds (an audiobook is played as a long song). */
+    val runtimeMs: Long? = null,
 ) {
     val isPlayable get() = kind == BaseItemKind.MOVIE || kind == BaseItemKind.EPISODE || kind == BaseItemKind.MUSIC_VIDEO
+
+    /** A book to read (this TV cannot show one: it offers audiobooks only). */
+    val isBook get() = kind == BaseItemKind.BOOK
+
+    /** A book read aloud: it plays in the music player. */
+    val isAudiobook get() = kind == BaseItemKind.AUDIO_BOOK
+
+    /** The audiobook as an item of the music player's queue. */
+    fun toAudiobookSong() = Song(
+        id = id,
+        name = name,
+        artist = artist.orEmpty(),
+        album = "",
+        albumId = null,
+        trackNumber = null,
+        durationMs = runtimeMs,
+        coverUrl = posterUrl,
+    )
 }
 
 /** [total] is null when the page was asked for without a count: the first page of a list says how many there are, the next ones do not. */
 data class Page<T>(val items: List<T>, val total: Int?)
 
 /** What a library list shows. */
-enum class Section { Movies, Series, Anime, MusicVideos, Collections }
+enum class Section { Movies, Series, Anime, MusicVideos, Books, Collections }
 
 data class Lib(val id: UUID, val name: String)
 
@@ -62,11 +84,14 @@ data class Libraries(
     val anime: List<Lib>,
     val music: List<Lib>,
     val musicVideos: List<Lib> = emptyList(),
+    val books: List<Lib> = emptyList(),
 ) {
     /** Series and anime together, for rows and picks that mix them. */
     val shows: List<Lib> get() = series + anime
     val hasVideo: Boolean get() = movies.isNotEmpty() || shows.isNotEmpty() || musicVideos.isNotEmpty()
-    val isEmpty: Boolean get() = !hasVideo && music.isEmpty()
+    /** Something to put on the main page: video, or books (whose rows have no banner). */
+    val hasTitles: Boolean get() = hasVideo || books.isNotEmpty()
+    val isEmpty: Boolean get() = !hasTitles && music.isEmpty()
 }
 
 /** Someone credited on a title (an actor), with their picture when the server has one. */

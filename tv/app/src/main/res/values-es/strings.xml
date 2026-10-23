@@ -76,6 +76,16 @@
     <string name="nav_music_videos">Videos musicales</string>
     <string name="row_new_music_videos">Videos musicales nuevos</string>
     <string name="search_music_videos">Videos musicales</string>
+    <string name="nav_books">Libros</string>
+    <string name="row_new_books">Libros nuevos</string>
+    <string name="search_books">Libros</string>
+    <string name="listen">Escuchar</string>
+    <string name="mark_listened">Marcar como escuchado</string>
+    <string name="mark_not_listened">Marcar como no escuchado</string>
+    <string name="mark_book_read">Marcar como leído</string>
+    <string name="mark_book_unread">Marcar como no leído</string>
+    <string name="book_kind">libro</string>
+    <string name="book_hint">Es un archivo %1$s. Léelo en la app web de Jellyflix o en tu teléfono; esta TV reproduce audiolibros.</string>
     <string name="nav_collections">Colecciones</string>
     <string name="row_new_anime">Anime nuevo</string>
     <string name="row_because">Porque viste %1$s</string>

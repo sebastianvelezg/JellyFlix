@@ -12,6 +12,7 @@ This list names the main direct dependencies. It is a courtesy summary, not a le
 | [React](https://react.dev) and React DOM | MIT |
 | [@jellyfin/sdk](https://github.com/jellyfin/jellyfin-sdk-typescript) (Jellyfin API client) | MPL-2.0 |
 | [axios](https://github.com/axios/axios) | MIT |
+| [fflate](https://github.com/101arrowz/fflate) (opens EPUB and comic archives) | MIT |
 | [hls.js](https://github.com/video-dev/hls.js) | Apache-2.0 |
 | [Inter](https://rsms.me/inter/) font, through `@fontsource-variable/inter` | SIL Open Font License 1.1 |
 | [Tailwind CSS](https://tailwindcss.com) (build time) | MIT |
