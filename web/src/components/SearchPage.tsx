@@ -8,6 +8,7 @@ import {
   searchEpisodes,
   searchMovies,
   searchMusic,
+  searchMusicVideos,
   searchShows,
   wideImageUrl,
   type Collection,
@@ -30,6 +31,7 @@ export function SearchPage({
   overrides,
   onOpenMovie,
   hasMusic,
+  hasMusicVideos = false,
   onOpenShow,
   onOpenCollection,
   onOpenAlbum,
@@ -44,16 +46,20 @@ export function SearchPage({
   onOpenCollection: (collection: Collection) => void
   /** Whether the account has a music library (otherwise music is not searched). */
   hasMusic: boolean
+  /** Whether the account has a music video library (otherwise they are not searched). */
+  hasMusicVideos?: boolean
   onOpenAlbum: (id: string) => void
   onOpenArtist: (id: string) => void
   onPlay: (episode: Episode) => void
 }) {
-  const [totals, setTotals] = useState<{ movies?: number; series?: number }>({})
+  const [totals, setTotals] = useState<{ movies?: number; series?: number; musicVideos?: number }>({})
   const [kind, setKind] = useState<SearchKind>('all')
   const shows = (...kinds: SearchKind[]) => kind === 'all' || kinds.includes(kind)
   const onMovies = useCallback((movies: number) => setTotals((t) => ({ ...t, movies })), [])
   const onSeries = useCallback((series: number) => setTotals((t) => ({ ...t, series })), [])
   const loadMovies = useCallback((startIndex: number) => searchMovies(session, term, { startIndex }), [session, term])
+  const onMusicVideos = useCallback((musicVideos: number) => setTotals((t) => ({ ...t, musicVideos })), [])
+  const loadMusicVideos = useCallback((startIndex: number) => searchMusicVideos(session, term, { startIndex }), [session, term])
   const loadSeries = useCallback((startIndex: number) => searchShows(session, term, { startIndex }), [session, term])
   const loadEpisodes = useCallback(() => searchEpisodes(session, term), [session, term])
   const episodes = useAsync(loadEpisodes).state
@@ -69,7 +75,7 @@ export function SearchPage({
   const noMusic = music.status === 'error' || (music.status === 'ready' && music.data.albums.length + music.data.artists.length + music.data.tracks.length === 0)
   const noCollections = collections.status === 'error' || (collections.status === 'ready' && collections.data.length === 0)
   const nothing =
-    totals.movies === 0 && totals.series === 0 && (episodes.status === 'error' || episodeCount === 0) && noMusic && noCollections
+    totals.movies === 0 && totals.series === 0 && (!hasMusicVideos || totals.musicVideos === 0) && (episodes.status === 'error' || episodeCount === 0) && noMusic && noCollections
 
   return (
     <div className="pt-6">
@@ -77,7 +83,7 @@ export function SearchPage({
         {t('Results for “')}<span className="text-[var(--color-accent)]">{term}</span>”
       </h1>
 
-      <SearchFilters value={kind} onChange={setKind} hasMusic={hasMusic} />
+      <SearchFilters value={kind} onChange={setKind} hasMusic={hasMusic} hasMusicVideos={hasMusicVideos} />
 
       {nothing && (
         <StateMessage
@@ -111,6 +117,21 @@ export function SearchPage({
             onOpen={onOpenShow}
             onTotal={onSeries}
             summary={(_, total) => t('{count} series found', { count: total })}
+          />
+        </section>
+      )}
+
+      {hasMusicVideos && totals.musicVideos !== 0 && (
+        <section aria-label={t('Music videos')} hidden={!shows('musicvideos')} className="mb-10">
+          <h2 className="mb-3 text-base font-semibold text-neutral-100">{t('Music videos')}</h2>
+          <PagedGrid
+            session={session}
+            load={loadMusicVideos}
+            overrides={overrides}
+            onOpen={onOpenMovie}
+            onTotal={onMusicVideos}
+            wide
+            summary={(_, total) => (total === 1 ? t('1 music video found') : t('{count} music videos found', { count: total }))}
           />
         </section>
       )}

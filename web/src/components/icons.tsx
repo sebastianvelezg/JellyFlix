@@ -281,6 +281,16 @@ export const AnimeIcon = () => (
     <path d="M19 3.5v3M17.5 5h3" />
   </Icon>
 )
+
+/** A screen with a note on it: music videos. */
+export const MusicVideoIcon = () => (
+  <Icon>
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <path d="M11 15.2V9.4l4-.9v5.4" />
+    <circle cx="9.6" cy="15.2" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="13.6" cy="14.3" r="1.4" fill="currentColor" stroke="none" />
+  </Icon>
+)
 export const PencilIcon = () => (
   <Icon>
     <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z" />

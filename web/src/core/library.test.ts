@@ -4,7 +4,19 @@ import { chromeLikeCapabilities as capabilities } from '../../test/fixtures'
 import { startMockJellyfin, type MockServer } from '../../test/mock/mockJellyfin'
 import { connect } from './auth'
 import type { Session } from './jellyfin'
-import { getMovie, getMovieLibraries, getMoviePage, PAGE_SIZE, posterUrl, toMovie } from './library'
+import {
+  getContinueWatching,
+  getLibrarySections,
+  getMovie,
+  getMovieLibraries,
+  getMoviePage,
+  getRecentTitles,
+  getTitlePage,
+  PAGE_SIZE,
+  posterUrl,
+  searchMusicVideos,
+  toMovie,
+} from './library'
 import { negotiatePlayback } from './playback'
 import { PlaybackReporter } from './reporting'
 
@@ -21,6 +33,49 @@ describe('toMovie / posterUrl', () => {
     const url = posterUrl('http://h:8096', { id: 'abc', imageTag: 'tag' })
     expect(url).toBe('http://h:8096/Items/abc/Images/Primary?fillWidth=300&quality=80&tag=tag')
     expect(posterUrl('http://h:8096', { id: 'abc' })).toBeNull()
+  })
+})
+
+describe('toMovie for a music video', () => {
+  it('marks it and names its artists', () => {
+    expect(toMovie({ Id: 'v', Name: 'Song', Type: 'MusicVideo', Artists: ['A', 'B'], ProductionYear: 1999 } as never)).toMatchObject({
+      musicVideo: true,
+      artist: 'A, B',
+    })
+    expect(toMovie({ Id: 'v', Name: 'Song', Type: 'MusicVideo' } as never)).toMatchObject({ musicVideo: true, artist: undefined })
+    expect(toMovie({ Id: 'm', Name: 'Film', Type: 'Movie', Artists: ['A'] } as never)?.musicVideo).toBeUndefined()
+  })
+})
+
+describe('music videos against a mock Jellyfin server', () => {
+  let mock: MockServer
+  let session: Session
+  beforeAll(async () => {
+    mock = await startMockJellyfin({ movieCount: 3, musicVideos: 5 })
+    session = await connect(mock.url, 'tester', 'secret')
+  })
+  afterAll(() => mock.close())
+
+  it('sorts a music video library into its own section, apart from the movies', async () => {
+    const sections = await getLibrarySections(session)
+    expect(sections.musicvideos).toEqual([{ id: 'lib-musicvideos', name: 'Music videos' }])
+    expect(sections.movies).toEqual([{ id: 'lib-movies', name: 'Movies' }])
+  })
+
+  it('lists, searches and orders them without mixing in movies', async () => {
+    const page = await getTitlePage(session, 'musicvideo', { libraryId: 'lib-musicvideos', startIndex: 0 })
+    expect(page.total).toBe(5)
+    expect(page.movies.every((m) => m.musicVideo && m.artist?.startsWith('Test Artist'))).toBe(true)
+    expect((await searchMusicVideos(session, 'video 003')).movies.map((m) => m.name)).toEqual(['Test Music Video 003'])
+    const recent = await getRecentTitles(session, 'musicvideo', 'lib-musicvideos', 2)
+    expect(recent.map((m) => m.name)).toEqual(['Test Music Video 005', 'Test Music Video 004'])
+  })
+
+  it('keeps "Continue watching" of music videos apart from the movies', async () => {
+    mock.user.resume.set('mv0002', 20 * 10_000_000)
+    mock.user.lastPlayed.push('mv0002')
+    expect((await getContinueWatching(session, 12, 'musicvideo')).map((m) => m.id)).toEqual(['mv0002'])
+    expect(await getContinueWatching(session)).toEqual([])
   })
 })
 

@@ -69,6 +69,7 @@ fun DetailScreen(vm: AppViewModel, state: DetailState) {
                     if (item.kind == BaseItemKind.EPISODE) {
                         Text(item.subtitle.orEmpty(), fontSize = 18.sp, color = Color(0xFFDDDDDD))
                     }
+                    item.artist?.let { Text(it, fontSize = 20.sp, fontWeight = FontWeight.Medium, color = Color(0xFFDDDDDD)) }
                     factsLine(item)?.let { Text(it, fontSize = 15.sp, color = Palette.TextDim) }
                     item.overview?.takeIf { it.isNotBlank() }?.let {
                         Text(it, fontSize = 16.sp, color = Color(0xFFDDDDDD), maxLines = 5, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))

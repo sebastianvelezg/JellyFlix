@@ -12,6 +12,7 @@ describe('routes', () => {
     { page: 'movie', id: 'abc123' },
     { page: 'section', section: 'series' },
     { page: 'section', section: 'anime' },
+    { page: 'section', section: 'musicvideos' },
     { page: 'show', id: 's0001' },
     { page: 'settings' },
     { page: 'admin' },

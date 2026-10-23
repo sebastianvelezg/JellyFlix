@@ -17,6 +17,7 @@ data class HomeSnapshot(
     val newSeries: List<MediaItem>,
     val newAnime: List<MediaItem>,
     val collections: List<MediaItem>,
+    val newMusicVideos: List<MediaItem> = emptyList(),
 )
 
 /**
@@ -43,6 +44,8 @@ object HomeCache {
             newSeries = items(root.getJSONArray("newSeries")),
             newAnime = items(root.getJSONArray("newAnime")),
             collections = items(root.getJSONArray("collections")),
+            // A copy saved before music videos existed has no such list.
+            newMusicVideos = root.optJSONArray("newMusicVideos")?.let(::items).orEmpty(),
         )
     }.getOrNull()
 
@@ -56,7 +59,8 @@ object HomeCache {
                     .put("movies", libs(snapshot.libs.movies))
                     .put("series", libs(snapshot.libs.series))
                     .put("anime", libs(snapshot.libs.anime))
-                    .put("music", libs(snapshot.libs.music)))
+                    .put("music", libs(snapshot.libs.music))
+                    .put("musicVideos", libs(snapshot.libs.musicVideos)))
                 .put("lineup", items(snapshot.lineup))
                 .put("continue", items(snapshot.continueRow))
                 .put("nextUp", items(snapshot.nextUp))
@@ -64,6 +68,7 @@ object HomeCache {
                 .put("newSeries", items(snapshot.newSeries))
                 .put("newAnime", items(snapshot.newAnime))
                 .put("collections", items(snapshot.collections))
+                .put("newMusicVideos", items(snapshot.newMusicVideos))
             // Write beside the old file and rename, so a power cut cannot leave half a file behind.
             val target = File(context.filesDir, FILE)
             val temp = File(context.filesDir, "$FILE.tmp")
@@ -84,10 +89,10 @@ object HomeCache {
     }
 
     private fun libraries(json: JSONObject): Libraries {
-        fun read(key: String) = json.getJSONArray(key).let { a ->
+        fun read(key: String) = (json.optJSONArray(key) ?: JSONArray()).let { a ->
             List(a.length()) { Lib(UUID.fromString(a.getJSONObject(it).getString("id")), a.getJSONObject(it).getString("name")) }
         }
-        return Libraries(read("movies"), read("series"), read("anime"), read("music"))
+        return Libraries(read("movies"), read("series"), read("anime"), read("music"), read("musicVideos"))
     }
 
     private fun items(list: List<MediaItem>) = JSONArray().also { array -> list.forEach { array.put(item(it)) } }
@@ -119,6 +124,7 @@ object HomeCache {
         .put("season", m.seasonNumber ?: JSONObject.NULL)
         .put("lastPlayed", m.lastPlayedAt ?: JSONObject.NULL)
         .put("childCount", m.childCount ?: JSONObject.NULL)
+        .put("artist", m.artist ?: JSONObject.NULL)
 
     private fun JSONObject.text(key: String): String? = if (isNull(key)) null else getString(key)
     private fun JSONObject.number(key: String): Int? = if (isNull(key)) null else getInt(key)
@@ -148,5 +154,6 @@ object HomeCache {
         seasonNumber = j.number("season"),
         lastPlayedAt = if (j.isNull("lastPlayed")) null else j.getLong("lastPlayed"),
         childCount = j.number("childCount"),
+        artist = if (j.has("artist")) j.text("artist") else null,
     )
 }

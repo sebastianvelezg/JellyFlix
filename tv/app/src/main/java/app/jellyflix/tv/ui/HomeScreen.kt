@@ -83,6 +83,7 @@ fun HomeScreen(vm: AppViewModel) {
                 HomeRow.Collections -> row(vm, R.string.row_collections, home.collections)
                 HomeRow.NewSeries -> row(vm, R.string.row_new_series, home.newSeries)
                 HomeRow.NewAnime -> row(vm, R.string.row_new_anime, home.newAnime)
+                HomeRow.NewMusicVideos -> row(vm, R.string.row_new_music_videos, home.newMusicVideos, landscape = true)
             }
         }
     }

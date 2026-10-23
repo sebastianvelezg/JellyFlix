@@ -41,23 +41,31 @@ data class MediaItem(
     val playsAs: Map<String, PlaysAs> = emptyMap(),
     /** A movie: the id of the TMDb collection it belongs to, when the server knows it (only filled in when the full title is loaded). */
     val tmdbCollection: String? = null,
+    /** A music video: who performs it. */
+    val artist: String? = null,
 ) {
-    val isPlayable get() = kind == BaseItemKind.MOVIE || kind == BaseItemKind.EPISODE
+    val isPlayable get() = kind == BaseItemKind.MOVIE || kind == BaseItemKind.EPISODE || kind == BaseItemKind.MUSIC_VIDEO
 }
 
 /** [total] is null when the page was asked for without a count: the first page of a list says how many there are, the next ones do not. */
 data class Page<T>(val items: List<T>, val total: Int?)
 
 /** What a library list shows. */
-enum class Section { Movies, Series, Anime, Collections }
+enum class Section { Movies, Series, Anime, MusicVideos, Collections }
 
 data class Lib(val id: UUID, val name: String)
 
 /** The user's libraries by kind. Anime is a TV library whose name says so ("Animation" stays under Series). */
-data class Libraries(val movies: List<Lib>, val series: List<Lib>, val anime: List<Lib>, val music: List<Lib>) {
+data class Libraries(
+    val movies: List<Lib>,
+    val series: List<Lib>,
+    val anime: List<Lib>,
+    val music: List<Lib>,
+    val musicVideos: List<Lib> = emptyList(),
+) {
     /** Series and anime together, for rows and picks that mix them. */
     val shows: List<Lib> get() = series + anime
-    val hasVideo: Boolean get() = movies.isNotEmpty() || shows.isNotEmpty()
+    val hasVideo: Boolean get() = movies.isNotEmpty() || shows.isNotEmpty() || musicVideos.isNotEmpty()
     val isEmpty: Boolean get() = !hasVideo && music.isEmpty()
 }
 

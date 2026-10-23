@@ -73,6 +73,9 @@
 
     <string name="dismiss">OK</string>
     <string name="nav_anime">Anime</string>
+    <string name="nav_music_videos">Music videos</string>
+    <string name="row_new_music_videos">New music videos</string>
+    <string name="search_music_videos">Music videos</string>
     <string name="nav_collections">Collections</string>
     <string name="row_new_anime">New anime</string>
     <string name="row_because">Because you watched %1$s</string>

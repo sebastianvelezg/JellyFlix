@@ -225,7 +225,8 @@ enum class HomeRow(val id: String, @StringRes val label: Int) {
     Favorites("favorites", R.string.row_favorites),
     Collections("collections", R.string.row_collections),
     NewSeries("newSeries", R.string.row_new_series),
-    NewAnime("newAnime", R.string.row_new_anime);
+    NewAnime("newAnime", R.string.row_new_anime),
+    NewMusicVideos("newMusicVideos", R.string.row_new_music_videos);
 
     companion object {
         fun of(id: Any?): HomeRow? = entries.firstOrNull { it.id == id }

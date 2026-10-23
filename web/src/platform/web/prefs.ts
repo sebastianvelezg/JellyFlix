@@ -109,7 +109,7 @@ export function writeBrowsePrefs(patch: Partial<BrowsePrefs>, section: Section =
 
 /** Forgets sort, filter and library choices for every section. */
 export function clearBrowsePrefs(): void {
-  for (const section of ['movies', 'series', 'anime'] as const) {
+  for (const section of ['movies', 'series', 'anime', 'musicvideos'] as const) {
     try {
       localStorage.removeItem(browseKey(section))
     } catch {

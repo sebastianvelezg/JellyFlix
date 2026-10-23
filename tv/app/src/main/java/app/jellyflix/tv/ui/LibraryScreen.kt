@@ -28,7 +28,7 @@ import app.jellyflix.tv.R
 import app.jellyflix.tv.data.Section
 import app.jellyflix.tv.data.SortOption
 
-/** The height of the banner at the top of Movies, Series and Anime. */
+/** The height of the banner at the top of Movies, Series and Anime (music videos have none). */
 private val SectionBannerHeight = 380.dp
 
 /** Draws a child [by] wider than the cell on each side, so a banner can reach the edges of a grid that has side padding. */
@@ -47,7 +47,7 @@ private fun Modifier.offsetBack() = layout { measurable, constraints ->
 }
 
 /**
- * Every movie, series, anime or collection: a banner with the newest titles (not in Collections, nor while a filter is on), the
+ * Every movie, series, anime, music video or collection: a banner with the newest titles (not in Collections, nor while a filter is on), the
  * sort and filter choices, and the poster grid, all in one page that scrolls together; more load as the grid is scrolled.
  */
 @Composable
@@ -60,9 +60,11 @@ fun LibraryScreen(vm: AppViewModel, lib: LibraryState) {
     val options = if (lib.section == Section.Collections) listOf(SortOption.Added, SortOption.Name) else SortOption.entries
     val banner = vm.sectionBanner(lib)
     val hasBanner = banner.isNotEmpty()
+    // A music video's picture is a wide frame: fewer, larger cards.
+    val wide = lib.section == Section.MusicVideos
 
     LazyVerticalGrid(
-        columns = GridCells.Fixed(Posters.columns(6)),
+        columns = GridCells.Fixed(Posters.columns(if (wide) 4 else 6)),
         state = lib.grid,
         // Under the top bar, unless the banner takes its place there.
         contentPadding = PaddingValues(start = 48.dp, end = 48.dp, top = if (hasBanner) 0.dp else ContentTop, bottom = 40.dp),
@@ -127,7 +129,7 @@ fun LibraryScreen(vm: AppViewModel, lib: LibraryState) {
                 val item = lib.items[index]
                 MediaCard(
                     item = item,
-                    landscape = false,
+                    landscape = wide,
                     fillWidth = true,
                     onClick = { vm.open(item) },
                     restoreFocusTo = vm.restoreTarget,

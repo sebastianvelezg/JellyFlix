@@ -240,6 +240,10 @@ body {
   grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr));
 }
 
+.wide-grid {
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--grid-min) * 1.75), 1fr));
+}
+
 /* We draw our own clear button in the search box. */
 input[type='search']::-webkit-search-cancel-button {
   appearance: none;

@@ -220,16 +220,18 @@ class JellyfinRepository(context: Context) {
         val series = ArrayList<Lib>()
         val anime = ArrayList<Lib>()
         val music = ArrayList<Lib>()
+        val musicVideos = ArrayList<Lib>()
         for (view in views) {
             val lib = Lib(view.id, view.name.orEmpty())
             when (view.collectionType) {
                 CollectionType.MOVIES -> movies.add(lib)
                 CollectionType.MUSIC -> music.add(lib)
+                CollectionType.MUSICVIDEOS -> musicVideos.add(lib)
                 CollectionType.TVSHOWS -> if (animeName.containsMatchIn(lib.name)) anime.add(lib) else series.add(lib)
                 else -> Unit
             }
         }
-        return Libraries(movies, series, anime, music)
+        return Libraries(movies, series, anime, music, musicVideos)
     }
 
     private val richFields = listOf(ItemFields.OVERVIEW, ItemFields.GENRES)
@@ -307,10 +309,11 @@ class JellyfinRepository(context: Context) {
         else listRecent(api(session), userId(session), kind, libs, limit, rich = false)
 
     /**
-     * Movies and episodes you stopped half-way, most recently watched first. Asked for separately and at the same time:
+     * Movies and episodes (and music videos, when the account has a library of them) you stopped half-way, most recently watched
+     * first. Asked for separately and at the same time:
      * on a real server one request for both took several seconds, each alone a fraction of that.
      */
-    suspend fun continueAll(session: Session): List<MediaItem> = coroutineScope {
+    suspend fun continueAll(session: Session, withMusicVideos: Boolean = false): List<MediaItem> = coroutineScope {
         val api = api(session)
         val userId = userId(session)
         fun read(kind: BaseItemKind) = async {
@@ -321,7 +324,8 @@ class JellyfinRepository(context: Context) {
         }
         val movies = read(BaseItemKind.MOVIE)
         val episodes = read(BaseItemKind.EPISODE)
-        newestFirst(movies.await() + episodes.await()).filter { it.resumeMs >= MIN_RESUME_MS }.take(16)
+        val videos = if (withMusicVideos) read(BaseItemKind.MUSIC_VIDEO) else null
+        newestFirst(movies.await() + episodes.await() + videos?.await().orEmpty()).filter { it.resumeMs >= MIN_RESUME_MS }.take(16)
     }
 
     suspend fun nextUp(session: Session): List<MediaItem> {
@@ -399,6 +403,7 @@ class JellyfinRepository(context: Context) {
         val kind = when (section) {
             Section.Movies -> BaseItemKind.MOVIE
             Section.Collections -> BaseItemKind.BOX_SET
+            Section.MusicVideos -> BaseItemKind.MUSIC_VIDEO
             else -> BaseItemKind.SERIES
         }
         val result = api.libraryApi.getItems(
@@ -428,6 +433,7 @@ class JellyfinRepository(context: Context) {
         val kind = when (section) {
             Section.Movies -> BaseItemKind.MOVIE
             Section.Collections -> BaseItemKind.BOX_SET
+            Section.MusicVideos -> BaseItemKind.MUSIC_VIDEO
             else -> BaseItemKind.SERIES
         }
         return api(session).libraryApi.getItems(
@@ -461,6 +467,7 @@ class JellyfinRepository(context: Context) {
         val kind = when (section) {
             Section.Movies -> BaseItemKind.MOVIE
             Section.Collections -> BaseItemKind.BOX_SET
+            Section.MusicVideos -> BaseItemKind.MUSIC_VIDEO
             else -> BaseItemKind.SERIES
         }
         val found = api(session).filterApi.getQueryFiltersLegacy(
@@ -681,7 +688,7 @@ class JellyfinRepository(context: Context) {
         return api.libraryApi.getItems(
             userId = userId(session),
             searchTerm = term,
-            includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES, BaseItemKind.BOX_SET),
+            includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES, BaseItemKind.BOX_SET, BaseItemKind.MUSIC_VIDEO),
             recursive = true,
             limit = 40,
             enableTotalRecordCount = false,
@@ -1501,11 +1508,14 @@ class JellyfinRepository(context: Context) {
         fun backdrop(width: Int): String? = dto.backdropImageTags?.firstOrNull()?.let {
             api.imageApi.getItemImageUrl(itemId = dto.id, imageType = ImageType.BACKDROP, maxWidth = width, tag = it)
         }
+        val artist = if (dto.type == BaseItemKind.MUSIC_VIDEO) dto.artists.orEmpty().filter { it.isNotBlank() }.joinToString(", ").ifBlank { null } else null
         val label = if (isEpisode) {
             val season = dto.parentIndexNumber
             val number = dto.indexNumber
             val code = if (season != null && number != null) "S$season E$number" else null
             listOfNotNull(code, dto.name).joinToString(" · ")
+        } else if (artist != null) {
+            listOfNotNull(artist, dto.productionYear?.toString()).joinToString(" · ")
         } else {
             dto.productionYear?.toString()
         }
@@ -1538,6 +1548,7 @@ class JellyfinRepository(context: Context) {
             versions = versionOptions(dto),
             playsAs = playsAsBySource(dto),
             tmdbCollection = dto.providerIds?.get("TmdbCollection")?.takeIf { it.isNotBlank() },
+            artist = artist,
             cast = dto.people.orEmpty().filter { it.type == PersonKind.ACTOR || it.type == PersonKind.GUEST_STAR }.take(24).map {
                 CastMember(
                     id = it.id,

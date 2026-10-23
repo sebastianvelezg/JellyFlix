@@ -67,6 +67,7 @@ export {
   shuffle,
   posterUrl,
   searchMovies,
+  searchMusicVideos,
   searchShows,
   searchTitles,
   SORT_LABELS,

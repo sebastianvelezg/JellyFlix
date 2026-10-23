@@ -5,6 +5,9 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+### Both apps
+- **Music videos:** a library of type "Music videos" gets its own tab with wide cards (the artist under the title), a title page with the artist, playback with the usual player, search, a "New music videos" row on Home (which can be moved or hidden in Appearance) and a place in "Continue watching".
+
 ## [1.0.0] - 2026-10-23
 
 The first public release: a web app and a Google TV / Android TV app for your own Jellyfin server, with the same sections, the same look and the same rules.

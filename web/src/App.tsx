@@ -213,7 +213,7 @@ export default function App() {
   )
 }
 
-const SECTIONS: Section[] = ['movies', 'series', 'anime', 'music']
+const SECTIONS: Section[] = ['movies', 'series', 'anime', 'musicvideos', 'music']
 
 const MUSIC_ROUTES = new Set(['music', 'album', 'artist', 'playlist'])
 
@@ -224,7 +224,7 @@ const SIMPLE_TITLES: Partial<Record<Route['page'], string>> = {
   collections: tr('Collections'),
   settings: tr('Settings'),
 }
-const SECTION_TITLES = { series: tr('Series'), anime: tr('Anime') } as const
+const SECTION_TITLES = { series: tr('Series'), anime: tr('Anime'), musicvideos: tr('Music videos') } as const
 
 /** Changes when the page changes, but not when only what is typed in the search box does. */
 function routeKeyForFocus(route: Route): string {
@@ -447,11 +447,11 @@ function Shell({
             <CatalogPage section="movies" onOpen={openMovie} {...catalog} />
           </div>
         )}
-        {(['series', 'anime'] as const)
+        {(['series', 'anime', 'musicvideos'] as const)
           .filter((x) => seen.includes(x))
           .map((x) => (
             <div key={x} hidden={!(route.page === 'section' && route.section === x)}>
-              <CatalogPage section={x} onOpen={openShow} {...catalog} />
+              <CatalogPage section={x} onOpen={x === 'musicvideos' ? openMovie : openShow} {...catalog} />
             </div>
           ))}
         {musicSeen && musicLibraries.length > 0 && (
@@ -542,6 +542,7 @@ function Shell({
             session={session}
             overrides={overrides}
             hasMusic={musicLibraries.length > 0}
+            hasMusicVideos={sections.status === 'ready' && sections.data.musicvideos.length > 0}
             onOpenMovie={openMovie}
             onOpenShow={openShow}
             onOpenCollection={openCollection}

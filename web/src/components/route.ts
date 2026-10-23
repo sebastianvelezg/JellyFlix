@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/                  the main page (a bit of everything)
  *   #/movies            the movies home
  *   #/collections       all collections; #/collection/<id> one of them
- *   #/series, #/anime   the series / anime home
+ *   #/series, #/anime, #/musicvideos   the series / anime / music videos home
  *   #/settings          preferences and account
  *   #/stats             what you have watched
  *   #/admin             administration (administrators only)
@@ -29,7 +29,7 @@ export type Route =
   | { page: 'collection'; id: string }
   | { page: 'lists' }
   | { page: 'list'; id: string }
-  | { page: 'section'; section: 'series' | 'anime' }
+  | { page: 'section'; section: 'series' | 'anime' | 'musicvideos' }
   | { page: 'show'; id: string }
   | { page: 'settings' }
   | { page: 'stats' }
@@ -113,7 +113,7 @@ export function parseRoute(hash: string): Route {
     }
     if ((kind === 'album' || kind === 'artist' || kind === 'playlist') && decoded) return { page: kind, id: decoded }
     if (kind === 'show' && decoded) return { page: 'show', id: decoded }
-    if ((kind === 'series' || kind === 'anime') && !decoded) return { page: 'section', section: kind }
+    if ((kind === 'series' || kind === 'anime' || kind === 'musicvideos') && !decoded) return { page: 'section', section: kind }
     if (kind === 'person' && decoded) {
       return { page: 'person', id: decoded, name: new URLSearchParams(query).get('name') ?? '' }
     }

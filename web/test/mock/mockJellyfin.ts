@@ -42,6 +42,8 @@ export interface MockOptions {
   collections?: number
   /** Series in an "Anime" library (same shape). 0 = no Anime library at all. */
   animeCount?: number
+  /** Videos in a "Music videos" library (each by one of three artists). 0 = no such library. */
+  musicVideos?: number
   /** Make /Sessions/Playing* fail, to prove reporting errors do not break playback. */
   failReporting?: boolean
   /**
@@ -369,8 +371,12 @@ function episodeDto(show: string, season: number, episode: number, user: UserSta
 }
 
 /** The DTO for any id the mock knows (movie, series, season or episode), or undefined. */
-function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; trickplay?: boolean }, full = false) {
+function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; trickplay?: boolean }, full = false) {
   const { movieCount } = counts
+  if (MUSIC_VIDEO_ID.test(id)) {
+    const at = Number(id.slice(2))
+    return at >= 1 && at <= (counts.musicVideos ?? 0) ? musicVideoDto(at, user, full) : undefined
+  }
   const box = COLLECTION_ID.exec(id)
   if (box && Number(box[1]) >= 1 && Number(box[1]) <= counts.collections) return collectionDto(Number(box[1]), user, full)
   const music = musicDto(id, user, counts.musicArtists)
@@ -420,6 +426,39 @@ function collectionDto(n: number, user: UserState, full = false) {
     BackdropImageTags: n % 2 === 1 ? ['bd1'] : [],
     ...(full ? { Overview: `The films of ${collectionName(n)}, in order.` } : {}),
     UserData: { IsFavorite: user.favorites.has(id), Played: false, PlaybackPositionTicks: 0 },
+  }
+}
+
+// ---- music videos: "mv0001"... in the "Music videos" library --------------------------------------------
+
+const MUSIC_VIDEO_ID = /^mv\d{4}$/
+const musicVideoId = (n: number) => `mv${String(n).padStart(4, '0')}`
+const musicVideoName = (n: number) => `Test Music Video ${String(n).padStart(3, '0')}`
+
+function musicVideoDto(n: number, user: UserState, full = false) {
+  const id = musicVideoId(n)
+  return {
+    Id: id,
+    Name: musicVideoName(n),
+    SortName: musicVideoName(n).toLowerCase(),
+    ProductionYear: 1990 + (n % 30),
+    Type: 'MusicVideo',
+    RunTimeTicks: DURATION_SECONDS * TICKS,
+    DateCreated: new Date(Date.UTC(2024, 2, 1) + n * 86_400_000).toISOString(),
+    Genres: [GENRES[n % 3]],
+    Artists: [`Test Artist ${(n % 3) + 1}`],
+    Album: `Test Album ${(n % 2) + 1}`,
+    ImageTags: { Primary: 'tag1' },
+    Chapters: [],
+    UserData: userData(id, user),
+    ...(full
+      ? {
+          Overview: `The video of song ${n}.`,
+          MediaSources: [
+            { Id: `ms-${id}`, Container: 'mp4', Size: 1_258_774, Bitrate: 335_000, MediaStreams: STREAMS.map((st) => (st.Type === 'Video' ? { ...st, Width: 1920, Height: 1080 } : st)) },
+          ],
+        }
+      : {}),
   }
 }
 
@@ -496,8 +535,8 @@ const STREAMS = [
 ]
 
 export async function startMockJellyfin(options: MockOptions = {}): Promise<MockServer> {
-  const opts = { username: 'tester', password: 'secret', movieCount: 130, playMode: 'direct', seriesCount: 0, animeCount: 0, musicArtists: 0, collections: 0, ...options } as Required<
-    Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicArtists' | 'collections'>
+  const opts = { username: 'tester', password: 'secret', movieCount: 130, playMode: 'direct', seriesCount: 0, animeCount: 0, musicVideos: 0, musicArtists: 0, collections: 0, ...options } as Required<
+    Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicVideos' | 'musicArtists' | 'collections'>
   > &
     MockOptions
   const requests: RecordedRequest[] = []
@@ -972,6 +1011,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         ...(opts.noMovieLibrary ? [] : [folder('lib-movies', 'Movies', 'movies', '/media/movies')]),
         ...(opts.noTvLibrary ? [] : [folder('lib-shows', 'Shows', 'tvshows', '/media/shows')]),
         ...(opts.animeCount > 0 ? [folder('lib-anime', 'Anime', 'tvshows', '/media/anime')] : []),
+        ...(opts.musicVideos > 0 ? [folder('lib-musicvideos', 'Music videos', 'musicvideos', '/media/musicvideos')] : []),
         ...(opts.musicArtists > 0 ? [folder(MUSIC_LIBRARY, 'Music', 'music', '/media/music')] : []),
       ]
       return json(res, 200, folders)
@@ -1104,6 +1144,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       if (!needAuth()) return
       const items: Array<{ Id: string; Name: string; CollectionType: string }> = opts.noTvLibrary ? [] : [{ Id: 'lib-shows', Name: 'Shows', CollectionType: 'tvshows' }]
       if (opts.animeCount > 0) items.push({ Id: 'lib-anime', Name: 'Anime', CollectionType: 'tvshows' })
+      if (opts.musicVideos > 0) items.push({ Id: 'lib-musicvideos', Name: 'Music videos', CollectionType: 'musicvideos' })
       if (opts.musicArtists > 0) items.push({ Id: MUSIC_LIBRARY, Name: 'Music', CollectionType: 'music' })
       if (!opts.noMovieLibrary) items.unshift({ Id: 'lib-movies', Name: 'Movies', CollectionType: 'movies' })
       return json(res, 200, { Items: items, TotalRecordCount: items.length, StartIndex: 0 })
@@ -1116,7 +1157,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         return json(res, 200, { Items: found, TotalRecordCount: found.length, StartIndex: 0 })
       }
       // Like Jellyfin: looking items up by id works for every type; browsing needs a type (the client always sends one).
-      const types = list('includeItemTypes') ?? (ids ? ['Movie', 'Series', 'Season', 'Episode'] : ['Movie'])
+      const types = list('includeItemTypes') ?? (ids ? ['Movie', 'Series', 'Season', 'Episode', 'MusicVideo'] : ['Movie'])
       interface Row {
         id: string
         name: string
@@ -1158,6 +1199,21 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
             official: n % 2 === 0 ? 'PG-13' : 'R',
             tags: n % 4 === 0 ? ['Classic'] : [],
             uhd: n % 5 === 0,
+          })
+        }
+      }
+      if (types.includes('MusicVideo')) {
+        for (let n = 1; n <= opts.musicVideos; n += 1) {
+          rows.push({
+            id: musicVideoId(n),
+            name: musicVideoName(n).toLowerCase(),
+            lib: 'lib-musicvideos',
+            genre: GENRES[n % 3],
+            year: 1990 + (n % 30),
+            created: n,
+            rating: 0,
+            backdrop: false,
+            people: [],
           })
         }
       }
@@ -1295,6 +1351,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         if ((user.resume.get(id) ?? 0) <= 0) return false
         const episode = EPISODE_ID.exec(id)
         if (episode) return wantsEpisodes && (!query.parentId || showLibrary(episode[1] as string) === query.parentId)
+        if (MUSIC_VIDEO_ID.test(id)) return types.includes('MusicVideo') && (!query.parentId || query.parentId === 'lib-musicvideos')
         return types.includes('Movie') && (!query.parentId || query.parentId === 'lib-movies')
       })
       const items = ids.slice(0, Number(query.limit ?? 12)).map((id) => dtoFor(id, user, opts))

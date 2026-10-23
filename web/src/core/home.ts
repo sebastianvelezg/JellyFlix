@@ -109,10 +109,11 @@ export function buildHomeLineup(
 }
 
 /**
- * Movies and episodes you stopped half-way, most recently watched first. Movies and episodes are asked for separately
- * and at the same time: on a real server one request for both took several seconds, each alone a fraction of that.
+ * Movies and episodes (and music videos, when the account has a library of them) you stopped half-way, most recently
+ * watched first. Each kind is asked for separately and at the same time: on a real server one request for both took
+ * several seconds, each alone a fraction of that.
  */
-export async function getContinueAll(session: Session, limit = 16): Promise<Movie[]> {
+export async function getContinueAll(session: Session, limit = 16, withMusicVideos = false): Promise<Movie[]> {
   const read = async (type: BaseItemKind) => {
     const { data } = await getLibraryApi(session.api).getResumeItems({
       userId: session.userId,
@@ -126,8 +127,12 @@ export async function getContinueAll(session: Session, limit = 16): Promise<Movi
     })
     return (data.Items ?? []).map((dto) => toEpisode(dto) ?? toMovie(dto)).filter((m): m is Movie => m !== null && m.resumeTicks > 0)
   }
-  const [movies, episodes] = await Promise.all([read(BaseItemKind.Movie), read(BaseItemKind.Episode)])
-  return newestFirst([...movies, ...episodes]).slice(0, limit)
+  const [movies, episodes, videos] = await Promise.all([
+    read(BaseItemKind.Movie),
+    read(BaseItemKind.Episode),
+    withMusicVideos ? read(BaseItemKind.MusicVideo) : Promise.resolve([]),
+  ])
+  return newestFirst([...movies, ...episodes, ...videos]).slice(0, limit)
 }
 
 /** Most recently played first; titles without a date keep their order after the dated ones. Pure. */
