@@ -1,0 +1,119 @@
+name: Release
+
+# Push a tag such as v1.0.0 to build the web bundle, the Docker image and the TV APK, and attach them to a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  web:
+    name: Web bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: web
+      - name: Zip the build
+        run: cd web/dist && zip -r "../../jellyflix-web-${GITHUB_REF_NAME}.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: jellyflix-web-*.zip
+
+  docker:
+    name: Docker image (ghcr.io)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image name in lower case
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/jellyflix-web" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: web
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  tv:
+    name: TV APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Use the release key, when the repository has one
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > tv/release.jks
+            {
+              echo "storeFile=release.jks"
+              echo "storePassword=$KEYSTORE_PASSWORD"
+              echo "keyAlias=$KEY_ALIAS"
+              echo "keyPassword=$KEY_PASSWORD"
+            } > tv/keystore.properties
+            echo "Signing with the release key."
+          else
+            echo "No release key in the repository secrets: the APK is signed with the debug key (fine for sideloading, not for updating over a build made with another key)."
+          fi
+      - run: chmod +x gradlew && ./gradlew --no-daemon :app:assembleRelease
+        working-directory: tv
+      - name: Name the APK
+        run: cp tv/app/build/outputs/apk/release/app-release.apk "jellyflix-tv-${GITHUB_REF_NAME}.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv
+          path: jellyflix-tv-*.apk
+
+  release:
+    name: GitHub release
+    needs: [web, docker, tv]
+    runs-on: ubuntu-latest
+    steps:
+      # Only our two artifacts: the Docker build also leaves a build-record artifact that must not be downloaded.
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: tv
+          path: assets
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*
+          generate_release_notes: true

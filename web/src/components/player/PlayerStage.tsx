@@ -1,0 +1,760 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  activeSegment,
+  audioChangeRequest,
+  episodeCode,
+  isEpisode,
+  PlaybackSession,
+  playbackTitle,
+  describePlayback,
+  retryRequest,
+  stepOffset,
+  SYNC_STEP,
+  SYNC_STEP_LARGE,
+  ticksToSeconds,
+  transcodeFallbackRequest,
+  type DeviceState,
+  type Movie,
+  type PlaybackExtras,
+  type PlaybackPlan,
+  type Session,
+  type StreamRequest,
+} from '../../core'
+import { reportStopOnPageHide } from '../../platform/web/browser'
+import { attachMedia, type Attached } from '../../platform/web/mediaAttach'
+import { bindMediaSession, keepScreenAwake } from '../../platform/web/mediaSession'
+import {
+  readPlayerPrefs,
+  readSubtitleOffset,
+  writePlayerPrefs,
+  writeSubtitleOffset,
+} from '../../platform/web/prefs'
+import { SkipIcon } from '../icons'
+import type { PlaybackController } from '../remote/controller'
+import { useRegisterPlayback } from '../remote/RemoteProvider'
+import { Controls } from './Controls'
+import { SubtitleOverlay, type SubtitleStyle } from './SubtitleOverlay'
+import { useSubtitleTrack } from './useSubtitleTrack'
+import { useTrickplay } from './useTrickplay'
+import { t } from '../../i18n'
+import { offsetLabel } from '../offsetLabel'
+
+const HIDE_CONTROLS_MS = 3000
+const PROGRESS_INTERVAL_MS = 10_000
+const STOP_TIMEOUT_MS = 2000
+const SKIP_SECONDS = 10
+/** After an episode ends, the next one starts by itself after this many seconds. */
+const UP_NEXT_SECONDS = 8
+
+function mediaErrorMessage(error: MediaError): string {
+  switch (error.code) {
+    case MediaError.MEDIA_ERR_NETWORK:
+      return t('The connection to the server was lost while loading the video.')
+    case MediaError.MEDIA_ERR_DECODE:
+      return t('The browser could not decode this video.')
+    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+      return t('The browser cannot play this video format.')
+    default:
+      return t('Playback failed.')
+  }
+}
+
+/** End of the buffered range that contains `time`, or `time` itself when nothing is buffered there. */
+function bufferedEndAt(video: HTMLVideoElement, time: number): number {
+  const ranges = video.buffered
+  for (let i = 0; i < ranges.length; i += 1) {
+    if (time >= ranges.start(i) - 0.25 && time <= ranges.end(i)) return ranges.end(i)
+  }
+  return time
+}
+
+export function PlayerStage({
+  session,
+  movie,
+  plan,
+  startSeconds,
+  fallback,
+  speed,
+  subtitleIndex,
+  next = null,
+  onNext,
+  extras,
+  localSubtitle,
+  subtitleFileError,
+  onSubtitleFile,
+  onClearLocalSubtitle,
+  onSpeed,
+  onSubtitle,
+  onRequest,
+  onExit,
+}: {
+  session: Session
+  movie: Movie
+  plan: PlaybackPlan
+  startSeconds: number
+  fallback: boolean
+  /** Speed and subtitle choice live in the parent so they survive switching audio track. */
+  speed: number
+  subtitleIndex: number | null
+  /** The episode after this one (if this is an episode and there is one). */
+  /** What plays after this: the next episode, or the next title of the playlist being played. */
+  next?: Movie | null
+  onNext?: () => void
+  /** Intro/credits segments and chapters (empty when the server has none). */
+  extras: PlaybackExtras
+  /** A subtitle file the viewer loaded from their device (instead of one of the server's tracks), already as a blob URL. */
+  localSubtitle: { name: string; url: string } | null
+  subtitleFileError: string | null
+  onSubtitleFile: (file: File) => void
+  /** Drops the loaded file (choosing a server track or turning subtitles off does this). */
+  onClearLocalSubtitle: () => void
+  onSpeed: (speed: number) => void
+  onSubtitle: (index: number | null) => void
+  onRequest: (request: StreamRequest) => void
+  onExit: () => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const attachedRef = useRef<Attached | null>(null)
+  const lastSubtitle = useRef<number | null>(null)
+
+  const [initialPrefs] = useState(readPlayerPrefs)
+  const fallbackDuration = ticksToSeconds(plan.durationTicks ?? movie.runtimeTicks)
+  const [paused, setPaused] = useState(true)
+  const [buffering, setBuffering] = useState(true)
+  const [currentTime, setCurrentTime] = useState(startSeconds)
+  const [now, setNow] = useState(() => Date.now())
+  const [bufferedEnd, setBufferedEnd] = useState(startSeconds)
+  const [duration, setDuration] = useState(fallbackDuration)
+  const [volume, setVolume] = useState(initialPrefs.volume)
+  const [muted, setMuted] = useState(initialPrefs.muted)
+  const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>({
+    size: initialPrefs.subtitleSize,
+    color: initialPrefs.subtitleColor,
+    background: initialPrefs.subtitleBackground,
+    position: initialPrefs.subtitlePosition,
+  })
+  // Sync is remembered per movie, and per series for episodes (its episodes usually share one release).
+  const syncKey = isEpisode(movie) ? movie.seriesId : movie.id
+  const [subtitleOffset, setSubtitleOffsetState] = useState(() => readSubtitleOffset(syncKey))
+  // Keys can arrive faster than the screen updates (holding one down), so the next step starts from this, not from the last render.
+  const offsetNow = useRef(subtitleOffset)
+  const [syncNote, setSyncNote] = useState<string | null>(null)
+  const syncNoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [awake, setAwake] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const title = playbackTitle(movie)
+  // Up next: set when an episode finishes; counts down, then starts the next episode.
+  const [ended, setEnded] = useState(false)
+  const [upNextDismissed, setUpNextDismissed] = useState(false)
+  const [secondsLeft, setSecondsLeft] = useState(UP_NEXT_SECONDS)
+  const [autoplay, setAutoplay] = useState(initialPrefs.autoplayNext)
+  const [pip, setPip] = useState(false)
+  const canPip = typeof document !== 'undefined' && document.pictureInPictureEnabled === true
+
+  // A file from the viewer's device replaces the server's track while it is in use.
+  const subtitle = useSubtitleTrack(session, plan, localSubtitle ? null : subtitleIndex)
+  const subtitleUrl = localSubtitle?.url ?? subtitle.url
+  const showingSubtitles = subtitleIndex !== null || !!localSubtitle
+
+  const setSubtitleOffset = useCallback(
+    (seconds: number) => {
+      offsetNow.current = seconds
+      setSubtitleOffsetState(seconds)
+      writeSubtitleOffset(syncKey, seconds)
+      setSyncNote(t('Subtitles: {offset}', { offset: offsetLabel(seconds) }))
+      if (syncNoteTimer.current) clearTimeout(syncNoteTimer.current)
+      syncNoteTimer.current = setTimeout(() => setSyncNote(null), 1800)
+    },
+    [syncKey],
+  )
+  useEffect(
+    () => () => {
+      if (syncNoteTimer.current) clearTimeout(syncNoteTimer.current)
+    },
+    [],
+  )
+
+  // All server reporting (start / progress / stop and which position to trust) lives in core.
+  const playback = useMemo(() => new PlaybackSession(session, plan, startSeconds), [session, plan, startSeconds])
+
+  useEffect(() => {
+    playback.setSubtitleIndex(subtitleIndex)
+  }, [playback, subtitleIndex])
+
+  const device = useCallback((): DeviceState => {
+    const video = videoRef.current
+    return {
+      paused: video?.paused ?? true,
+      muted: video?.muted ?? false,
+      volume: video?.volume ?? 1,
+    }
+  }, [])
+
+  // Apply remembered volume and the chosen speed before the stream starts.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.volume = initialPrefs.volume
+    video.muted = initialPrefs.muted
+  }, [initialPrefs])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    // Loading a stream resets playbackRate to defaultPlaybackRate, so set both.
+    video.defaultPlaybackRate = speed
+    video.playbackRate = speed
+  }, [speed, plan])
+
+  // Connect the stream to the <video> element (attachMedia also starts playback).
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const attached = attachMedia({
+      video,
+      plan,
+      token: session.accessToken,
+      authorization: session.api.authorizationHeader,
+      startSeconds,
+      onFatal: setError,
+    })
+    attachedRef.current = attached
+    return () => {
+      attached.destroy()
+      attachedRef.current = null
+    }
+  }, [plan, session, startSeconds])
+
+  // OS media keys / now-playing, screen wake lock and the tab title while this stage is open.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const unbind = bindMediaSession(video, title)
+    const release = keepScreenAwake()
+    const previousTitle = document.title
+    document.title = `▶ ${title}`
+    return () => {
+      unbind()
+      release()
+      document.title = previousTitle
+    }
+  }, [title])
+
+  // Mirror <video> state into React and drive progress reporting from the same events.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const on = {
+      play: () => setPaused(false),
+      pause: () => {
+        setPaused(true)
+        playback.stateChanged(video.currentTime, device())
+      },
+      playing: () => {
+        setEnded(false)
+        setSecondsLeft(UP_NEXT_SECONDS)
+        setBuffering(false)
+        playback.playing(video.currentTime, device())
+      },
+      waiting: () => setBuffering(true),
+      canplay: () => setBuffering(false),
+      seeking: () => setBuffering(true),
+      seeked: () => {
+        setBuffering(video.readyState < 3)
+        playback.stateChanged(video.currentTime, device())
+      },
+      timeupdate: () => {
+        setCurrentTime(video.currentTime)
+        setNow(Date.now())
+        setBufferedEnd(bufferedEndAt(video, video.currentTime))
+        playback.moved(video.currentTime)
+      },
+      progress: () => setBufferedEnd(bufferedEndAt(video, video.currentTime)),
+      durationchange: () => {
+        if (Number.isFinite(video.duration) && video.duration > 0) setDuration(video.duration)
+      },
+      enterpictureinpicture: () => setPip(true),
+      leavepictureinpicture: () => setPip(false),
+      volumechange: () => {
+        setVolume(video.volume)
+        setMuted(video.muted)
+        writePlayerPrefs({ volume: video.volume, muted: video.muted })
+      },
+      ended: () => {
+        setPaused(true)
+        setEnded(true)
+        void playback.ended(video.duration, device())
+      },
+      error: () => {
+        const mediaError = video.error
+        if (!mediaError || mediaError.code === MediaError.MEDIA_ERR_ABORTED) return
+        // hls.js reports its own fatal errors (and may recover from MSE errors).
+        if (attachedRef.current?.handlesErrors) return
+        const undecodable =
+          mediaError.code === MediaError.MEDIA_ERR_DECODE ||
+          mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+        // The browser could not decode what the profile promised: let the server transcode instead.
+        const fallbackRequest = undecodable
+          ? transcodeFallbackRequest(plan, { fallback, startSeconds: playback.position })
+          : null
+        if (fallbackRequest) {
+          onRequest(fallbackRequest)
+          return
+        }
+        setError(mediaErrorMessage(mediaError))
+      },
+    }
+    for (const [name, handler] of Object.entries(on)) video.addEventListener(name, handler)
+
+    const interval = setInterval(() => {
+      playback.tick(device())
+    }, PROGRESS_INTERVAL_MS)
+    const onPageHide = () => reportStopOnPageHide(playback, device())
+    window.addEventListener('pagehide', onPageHide)
+
+    return () => {
+      for (const [name, handler] of Object.entries(on)) video.removeEventListener(name, handler)
+      clearInterval(interval)
+      window.removeEventListener('pagehide', onPageHide)
+      // Covers unmounting for any reason (audio switch, sign-out). A no-op if already stopped.
+      void playback.stop(device())
+    }
+  }, [playback, device, plan, fallback, onRequest])
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === containerRef.current)
+    document.addEventListener('fullscreenchange', onChange)
+    containerRef.current?.focus()
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange)
+      if (hideTimer.current) clearTimeout(hideTimer.current)
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
+    }
+  }, [])
+
+  const poke = useCallback(() => {
+    setAwake(true)
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    hideTimer.current = setTimeout(() => setAwake(false), HIDE_CONTROLS_MS)
+  }, [])
+
+  const togglePlay = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) void video.play().catch(() => undefined)
+    else video.pause()
+  }, [])
+
+  const seek = useCallback((seconds: number) => {
+    const video = videoRef.current
+    if (!video) return
+    const max = Number.isFinite(video.duration) ? video.duration : Number.POSITIVE_INFINITY
+    const target = Math.min(Math.max(0, seconds), max)
+    video.currentTime = target
+    setCurrentTime(target)
+  }, [])
+
+  const skip = useCallback(
+    (delta: number) => {
+      const video = videoRef.current
+      if (video) seek(video.currentTime + delta)
+    },
+    [seek],
+  )
+
+  const changeVolume = useCallback((next: number) => {
+    const video = videoRef.current
+    if (!video) return
+    video.volume = Math.min(1, Math.max(0, next))
+    video.muted = next <= 0
+  }, [])
+
+  const toggleMute = useCallback(() => {
+    const video = videoRef.current
+    if (video) video.muted = !video.muted
+  }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
+    else void containerRef.current?.requestFullscreen().catch(() => undefined)
+  }, [])
+
+  const chooseSubtitle = useCallback(
+    (index: number | null) => {
+      if (index !== null) lastSubtitle.current = index
+      onClearLocalSubtitle()
+      onSubtitle(index)
+    },
+    [onSubtitle, onClearLocalSubtitle],
+  )
+
+  const toggleSubtitles = useCallback(() => {
+    if (localSubtitle) onClearLocalSubtitle()
+    else if (subtitleIndex !== null) chooseSubtitle(null)
+    else {
+      const next = lastSubtitle.current ?? plan.subtitleTracks[0]?.index ?? null
+      if (next !== null) chooseSubtitle(next)
+    }
+  }, [localSubtitle, onClearLocalSubtitle, subtitleIndex, chooseSubtitle, plan.subtitleTracks])
+
+  const back = useCallback(async () => {
+    // Wait (briefly) for the final position to reach the server so the library shows it.
+    await Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))])
+    onExit()
+  }, [playback, device, onExit])
+
+  /** Report where this episode stopped (so it counts as watched), then move on to the next one. */
+  const goNext = useCallback(async () => {
+    if (!onNext) return
+    await Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))])
+    onNext()
+  }, [playback, device, onNext])
+
+  // Other devices can drive this player ("pause", "seek", "send it to the TV"): see the remote-control provider.
+  const remoteController = useMemo<PlaybackController>(
+    () => ({
+      pause: () => videoRef.current?.pause(),
+      resume: () => void videoRef.current?.play().catch(() => undefined),
+      toggle: togglePlay,
+      stop: () => back(),
+      seek,
+      skip,
+      next: () => {
+        if (onNext) void goNext()
+      },
+      previous: () => seek(0),
+      setVolume: changeVolume,
+      setMuted: (muted) => {
+        const video = videoRef.current
+        if (video) video.muted = muted === 'toggle' ? !video.muted : muted
+      },
+      snapshot: () => ({ itemIds: [plan.itemId], startIndex: 0, positionSeconds: videoRef.current?.currentTime ?? 0 }),
+    }),
+    [togglePlay, back, seek, skip, onNext, goNext, changeVolume, plan.itemId],
+  )
+  useRegisterPlayback('video', remoteController)
+
+  const togglePip = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+    if (document.pictureInPictureElement) void document.exitPictureInPicture().catch(() => undefined)
+    else void video.requestPictureInPicture().catch(() => undefined)
+  }, [])
+
+  // "Skip intro" / "Skip credits" while the playhead is inside such a segment.
+  const segment = activeSegment(extras.segments, currentTime)
+  const skipSegment = useCallback(() => {
+    if (!segment) return
+    if (segment.kind === 'outro' && next) void goNext()
+    else seek(segment.endSeconds)
+  }, [segment, next, goNext, seek])
+
+  const upNextVisible = ended && !!next && !upNextDismissed && !error
+  const counting = upNextVisible && autoplay
+  useEffect(() => {
+    if (!counting) return
+    const timer = setInterval(() => setSecondsLeft((n) => n - 1), 1000)
+    return () => clearInterval(timer)
+  }, [counting])
+  useEffect(() => {
+    if (counting && secondsLeft <= 0) void goNext()
+  }, [counting, secondsLeft, goNext])
+
+  const changeAudio = useCallback(
+    (index: number) => {
+      onRequest(audioChangeRequest(plan, index, { fallback, startSeconds: playback.position }))
+    },
+    [onRequest, fallback, plan, playback],
+  )
+
+  // The most the video may stream at (0 = no limit). Another limit means asking the server again, at the same place.
+  const trickplay = useTrickplay(session, plan.itemId, plan.mediaSourceId)
+  const [quality, setQuality] = useState(initialPrefs.maxBitrateMbps)
+  const changeQuality = useCallback(
+    (mbps: number) => {
+      setQuality(mbps)
+      writePlayerPrefs({ maxBitrateMbps: mbps })
+      onRequest(retryRequest(plan, { fallback, startSeconds: playback.position }))
+    },
+    [onRequest, fallback, plan, playback],
+  )
+
+  const retry = () => onRequest(retryRequest(plan, { fallback, startSeconds: playback.position }))
+  const retryRef = useRef(retry)
+  useEffect(() => {
+    retryRef.current = retry
+  })
+  // After a failure, coming back online picks the stream up again where it stopped.
+  useEffect(() => {
+    if (!error) return
+    const onOnline = () => retryRef.current()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [error])
+  const transcodeInstead = transcodeFallbackRequest(plan, { fallback, startSeconds: playback.position })
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    poke()
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
+    const target = event.target as HTMLElement
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
+    const onButton = target.tagName === 'BUTTON'
+    const key = event.key
+    if (/^[0-9]$/.test(key) && duration > 0) {
+      event.preventDefault()
+      seek((Number(key) / 10) * duration)
+      return
+    }
+    switch (key) {
+      case ' ':
+      case 'k':
+        if (onButton) return
+        event.preventDefault()
+        togglePlay()
+        break
+      case 'ArrowLeft':
+      case 'j':
+        event.preventDefault()
+        skip(-SKIP_SECONDS)
+        break
+      case 'ArrowRight':
+      case 'l':
+        event.preventDefault()
+        skip(SKIP_SECONDS)
+        break
+      case 'ArrowUp':
+        event.preventDefault()
+        changeVolume((videoRef.current?.volume ?? 1) + 0.1)
+        break
+      case 'ArrowDown':
+        event.preventDefault()
+        changeVolume((videoRef.current?.volume ?? 1) - 0.1)
+        break
+      case 'Home':
+        event.preventDefault()
+        seek(0)
+        break
+      case 'End':
+        event.preventDefault()
+        seek(duration - 1)
+        break
+      case 'm':
+        toggleMute()
+        break
+      case 'f':
+        toggleFullscreen()
+        break
+      case 'c':
+        toggleSubtitles()
+        break
+      case 'z':
+      case 'Z':
+      case 'x':
+      case 'X':
+        // Z shows the subtitles earlier, X later; Shift takes bigger steps.
+        if (showingSubtitles) {
+          event.preventDefault()
+          const step = event.shiftKey ? SYNC_STEP_LARGE : SYNC_STEP
+          setSubtitleOffset(stepOffset(offsetNow.current, key.toLowerCase() === 'z' ? -step : step))
+        }
+        break
+      case 'n':
+        if (next) void goNext()
+        break
+      case 's':
+        skipSegment()
+        break
+      case 'p':
+        if (canPip) togglePip()
+        break
+      case 'Escape':
+        if (!document.fullscreenElement) void back()
+        break
+    }
+  }
+
+  const controlsVisible = paused || awake || menuOpen || !!error
+  const showSpinner = buffering && !error
+
+  return (
+    <div
+      ref={containerRef}
+      tabIndex={-1}
+      className={`fixed inset-0 z-50 bg-black outline-none ${controlsVisible ? '' : 'cursor-none'}`}
+      onMouseMove={poke}
+      onKeyDown={onKeyDown}
+      role="region"
+      aria-label={t('Playing {title}', { title })}
+    >
+      <video
+        ref={videoRef}
+        className="h-full w-full"
+        playsInline
+        onClick={togglePlay}
+        onDoubleClick={toggleFullscreen}
+        data-testid="video"
+        data-play-method={plan.playMethod}
+        data-protocol={plan.protocol}
+      >
+        {subtitleUrl && <track key={subtitleUrl} kind="subtitles" src={subtitleUrl} label={t('Subtitles')} />}
+      </video>
+
+      <SubtitleOverlay videoRef={videoRef} trackUrl={subtitleUrl} lifted={controlsVisible} style={subtitleStyle} offset={subtitleOffset} />
+
+      {syncNote && (
+        <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
+          <p role="status" className="rounded-full border border-white/10 bg-black/75 px-4 py-1.5 text-sm tabular-nums text-neutral-100 backdrop-blur-xl">
+            {syncNote}
+          </p>
+        </div>
+      )}
+
+      {(subtitle.loading || subtitle.failed) && (
+        <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
+          <div
+            role="status"
+            className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-black/75 px-4 py-2 text-sm text-neutral-100 shadow-lg backdrop-blur-xl"
+          >
+            {subtitle.loading ? (
+              <>
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/20 border-t-[var(--color-accent)]" aria-hidden="true" />
+                {t('Loading subtitles… the first time can take a little while')}
+              </>
+            ) : (
+              <>
+                {t('Could not load subtitles')}
+                <button type="button" className="font-semibold text-[var(--color-accent)] hover:underline" onClick={subtitle.retry}>
+                  {t('Try again')}
+                </button>
+                <button type="button" className="text-neutral-400 hover:text-white" onClick={() => chooseSubtitle(null)}>
+                  {t('Turn off')}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showSpinner && (
+        <div role="status" aria-label={t('Buffering')} className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-[var(--color-accent)] shadow-[0_0_30px_-4px_var(--glow)]" />
+        </div>
+      )}
+
+      {error && (
+        <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
+          <p className="max-w-md text-neutral-100">{t(error)}</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button type="button" className="btn-primary" onClick={retry}>
+              {t('Try again')}
+            </button>
+            {transcodeInstead && (
+              <button type="button" className="btn" onClick={() => onRequest(transcodeInstead)}>
+                {t('Let the server transcode')}
+              </button>
+            )}
+            <button type="button" className="btn" onClick={() => void back()}>
+              {t('Back')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {segment && !upNextVisible && (
+        <button
+          type="button"
+          onClick={skipSegment}
+          className="btn-primary absolute bottom-28 right-4 z-20 gap-2 sm:right-6"
+        >
+          <SkipIcon />
+          {segment.kind === 'intro' ? t('Skip intro') : segment.kind === 'recap' ? t('Skip recap') : segment.kind === 'preview' ? t('Skip preview') : next ? (isEpisode(next) ? t('Next episode') : t('Next title')) : t('Skip credits')}
+        </button>
+      )}
+
+      {upNextVisible && next && (
+        <div
+          role="status"
+          aria-label={t('Up next')}
+          className="absolute bottom-28 right-4 z-20 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-white/10 bg-black/80 p-4 shadow-[0_24px_70px_-10px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:right-6"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)]">{t('Up next')}</p>
+          <p className="mt-1 truncate font-medium text-white">{next.name}</p>
+          <p className="truncate text-sm text-neutral-400">
+            {(isEpisode(next) ? [next.seriesName, episodeCode(next)] : [next.year ? String(next.year) : '']).filter(Boolean).join(' · ')}
+          </p>
+          {counting && <p className="mt-2 text-sm text-neutral-300">{t('Starting in {seconds}s', { seconds: Math.max(0, secondsLeft) })}</p>}
+          <div className="mt-3 flex gap-2">
+            <button type="button" className="btn-primary flex-1 py-2" onClick={() => void goNext()}>
+              {t('Play now')}
+            </button>
+            {counting && (
+              <button type="button" className="btn py-2" onClick={() => setUpNextDismissed(true)}>
+                {t('Cancel')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <Controls
+        title={title}
+        visible={controlsVisible}
+        paused={paused}
+        currentTime={currentTime}
+        now={now}
+        duration={duration}
+        bufferedEnd={bufferedEnd}
+        volume={volume}
+        muted={muted}
+        fullscreen={fullscreen}
+        speed={speed}
+        audioTracks={plan.audioTracks}
+        audioIndex={plan.audioIndex}
+        subtitleTracks={plan.subtitleTracks}
+        subtitleIndex={localSubtitle ? null : subtitleIndex}
+        subtitleStatus={subtitle.loading ? 'loading' : subtitle.failed ? 'failed' : 'idle'}
+        subtitleStyle={subtitleStyle}
+        subtitleOffset={subtitleOffset}
+        localSubtitle={localSubtitle?.name ?? null}
+        subtitleFileError={subtitleFileError}
+        onBack={() => void back()}
+        onTogglePlay={togglePlay}
+        onSkip={skip}
+        onSeek={seek}
+        onVolume={changeVolume}
+        onToggleMute={toggleMute}
+        onToggleFullscreen={toggleFullscreen}
+        onAudio={changeAudio}
+        quality={quality}
+        playback={describePlayback(plan)}
+        onQuality={changeQuality}
+        onSubtitle={chooseSubtitle}
+        onSubtitleStyle={(patch) => {
+          setSubtitleStyle((style) => ({ ...style, ...patch }))
+          writePlayerPrefs({
+            ...(patch.size && { subtitleSize: patch.size }),
+            ...(patch.color && { subtitleColor: patch.color }),
+            ...(patch.background && { subtitleBackground: patch.background }),
+            ...(patch.position && { subtitlePosition: patch.position }),
+          })
+        }}
+        onSubtitleOffset={setSubtitleOffset}
+        onSubtitleFile={onSubtitleFile}
+        onSpeed={onSpeed}
+        onMenuOpenChange={setMenuOpen}
+        chapters={extras.chapters}
+        trickplay={trickplay}
+        pictureInPicture={canPip ? { active: pip, onToggle: togglePip } : undefined}
+        nextEpisode={next ? { label: `${isEpisode(next) ? episodeCode(next) : ''} ${next.name}`.trim(), onPlay: () => void goNext() } : undefined}
+        autoplayNext={next ? { enabled: autoplay, onChange: (on) => {
+          setAutoplay(on)
+          writePlayerPrefs({ autoplayNext: on })
+        } } : undefined}
+      />
+    </div>
+  )
+}

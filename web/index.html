@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Opened from the home screen of an iPhone or iPad: no browser bars, a dark status bar, and the short name under the icon. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Jellyflix" />
+    <title>Jellyflix</title>
+    <!-- The look you chose (theme colours, poster size), put on the page before anything is drawn so it never flashes the default. -->
+    <script>
+      try {
+        var saved = JSON.parse(localStorage.getItem('jellyflix.appearance.css') || 'null')
+        if (saved && saved.vars) {
+          for (var name in saved.vars) document.documentElement.style.setProperty(name, saved.vars[name])
+          for (var attr in saved.attrs) document.documentElement.dataset[attr] = saved.attrs[attr]
+          if (saved.bg) document.querySelector('meta[name="theme-color"]').setAttribute('content', saved.bg)
+        }
+      } catch (e) {}
+    </script>
+    <!-- Settings of whoever hosts the app (the default server address). Written when the server starts, not at build time. -->
+    <script src="/config.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

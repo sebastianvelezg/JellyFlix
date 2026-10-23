@@ -1,0 +1,29 @@
+name: Feature request
+description: An idea for Jellyflix
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: app
+    attributes:
+      label: Which app?
+      options: [Jellyflix Web, Jellyflix TV, Both]
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to be able to do?
+      description: Describe the need first, the solution second.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could it work?
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Project rules
+      description: See CONTRIBUTING.md.
+      options:
+        - label: It needs no server of ours and no call to anything but the user's own Jellyfin server (or it is an opt-in the user switches on).

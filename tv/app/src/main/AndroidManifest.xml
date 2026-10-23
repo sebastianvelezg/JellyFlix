@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The "Continue watching" row of the Google TV home screen is written to the TV's own local database. -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
+
+    <!-- A TV has no touch screen and is required to be a leanback device. -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="true" />
+
+    <application
+        android:name=".JellyflixApp"
+        android:allowBackup="false"
+        android:banner="@drawable/banner"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.JellyflixTV"
+        android:usesCleartextTraffic="true">
+        <!-- Cleartext is allowed because a home Jellyfin server is usually plain http on the LAN. -->
+        <activity
+            android:name=".MainActivity"
+            android:banner="@drawable/banner"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <!-- A card of the home screen row opens jellyflix://play/<id>. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:host="play" android:scheme="jellyflix" />
+            </intent-filter>
+        </activity>
+        <!-- Pictures for that row, saved by the app itself (see WatchNextArt). -->
+        <provider
+            android:name=".WatchNextArt"
+            android:authorities="app.jellyflix.tv.art"
+            android:exported="true" />
+    </application>
+
+</manifest>

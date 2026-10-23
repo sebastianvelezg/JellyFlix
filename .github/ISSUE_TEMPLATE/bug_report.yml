@@ -1,0 +1,56 @@
+name: Bug report
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Please remove server addresses, tokens and personal library names from anything you paste.**
+  - type: dropdown
+    id: app
+    attributes:
+      label: Which app?
+      options: [Jellyflix Web, Jellyflix TV, Both / not sure]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings → About (TV) or Settings → Version (web), or the release tag you installed.
+    validations:
+      required: true
+  - type: input
+    id: jellyfin
+    attributes:
+      label: Jellyfin server version
+      placeholder: "12.0.x"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device, or browser and operating system
+      placeholder: "TCL C6K (Google TV), or Chrome 130 on Windows 11"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Press ...
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: For playback problems, the TV app's Info panel (INFO key during playback) or the browser's network and console tabs help a lot, and so do the details of the file (container, video and audio codecs).

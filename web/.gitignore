@@ -1,0 +1,12 @@
+node_modules
+dist
+*.local
+.env
+.env.*
+!.env.example
+coverage
+test-results
+test-media
+playwright-report
+.DS_Store
+.impeccable

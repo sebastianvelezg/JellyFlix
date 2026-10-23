@@ -1,0 +1,232 @@
+import { useEffect, useRef } from 'react'
+import {
+  episodeCode,
+  formatTime,
+  getMovieDetails,
+  isEpisode,
+  posterUrl,
+  ticksToSeconds,
+  wideImageUrl,
+  type Movie,
+  type Session,
+} from '../core'
+import { CardMenu } from './CardMenu'
+import { useCardActions } from './cardActions'
+import { CheckIcon, HeartIcon, InfoIcon, PlayIcon } from './icons'
+import { Img } from './Img'
+import { Subtext } from './Subtext'
+import { detailsKey, prefetchSwr } from './useSwr'
+import { t } from '../i18n'
+
+function Placeholder({ name }: { name: string }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[var(--color-surface-3)] to-[var(--color-surface)] p-3 text-center text-sm font-medium text-neutral-500">
+      {name}
+    </div>
+  )
+}
+
+function progressPercent(movie: Movie): number {
+  return movie.resumeTicks > 0 && movie.runtimeTicks
+    ? Math.min(100, (movie.resumeTicks / movie.runtimeTicks) * 100)
+    : 0
+}
+
+export const frame =
+  'relative overflow-hidden rounded-xl bg-[var(--color-surface-2)] ring-1 ring-white/[.08] transition duration-300 ease-out group-hover:z-10 group-hover:scale-[1.04] group-hover:shadow-[0_14px_44px_-10px_var(--glow)] group-hover:ring-[var(--color-accent)]/70 group-focus-visible:scale-[1.04] group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-accent)]'
+
+/** "1h 52m" or "48m". */
+export function formatRuntime(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60))
+  return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m` : `${minutes}m`
+}
+
+/** The round play button that fades in over a hovered card, and (when given) how long the title is. */
+function HoverPlay({ runtime }: { runtime?: string }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 transition duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-accent-strong)] pl-0.5 text-[var(--color-accent-ink)] shadow-[0_0_30px_var(--glow)] ring-1 ring-white/30">
+        <PlayIcon />
+      </span>
+      {runtime && <Subtext as="span" className="absolute bottom-2 left-2.5 text-xs font-medium text-neutral-100" text={runtime} />}
+    </div>
+  )
+}
+
+function ProgressBar({ percent }: { percent: number }) {
+  return (
+    <div className="absolute inset-x-0 bottom-0 h-1 bg-black/70" role="presentation">
+      <div className="h-full rounded-r-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)]" style={{ width: `${percent}%` }} />
+    </div>
+  )
+}
+
+/** How long a mouse must rest on a card before its page is read ahead (a quick sweep over many cards reads none). */
+const PREFETCH_DELAY_MS = 150
+
+/**
+ * Reads a title's page ahead of time when the mouse rests on its card or the card gets keyboard focus, so that
+ * opening it shows the page at once. Touch has no hover, so it is left out.
+ */
+function usePrefetchOnHover(session: Session, id: string) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancel = () => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+  }
+  useEffect(() => cancel, [])
+  const prefetch = () => prefetchSwr(detailsKey(session, id), () => getMovieDetails(session, id), 60_000)
+  return {
+    onPointerEnter: (e: { pointerType: string }) => {
+      if (e.pointerType !== 'mouse') return
+      cancel()
+      timer.current = setTimeout(prefetch, PREFETCH_DELAY_MS)
+    },
+    onPointerLeave: cancel,
+    onFocus: prefetch,
+    onBlur: cancel,
+  }
+}
+
+/** Poster card used in grids and rows. Click opens the movie page. */
+export function MovieCard({
+  session,
+  movie,
+  onOpen,
+}: {
+  session: Session
+  movie: Movie
+  onOpen: (movie: Movie) => void
+}) {
+  const progress = progressPercent(movie)
+  const label = `${movie.name}${movie.year ? ` (${movie.year})` : ''}`
+  const hover = usePrefetchOnHover(session, movie.id)
+  const remember = useCardActions()
+  const runtime = movie.runtimeTicks ? formatRuntime(ticksToSeconds(movie.runtimeTicks)) : undefined
+
+  return (
+    <div className="group/card relative">
+    <button
+      type="button"
+      onClick={() => onOpen(movie)}
+      className="group block w-full text-left outline-none"
+      aria-label={t('Open {label}', { label })}
+      {...hover}
+    >
+      <div className={`aspect-[2/3] ${frame}`}>
+        <Img
+          session={session}
+          src={posterUrl(session.serverUrl, movie)}
+          className="h-full w-full object-cover"
+          fallback={<Placeholder name={movie.name} />}
+        />
+        <HoverPlay runtime={runtime} />
+        {movie.favorite && (
+          <span className="absolute left-2 top-2 rounded-full bg-black/60 p-1 text-rose-400 backdrop-blur" title={t('Favorite')}>
+            <HeartIcon filled />
+          </span>
+        )}
+        {!movie.played && movie.unwatchedCount != null && movie.unwatchedCount > 0 && (
+          <span
+            className="absolute right-2 top-2 min-w-6 rounded-full bg-[var(--color-accent-strong)] px-2 py-0.5 text-center text-xs font-semibold text-[var(--color-accent-ink)] shadow-[0_0_14px_var(--glow)] transition group-focus-within/card:opacity-0 group-hover/card:opacity-0 pointer-coarse:opacity-100"
+            title={movie.unwatchedCount === 1 ? t('1 episode to watch') : t('{count} episodes to watch', { count: movie.unwatchedCount })}
+          >
+            <Subtext text={movie.unwatchedCount} />
+          </span>
+        )}
+        {movie.played && (
+          <span
+            className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-200 backdrop-blur transition group-focus-within/card:opacity-0 group-hover/card:opacity-0"
+            title={t('Watched')}
+          >
+            <span className="text-[var(--color-accent)]" aria-hidden="true">
+              <CheckIcon />
+            </span>
+            <Subtext text={t('Watched')} />
+          </span>
+        )}
+        {progress > 0 && <ProgressBar percent={progress} />}
+      </div>
+      <p className="mt-2.5 truncate text-sm font-medium text-neutral-100 transition group-hover:text-white">{movie.name}</p>
+      <Subtext as="p" className="block min-h-4 text-xs text-neutral-500" text={movie.year} />
+    </button>
+    {remember && <CardMenu session={session} movie={movie} onOpen={onOpen} onChange={remember} />}
+    </div>
+  )
+}
+
+/** A poster card sized for horizontal rows. */
+export function RowCard(props: { session: Session; movie: Movie; onOpen: (movie: Movie) => void }) {
+  return (
+    <div className="w-[var(--poster-w)] shrink-0 snap-start">
+      <MovieCard {...props} />
+    </div>
+  )
+}
+
+/** Wide card for "Continue watching": click resumes playback, the info button opens the movie page. */
+export function ContinueCard({
+  session,
+  movie,
+  onPlay,
+  onOpen,
+}: {
+  session: Session
+  movie: Movie
+  onPlay: (movie: Movie) => void
+  onOpen: (movie: Movie) => void
+}) {
+  const progress = progressPercent(movie)
+  const left = movie.runtimeTicks ? ticksToSeconds(movie.runtimeTicks - movie.resumeTicks) : 0
+  const resuming = movie.resumeTicks > 0
+  // An episode card is headed by its series; the line below says which episode, and how much is left.
+  const heading = isEpisode(movie) ? movie.seriesName : movie.name
+  const detail = isEpisode(movie) ? [episodeCode(movie), movie.name].filter(Boolean).join(' · ') : null
+  const status = resuming ? (left > 0 ? t('{time} left', { time: formatTime(left) }) : t('Resume')) : t('Up next')
+
+  return (
+    <div className="group relative w-64 shrink-0 snap-start sm:w-72 lg:w-80">
+      <button
+        type="button"
+        onClick={() => onPlay(movie)}
+        className="group block w-full text-left outline-none"
+        aria-label={t(resuming ? 'Resume {title}' : 'Play {title}', { title: isEpisode(movie) ? `${movie.seriesName} ${episodeCode(movie)}` : movie.name })}
+      >
+        <div className={`aspect-video ${frame}`}>
+          <Img
+            session={session}
+            src={wideImageUrl(session.serverUrl, movie)}
+            className="h-full w-full object-cover"
+            fallback={<Placeholder name={movie.name} />}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
+          <HoverPlay />
+          {progress > 0 && <ProgressBar percent={progress} />}
+        </div>
+        <p className="mt-2.5 truncate text-sm font-medium text-neutral-100 group-hover:text-white">{heading}</p>
+        <p className="truncate text-xs text-neutral-500">
+          {detail ? `${detail} · ${status}` : status}
+        </p>
+      </button>
+      <button
+        type="button"
+        onClick={() => onOpen(movie)}
+        className="absolute right-2 top-2 z-20 rounded-full bg-black/60 p-1.5 text-neutral-200 opacity-0 backdrop-blur transition hover:bg-black/85 hover:text-white focus-visible:opacity-100 group-hover:opacity-100"
+        aria-label={t('Details for {name}', { name: movie.name })}
+        title={t('Details')}
+      >
+        <InfoIcon />
+      </button>
+    </div>
+  )
+}
+
+export function CardSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <div className="skeleton aspect-[2/3] w-full" />
+      <div className="skeleton mt-2.5 h-3.5 w-3/4 !rounded-md" />
+      <div className="skeleton mt-1.5 h-3 w-1/4 !rounded-md" />
+    </div>
+  )
+}

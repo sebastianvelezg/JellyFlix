@@ -1,0 +1,439 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+/*
+ * Design tokens. True black canvas, blue accent: the look the app starts with. The theme chosen in Settings → Appearance
+ * (src/theme/themes.ts) replaces the colour tokens on the page's root element, and everything else is drawn from them.
+ */
+:root {
+  color-scheme: dark;
+  --color-bg: #000;
+  --color-surface: #07090e;
+  --color-surface-2: #0e121b;
+  --color-surface-3: #151a27;
+  --color-border: #1a2030;
+  --color-border-strong: #2b3555;
+  --color-muted: #8b94ab;
+  --color-accent: #4d8dff;
+  --color-accent-strong: #2563eb;
+  --color-accent-ink: #fff;
+  --color-accent-deep: #1d4ed8;
+  --color-accent-top: #3b82f6;
+  --color-accent-top-hover: #5b97fb;
+  --color-accent-deep-hover: #2563eb;
+  --color-cyan: #38d6f5;
+  --glow: color-mix(in srgb, var(--color-accent-strong) 55%, transparent);
+
+  /* Poster width in rows, and the narrowest a poster may get in a grid. Settings → Appearance → Poster size scales them. */
+  /* Shape and motion shared by cards, panels and menus. */
+  --radius-card: 0.75rem;
+  --radius-panel: 1rem;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --poster-scale: 1;
+  --poster-w: calc(9rem * var(--poster-scale));
+  --grid-min: calc(9rem * var(--poster-scale));
+
+  /*
+   * The notch, the rounded corners and the home indicator. An installed app (a PWA) draws under them, so the header, the side
+   * padding and the bars at the bottom of the screen keep clear of them. They are 0 in an ordinary browser tab.
+   */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-x: max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+
+  /* Page side padding and fixed-header height, shared by every full-bleed element. */
+  --gutter: calc(1rem + var(--safe-x));
+  --header-h: calc(4rem + var(--safe-top));
+}
+@media (min-width: 640px) {
+  :root {
+    --gutter: calc(2rem + var(--safe-x));
+    --poster-w: calc(10rem * var(--poster-scale));
+    --grid-min: calc(10rem * var(--poster-scale));
+  }
+}
+@media (min-width: 1024px) {
+  :root {
+    --gutter: calc(3.5rem + var(--safe-x));
+    --poster-w: calc(11rem * var(--poster-scale));
+  }
+}
+@media (min-width: 1536px) {
+  :root {
+    --poster-w: calc(12rem * var(--poster-scale));
+  }
+}
+/* Settings → Appearance → Density, Interface size and Banner. */
+:root {
+  --section-gap: 2.25rem;
+  --hero-min: 66vh;
+}
+@media (min-width: 640px) {
+  :root {
+    --hero-min: 74vh;
+  }
+}
+html[data-density='compact'] {
+  --section-gap: 1.5rem;
+}
+html[data-banner='compact'] {
+  --hero-min: 46vh;
+}
+@media (min-width: 640px) {
+  html[data-banner='compact'] {
+    --hero-min: 52vh;
+  }
+}
+html[data-size='small'] {
+  font-size: 93.75%;
+}
+html[data-size='large'] {
+  font-size: 112.5%;
+}
+html[data-posters='compact'] {
+  --poster-scale: 0.85;
+}
+html[data-posters='large'] {
+  --poster-scale: 1.2;
+}
+
+/* On a phone the Home / Movies / Series / Anime / Music tabs are a bar at the bottom; the floating bars and the page keep clear of it. */
+:root {
+  --nav-h: 0px;
+  --bottom-inset: var(--safe-bottom);
+}
+@media (max-width: 767px) {
+  html[data-tabs] {
+    --nav-h: calc(3.5rem + var(--safe-bottom));
+    --bottom-inset: 0px;
+  }
+}
+
+/* A short screen (a phone held sideways): layouts that stack vertically need to sit side by side instead. */
+@custom-variant short (@media (max-height: 34rem));
+
+@theme {
+  /* The default grey for secondary text (#737373) is a little too dim on black (4.4:1); this one is 6:1. */
+  --color-neutral-500: #8c8c8c;
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html {
+  background: var(--color-bg);
+  scrollbar-color: var(--color-surface-3) transparent;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: #eceef4;
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  color: #fff;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-3);
+  border-radius: 999px;
+  border: 2px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@layer components {
+  /* ---- buttons ------------------------------------------------------------------------------ */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[.06] px-4 py-2 text-sm font-medium text-neutral-100 backdrop-blur-md transition duration-200 hover:border-white/25 hover:bg-white/[.13] active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-gradient-to-b from-[var(--color-accent-top)] to-[var(--color-accent-deep)] px-5 py-2 text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_0_28px_-6px_var(--glow)] transition duration-200 hover:from-[var(--color-accent-top-hover)] hover:to-[var(--color-accent-deep-hover)] hover:shadow-[0_0_36px_-4px_var(--glow)] active:scale-[.97] disabled:cursor-wait disabled:opacity-60;
+  }
+  /* A round button with only an icon (give it an aria-label and a title). */
+  .btn-icon {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[.06] text-neutral-200 backdrop-blur-md transition duration-200 hover:border-white/25 hover:bg-white/[.13] hover:text-white active:scale-[.94] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-3 py-1.5 text-sm text-neutral-300 transition hover:bg-white/10 hover:text-white;
+  }
+
+  /* ---- form controls ------------------------------------------------------------------------ */
+  .field {
+    @apply w-full rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-2.5 text-sm text-neutral-100 transition placeholder:text-neutral-500 hover:border-white/20 focus:border-[var(--color-accent)] focus:bg-white/[.06] focus:outline-none focus:ring-4 focus:ring-[var(--color-accent)]/15;
+  }
+  .select {
+    @apply cursor-pointer appearance-none rounded-full border border-white/10 bg-white/[.05] bg-[length:14px] bg-[position:right_0.8rem_center] bg-no-repeat py-1.5 pl-3.5 pr-9 text-sm text-neutral-100 transition hover:border-white/25 hover:bg-white/[.09] focus:border-[var(--color-accent)] focus:outline-none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b94ab' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+  .select option {
+    background: var(--color-surface-2);
+    color: #eceef4;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full border border-white/10 bg-white/[.06] px-2.5 py-0.5 text-xs font-medium text-neutral-300;
+  }
+  .chip-accent {
+    @apply inline-flex items-center rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent)];
+  }
+
+  /* ---- surfaces ----------------------------------------------------------------------------- */
+  .glass {
+    @apply border border-white/10 bg-white/[.04] backdrop-blur-xl;
+  }
+  .skeleton {
+    @apply rounded-xl;
+    background: linear-gradient(100deg, var(--color-surface-2) 30%, var(--color-surface-3) 50%, var(--color-surface-2) 70%);
+    background-size: 220% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+  .alert-error {
+    @apply rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-200;
+  }
+  .alert-info {
+    @apply rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-3.5 py-2.5 text-sm text-neutral-100;
+  }
+}
+
+/* ---- layout helpers ------------------------------------------------------------------------- */
+.gutter-x {
+  padding-inline: var(--gutter);
+}
+/* Cancels the page gutter, so an element spans the full window width. */
+.bleed {
+  margin-inline: calc(var(--gutter) * -1);
+}
+/* Slides a page's hero up underneath the fixed header. */
+.under-header {
+  margin-top: calc(var(--header-h) * -1);
+}
+
+/* Poster/backdrop images fade in once loaded instead of popping. */
+.img-fade {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.img-fade[data-loaded='true'] {
+  opacity: 1;
+}
+
+/* Poster grids: as many columns as fit, never narrower than --grid-min (so the poster size setting works at every window width). */
+.poster-grid {
+  display: grid;
+  gap: 2rem 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr));
+}
+
+/* We draw our own clear button in the search box. */
+input[type='search']::-webkit-search-cancel-button {
+  appearance: none;
+  display: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -4%, 0) scale(1.08);
+  }
+}
+.rise {
+  animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.rise-2 {
+  animation-delay: 0.08s;
+}
+.rise-3 {
+  animation-delay: 0.16s;
+}
+.rise-4 {
+  animation-delay: 0.24s;
+}
+
+/* Faint blue grid that fades out toward the edges (sign-in screen). */
+.grid-bg {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-accent) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 7%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 40%, #000 10%, transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Featured banner: each title fades in, and the active dot fills over the time it stays up. */
+@keyframes hero-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hero-fill {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+.hero-slide {
+  animation: hero-fade 0.7s ease both;
+}
+.hero-progress {
+  animation-name: hero-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+/* The three bars next to the song that is playing. */
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.eq-bar {
+  height: 100%;
+  animation: eq 0.9s ease-in-out infinite;
+}
+
+/* Sliders of the music player: a thin bar filled up to --pct, with a round handle that appears on hover. */
+.music-range {
+  appearance: none;
+  height: 1.25rem;
+  background: transparent;
+  cursor: pointer;
+}
+.music-range:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.music-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-accent) var(--pct), rgba(255, 255, 255, 0.2) var(--pct));
+}
+.music-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-accent) var(--pct), rgba(255, 255, 255, 0.2) var(--pct));
+}
+.music-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-top: -5px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 12px var(--glow);
+  transform: scale(0);
+  transition: transform 0.15s ease;
+}
+.music-range::-moz-range-thumb {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 12px var(--glow);
+  transform: scale(0);
+  transition: transform 0.15s ease;
+}
+.music-range:hover::-webkit-slider-thumb,
+.music-range:focus-visible::-webkit-slider-thumb {
+  transform: scale(1);
+}
+.music-range:hover::-moz-range-thumb,
+.music-range:focus-visible::-moz-range-thumb {
+  transform: scale(1);
+}
+
+/* Subtitle lines on a dark box (an option in the player's menu) instead of a shadow. */
+.subtitles[data-background='box'] .subtitle-line {
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 0.4rem;
+  padding: 0.05em 0.5em;
+}
+
+/*
+ * Grid cells that are off screen are not laid out or painted until they are about to be seen, which keeps a grid of
+ * thousands of posters cheap to scroll. That containment would clip a card's hover glow and zoom, so each cell has
+ * room around it (padding) that its neighbours' gap makes up for (negative margin).
+ */
+.cv-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 19rem;
+  padding: 0.75rem;
+  margin: -0.75rem;
+}
+
+/* On a touchscreen every button, pill and menu is at least 44px tall, the size a finger can hit reliably. */
+@media (pointer: coarse) {
+  .btn,
+  .btn-primary,
+  .btn-ghost,
+  .select {
+    min-height: 2.75rem;
+  }
+  .btn-icon {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+}

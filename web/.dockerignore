@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+test-results
+test-media
+playwright-report
+.env
+.env.*
+!.env.example
+.impeccable
+.git
+docs
+*.md
+!README.md

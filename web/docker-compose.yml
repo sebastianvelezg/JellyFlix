@@ -1,0 +1,16 @@
+# Jellyflix Web. From this folder:   docker compose up -d --build
+# Then open  http://<IP address of this machine>:8080   (full guide: the "Host it" section of web/README.md)
+#
+# Optional settings go in a file called .env next to this one (copy .env.example):
+#   JELLYFIN_URL    the address your Jellyfin server has for your browser, e.g. http://YOUR-JELLYFIN-IP:8096. It only pre-fills the sign-in screen.
+#   JELLYFLIX_PORT  the port Jellyflix is served on (default 8080)
+services:
+  jellyflix-web:
+    build: .
+    image: jellyflix-web:latest
+    container_name: jellyflix-web
+    restart: unless-stopped
+    ports:
+      - "${JELLYFLIX_PORT:-8080}:80"
+    environment:
+      JELLYFIN_URL: "${JELLYFIN_URL:-}"

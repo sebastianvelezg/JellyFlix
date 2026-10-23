@@ -1,0 +1,11 @@
+{
+  // Type-checks src/core without the DOM lib, so value uses such as `document` fail the build.
+  // (Some dependency typings re-add DOM types, so type-only DOM references are caught by an ESLint rule instead.)
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["src/core"],
+  "exclude": ["src/core/**/*.test.ts"]
+}
