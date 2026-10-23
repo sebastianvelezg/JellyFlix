@@ -21,9 +21,9 @@ export interface MovieLibrary {
 
 /**
  * What a library is shown as: Jellyfin knows "movies", "tvshows", "music" and "musicvideos"; anime is a TV library named like anime.
- * Books (and audiobooks) are a library of type "Books". (Live TV is not shown yet.)
+ * Books (and audiobooks) are a library of type "Books"; Live TV is the server's one "live TV" view.
  */
-export type Section = 'movies' | 'series' | 'anime' | 'musicvideos' | 'books' | 'music'
+export type Section = 'movies' | 'series' | 'anime' | 'musicvideos' | 'books' | 'livetv' | 'music'
 
 /** The sections that list titles in a catalog page: everything except music (which has its own pages). */
 export type VideoSection = Exclude<Section, 'music'>
@@ -191,13 +191,14 @@ const FILTERS: Record<WatchFilter, ItemFilter[] | undefined> = {
 
 export async function getLibrarySections(session: Session): Promise<LibrarySections> {
   const { data } = await getUserViewApi(session.api).getUserViews({ userId: session.userId })
-  const sections: LibrarySections = { movies: [], series: [], anime: [], musicvideos: [], books: [], music: [] }
+  const sections: LibrarySections = { movies: [], series: [], anime: [], musicvideos: [], books: [], livetv: [], music: [] }
   for (const view of data.Items ?? []) {
     if (!view.Id) continue
     if (view.CollectionType === CollectionType.Movies) sections.movies.push({ id: view.Id, name: view.Name ?? 'Movies' })
     else if (view.CollectionType === CollectionType.Music) sections.music.push({ id: view.Id, name: view.Name ?? 'Music' })
     else if (view.CollectionType === CollectionType.Musicvideos) sections.musicvideos.push({ id: view.Id, name: view.Name ?? 'Music videos' })
     else if (view.CollectionType === CollectionType.Books) sections.books.push({ id: view.Id, name: view.Name ?? 'Books' })
+    else if (view.CollectionType === CollectionType.Livetv) sections.livetv.push({ id: view.Id, name: view.Name ?? 'Live TV' })
     else if (view.CollectionType === CollectionType.Tvshows) {
       const name = view.Name ?? 'Series'
       sections[isAnimeLibraryName(name) ? 'anime' : 'series'].push({ id: view.Id, name })

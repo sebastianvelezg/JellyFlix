@@ -12,6 +12,9 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
   Other formats (Mobi, RAR comics) can be downloaded. Reading and downloading need an account that may download files.
 
 ### Both apps
+- **Live TV:** the Live TV tab lists your channels with what is on each, and a guide (a time grid of the next hours on the web, "now and next" for each channel on the TV).
+  Choosing a channel opens the stream the server provides: no seek bar (it is live), the channel before and after on the arrow keys (the TV remote's channel keys too), and the usual reports to the server.
+  Favorites work for channels. Recording and timers come later.
 - **Books on the TV:** the Books tab lists books and audiobooks; audiobooks play in the music player (from where they were left) and the TV says that books to read are for the web app or a phone.
 - **Music videos:** a library of type "Music videos" gets its own tab with wide cards (the artist under the title), a title page with the artist, playback with the usual player, search, a "New music videos" row on Home (which can be moved or hidden in Appearance) and a place in "Continue watching".
 

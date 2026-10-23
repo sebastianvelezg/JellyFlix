@@ -51,6 +51,8 @@ export interface MockOptions {
   audiobooks?: number
   /** Answer the download of a book's file with "not allowed" (an account that may not download). */
   noDownload?: boolean
+  /** Live TV channels: ch0001... each with a programme every half hour from two hours ago to ten hours ahead. 0 = no Live TV. */
+  liveTv?: number
   /** Make /Sessions/Playing* fail, to prove reporting errors do not break playback. */
   failReporting?: boolean
   /**
@@ -378,8 +380,9 @@ function episodeDto(show: string, season: number, episode: number, user: UserSta
 }
 
 /** The DTO for any id the mock knows (movie, series, season or episode), or undefined. */
-function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; books?: number; audiobooks?: number; trickplay?: boolean }, full = false) {
+function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; books?: number; audiobooks?: number; liveTv?: number; trickplay?: boolean }, full = false) {
   const { movieCount } = counts
+  if (CHANNEL_ID.test(id)) return Number(id.slice(2)) <= (counts.liveTv ?? 0) ? channelDto(Number(id.slice(2)), user) : undefined
   if (BOOK_ID.test(id)) return Number(id.slice(2)) <= (counts.books ?? 0) ? bookDto(Number(id.slice(2)), user, full) : undefined
   if (AUDIOBOOK_ID.test(id)) return Number(id.slice(2)) <= (counts.audiobooks ?? 0) ? audiobookDto(Number(id.slice(2)), user, full) : undefined
   if (MUSIC_VIDEO_ID.test(id)) {
@@ -532,6 +535,49 @@ function audiobookDto(n: number, user: UserState, full = false) {
   }
 }
 
+// ---- live TV: channels "ch0001"... and their programmes ---------------------------------------------------
+
+const CHANNEL_ID = /^ch\d{4}$/
+const channelId = (n: number) => `ch${String(n).padStart(4, '0')}`
+const channelName = (n: number) => `Test Channel ${String(n).padStart(2, '0')}`
+const SLOT_MS = 30 * 60_000
+
+/** The programme of a channel that starts at a half hour (ms since the epoch). */
+function programDto(n: number, startMs: number) {
+  const slot = Math.floor(startMs / SLOT_MS)
+  return {
+    Id: `pg-${channelId(n)}-${slot}`,
+    ChannelId: channelId(n),
+    Name: `Show ${n}-${slot % 100}`,
+    EpisodeTitle: `Episode ${slot % 7}`,
+    Overview: `A programme on channel ${n}.`,
+    Type: 'Program',
+    StartDate: new Date(startMs).toISOString(),
+    EndDate: new Date(startMs + SLOT_MS).toISOString(),
+    Genres: [GENRES[slot % 3]],
+  }
+}
+
+/** The programmes of a channel from two hours ago to ten hours ahead, as the guide has them. */
+function programsOf(n: number, nowMs: number) {
+  const first = Math.floor(nowMs / SLOT_MS) * SLOT_MS - 4 * SLOT_MS
+  return Array.from({ length: 24 }, (_, i) => programDto(n, first + i * SLOT_MS))
+}
+
+function channelDto(n: number, user: UserState, nowMs = Date.now()) {
+  const id = channelId(n)
+  return {
+    Id: id,
+    Name: channelName(n),
+    SortName: channelName(n).toLowerCase(),
+    ChannelNumber: String(n),
+    Type: 'TvChannel',
+    ImageTags: n % 2 === 1 ? { Primary: 'tag1' } : {},
+    CurrentProgram: programDto(n, Math.floor(nowMs / SLOT_MS) * SLOT_MS),
+    UserData: { IsFavorite: user.favorites.has(id), Played: false, PlaybackPositionTicks: 0 },
+  }
+}
+
 function movieDto(n: number, user: UserState) {
   const id = movieId(n)
   return {
@@ -605,8 +651,8 @@ const STREAMS = [
 ]
 
 export async function startMockJellyfin(options: MockOptions = {}): Promise<MockServer> {
-  const opts = { username: 'tester', password: 'secret', movieCount: 130, playMode: 'direct', seriesCount: 0, animeCount: 0, musicVideos: 0, books: 0, audiobooks: 0, musicArtists: 0, collections: 0, ...options } as Required<
-    Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicVideos' | 'books' | 'audiobooks' | 'musicArtists' | 'collections'>
+  const opts = { username: 'tester', password: 'secret', movieCount: 130, playMode: 'direct', seriesCount: 0, animeCount: 0, musicVideos: 0, books: 0, audiobooks: 0, liveTv: 0, musicArtists: 0, collections: 0, ...options } as Required<
+    Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicVideos' | 'books' | 'audiobooks' | 'liveTv' | 'musicArtists' | 'collections'>
   > &
     MockOptions
   const requests: RecordedRequest[] = []
@@ -1083,6 +1129,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         ...(opts.animeCount > 0 ? [folder('lib-anime', 'Anime', 'tvshows', '/media/anime')] : []),
         ...(opts.musicVideos > 0 ? [folder('lib-musicvideos', 'Music videos', 'musicvideos', '/media/musicvideos')] : []),
         ...(opts.books + opts.audiobooks > 0 ? [folder('lib-books', 'Books', 'books', '/media/books')] : []),
+        ...(opts.liveTv > 0 ? [folder('lib-livetv', 'Live TV', 'livetv', '/media/livetv')] : []),
         ...(opts.musicArtists > 0 ? [folder(MUSIC_LIBRARY, 'Music', 'music', '/media/music')] : []),
       ]
       return json(res, 200, folders)
@@ -1217,6 +1264,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       if (opts.animeCount > 0) items.push({ Id: 'lib-anime', Name: 'Anime', CollectionType: 'tvshows' })
       if (opts.musicVideos > 0) items.push({ Id: 'lib-musicvideos', Name: 'Music videos', CollectionType: 'musicvideos' })
       if (opts.books + opts.audiobooks > 0) items.push({ Id: 'lib-books', Name: 'Books', CollectionType: 'books' })
+      if (opts.liveTv > 0) items.push({ Id: 'lib-livetv', Name: 'Live TV', CollectionType: 'livetv' })
       if (opts.musicArtists > 0) items.push({ Id: MUSIC_LIBRARY, Name: 'Music', CollectionType: 'music' })
       if (!opts.noMovieLibrary) items.unshift({ Id: 'lib-movies', Name: 'Movies', CollectionType: 'movies' })
       return json(res, 200, { Items: items, TotalRecordCount: items.length, StartIndex: 0 })
@@ -1759,6 +1807,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       // Like a real server (verified against Jellyfin 12.2): the audio track is only honoured when the media source is named.
       const audio = dto.MediaSourceId ? (dto.AudioStreamIndex ?? 1) : 1
       const isTrack = TRACK_ID.test(id) || AUDIOBOOK_ID.test(id)
+      const isChannel = CHANNEL_ID.test(id)
       const source: Record<string, unknown> = {
         Id: `ms-${id}`,
         ETag: 'etag1',
@@ -1769,6 +1818,8 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         SupportsTranscoding: true,
         DefaultAudioStreamIndex: 1,
         MediaStreams: isTrack ? [{ Index: 0, Type: 'Audio', Codec: 'mp3', IsDefault: true, DisplayTitle: 'MP3 - Stereo' }] : STREAMS,
+        // A live channel has no length; the server opens a stream for it and says which.
+        ...(isChannel ? { RunTimeTicks: undefined, LiveStreamId: `live-${id}`, IsInfiniteStream: true } : {}),
       }
       if (isTrack) {
         source.Container = 'mp3'
@@ -1851,6 +1902,33 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         savedLyrics.add(id)
         return json(res, 200, { Metadata: { IsSynced: true }, Lyrics: timedLyrics })
       }
+    }
+    // Live TV: the channels (with what is on now), one channel, and the guide.
+    if (path === '/LiveTv/Channels' && req.method === 'GET') {
+      if (!needAuth()) return
+      let numbers = Array.from({ length: opts.liveTv }, (_, i) => i + 1)
+      if (query.isFavorite === 'true') numbers = numbers.filter((n) => user.favorites.has(channelId(n)))
+      const start = Number(query.startIndex ?? 0)
+      const limit = Number(query.limit ?? numbers.length)
+      const items = numbers.slice(start, start + limit).map((n) => channelDto(n, user))
+      return json(res, 200, { Items: items, TotalRecordCount: numbers.length, StartIndex: start })
+    }
+    const oneChannel = /^\/LiveTv\/Channels\/([^/]+)$/.exec(path)
+    if (oneChannel && req.method === 'GET') {
+      if (!needAuth()) return
+      const found = dtoFor(oneChannel[1] as string, user, opts)
+      return found ? json(res, 200, found) : void res.writeHead(404).end()
+    }
+    if (path === '/LiveTv/Programs' && req.method === 'POST') {
+      if (!needAuth()) return
+      const b = (body ?? {}) as { ChannelIds?: string[]; MinEndDate?: string; MaxStartDate?: string }
+      const minEnd = b.MinEndDate ? Date.parse(b.MinEndDate) : -Infinity
+      const maxStart = b.MaxStartDate ? Date.parse(b.MaxStartDate) : Infinity
+      const items = (b.ChannelIds ?? [])
+        .filter((id) => CHANNEL_ID.test(id) && Number(id.slice(2)) <= opts.liveTv)
+        .flatMap((id) => programsOf(Number(id.slice(2)), Date.now()))
+        .filter((p) => Date.parse(p.EndDate) > minEnd && Date.parse(p.StartDate) < maxStart)
+      return json(res, 200, { Items: items, TotalRecordCount: items.length, StartIndex: 0 })
     }
     // A book's own file, for reading or saving (an account may be forbidden to download).
     const download = /^\/Items\/([^/]+)\/Download$/.exec(path)

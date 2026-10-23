@@ -63,7 +63,8 @@ object HomeCache {
                     .put("anime", libs(snapshot.libs.anime))
                     .put("music", libs(snapshot.libs.music))
                     .put("musicVideos", libs(snapshot.libs.musicVideos))
-                    .put("books", libs(snapshot.libs.books)))
+                    .put("books", libs(snapshot.libs.books))
+                    .put("liveTv", libs(snapshot.libs.liveTv)))
                 .put("lineup", items(snapshot.lineup))
                 .put("continue", items(snapshot.continueRow))
                 .put("nextUp", items(snapshot.nextUp))
@@ -96,7 +97,7 @@ object HomeCache {
         fun read(key: String) = (json.optJSONArray(key) ?: JSONArray()).let { a ->
             List(a.length()) { Lib(UUID.fromString(a.getJSONObject(it).getString("id")), a.getJSONObject(it).getString("name")) }
         }
-        return Libraries(read("movies"), read("series"), read("anime"), read("music"), read("musicVideos"), read("books"))
+        return Libraries(read("movies"), read("series"), read("anime"), read("music"), read("musicVideos"), read("books"), read("liveTv"))
     }
 
     private fun items(list: List<MediaItem>) = JSONArray().also { array -> list.forEach { array.put(item(it)) } }

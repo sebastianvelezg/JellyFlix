@@ -54,6 +54,8 @@ const AdminPage = lazy(() => import('./components/admin/AdminPage').then((m) => 
 const StatsPage = lazy(() => import('./components/StatsPage').then((m) => ({ default: m.StatsPage })))
 const ListsPage = lazy(() => import('./components/ListsPage').then((m) => ({ default: m.ListsPage })))
 const ListPage = lazy(() => import('./components/ListsPage').then((m) => ({ default: m.ListPage })))
+const LiveTvPage = lazy(() => import('./components/live/LiveTvPage').then((m) => ({ default: m.LiveTvPage })))
+const LivePlayer = lazy(() => import('./components/live/LivePlayer').then((m) => ({ default: m.LivePlayer })))
 const BookPage = lazy(() => import('./components/BookPage').then((m) => ({ default: m.BookPage })))
 const BookReader = lazy(() => import('./components/reader/BookReader').then((m) => ({ default: m.BookReader })))
 const MusicPage = lazy(() => import('./components/music/MusicPage').then((m) => ({ default: m.MusicPage })))
@@ -224,7 +226,7 @@ export default function App() {
   )
 }
 
-const SECTIONS: Section[] = ['movies', 'series', 'anime', 'musicvideos', 'books', 'music']
+const SECTIONS: Section[] = ['movies', 'series', 'anime', 'musicvideos', 'books', 'livetv', 'music']
 
 const MUSIC_ROUTES = new Set(['music', 'album', 'artist', 'playlist'])
 
@@ -235,7 +237,7 @@ const SIMPLE_TITLES: Partial<Record<Route['page'], string>> = {
   collections: tr('Collections'),
   settings: tr('Settings'),
 }
-const SECTION_TITLES = { series: tr('Series'), anime: tr('Anime'), musicvideos: tr('Music videos'), books: tr('Books') } as const
+const SECTION_TITLES = { series: tr('Series'), anime: tr('Anime'), musicvideos: tr('Music videos'), books: tr('Books'), livetv: tr('Live TV') } as const
 
 /** Changes when the page changes, but not when only what is typed in the search box does. */
 function routeKeyForFocus(route: Route): string {
@@ -280,7 +282,9 @@ function Shell({
             ? 'music'
             : route.page === 'book' || route.page === 'read'
               ? 'books'
-              : null
+              : route.page === 'live'
+                ? 'livetv'
+                : null
 
   // With two or more tabs the phone layout needs a second header row for them.
   const hasTabs = tabs.length >= 2
@@ -602,6 +606,13 @@ function Shell({
             />
           </Suspense>
         )}
+        {(route.page === 'section' && route.section === 'livetv') || route.page === 'live' ? (
+          <div hidden={route.page !== 'section'}>
+            <Suspense fallback={<PageLoading />}>
+              <LiveTvPage session={session} onPlay={(channel) => go({ page: 'live', id: channel.id })} />
+            </Suspense>
+          </div>
+        ) : null}
         {route.page === 'book' && (
           <Suspense fallback={<PageLoading />}>
             <BookPage
@@ -644,6 +655,17 @@ function Shell({
         }
       />
       <MiniPlayer session={session} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
+      {route.page === 'live' && (
+        <Suspense fallback={<PlayerLoading />}>
+          <LivePlayer
+            key={route.id}
+            session={session}
+            id={route.id}
+            onChannel={(id) => go({ page: 'live', id }, { replace: true })}
+            onExit={() => back({ page: 'section', section: 'livetv' })}
+          />
+        </Suspense>
+      )}
       {route.page === 'read' && (
         <Suspense fallback={<PlayerLoading />}>
           <BookReader key={route.id} session={session} id={route.id} onExit={() => back({ page: 'book', id: route.id })} />

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import type { Section, Session } from '../core'
-import { AnimeIcon, BookIcon, CloseIcon, FilmIcon, HomeIcon, LogoMark, MusicIcon, MusicVideoIcon, SearchIcon, TvIcon, Wordmark } from './icons'
+import { AnimeIcon, BookIcon, CloseIcon, FilmIcon, HomeIcon, LiveTvIcon, LogoMark, MusicIcon, MusicVideoIcon, SearchIcon, TvIcon, Wordmark } from './icons'
 import { t, tr } from '../i18n'
 import { addRecentSearch, clearRecentSearches, readRecentSearches } from '../platform/web/recentSearches'
 
@@ -173,10 +173,11 @@ export const TAB_LABELS: Record<NavTab, string> = {
   anime: tr('Anime'),
   musicvideos: tr('Music videos'),
   books: tr('Books'),
+  livetv: tr('Live TV'),
   music: tr('Music'),
 }
 
-/** Home / Movies / Series / Anime / Music videos / Books / Music. Only sections that have a library are offered, and nothing is shown if there is just one. */
+/** Home / Movies / Series / Anime / Music videos / Books / Live TV / Music. Only sections that have a library are offered, and nothing is shown if there is just one. */
 export function SectionTabs({
   sections,
   current,
@@ -221,6 +222,7 @@ const TAB_ICONS: Record<NavTab, () => ReactElement> = {
   anime: AnimeIcon,
   musicvideos: MusicVideoIcon,
   books: BookIcon,
+  livetv: LiveTvIcon,
   music: MusicIcon,
 }
 

@@ -48,7 +48,10 @@ data class MediaItem(
     /** How long it runs, in milliseconds (an audiobook is played as a long song). */
     val runtimeMs: Long? = null,
 ) {
-    val isPlayable get() = kind == BaseItemKind.MOVIE || kind == BaseItemKind.EPISODE || kind == BaseItemKind.MUSIC_VIDEO
+    val isPlayable get() = kind == BaseItemKind.MOVIE || kind == BaseItemKind.EPISODE || kind == BaseItemKind.MUSIC_VIDEO || kind == BaseItemKind.TV_CHANNEL
+
+    /** A live TV channel: it has no end and no place to resume from. */
+    val isChannel get() = kind == BaseItemKind.TV_CHANNEL
 
     /** A book to read (this TV cannot show one: it offers audiobooks only). */
     val isBook get() = kind == BaseItemKind.BOOK
@@ -85,13 +88,15 @@ data class Libraries(
     val music: List<Lib>,
     val musicVideos: List<Lib> = emptyList(),
     val books: List<Lib> = emptyList(),
+    /** The server's Live TV view, when the account has channels. */
+    val liveTv: List<Lib> = emptyList(),
 ) {
     /** Series and anime together, for rows and picks that mix them. */
     val shows: List<Lib> get() = series + anime
     val hasVideo: Boolean get() = movies.isNotEmpty() || shows.isNotEmpty() || musicVideos.isNotEmpty()
     /** Something to put on the main page: video, or books (whose rows have no banner). */
     val hasTitles: Boolean get() = hasVideo || books.isNotEmpty()
-    val isEmpty: Boolean get() = !hasTitles && music.isEmpty()
+    val isEmpty: Boolean get() = !hasTitles && music.isEmpty() && liveTv.isEmpty()
 }
 
 /** Someone credited on a title (an actor), with their picture when the server has one. */
@@ -134,6 +139,8 @@ data class PlaybackPlan(
     val subtitleUrl: String?,
     val subtitleLanguage: String?,
     val startMs: Long,
+    /** A live channel: the id of the stream the server opened for it (no end, no seeking, no resume point). */
+    val liveStreamId: String? = null,
     /** False after a direct play failed on this TV, so later plans for the same title ask for a converted stream. */
     val directAllowed: Boolean,
     /** What the server said about the stream, for the Info panel. */

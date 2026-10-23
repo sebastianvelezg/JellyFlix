@@ -16,6 +16,8 @@ describe('routes', () => {
     { page: 'section', section: 'books' },
     { page: 'book', id: 'bk0001' },
     { page: 'read', id: 'bk0001' },
+    { page: 'section', section: 'livetv' },
+    { page: 'live', id: 'ch0001' },
     { page: 'show', id: 's0001' },
     { page: 'settings' },
     { page: 'admin' },

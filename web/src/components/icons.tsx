@@ -299,6 +299,14 @@ export const BookIcon = () => (
     <path d="M12 6.5v13" />
   </Icon>
 )
+/** A television with an aerial: live TV. */
+export const LiveTvIcon = () => (
+  <Icon>
+    <rect x="3" y="8" width="18" height="12" rx="2.5" />
+    <path d="m8 3.5 4 4.5 4-4.5" />
+  </Icon>
+)
+
 export const DownloadIcon = () => (
   <Icon>
     <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />

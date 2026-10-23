@@ -76,6 +76,15 @@
     <string name="nav_music_videos">Videos musicales</string>
     <string name="row_new_music_videos">Videos musicales nuevos</string>
     <string name="search_music_videos">Videos musicales</string>
+    <string name="nav_live_tv">TV en vivo</string>
+    <string name="live_channels">Canales</string>
+    <string name="live_guide">Guía</string>
+    <string name="live_favorites">Favoritos</string>
+    <string name="live_empty">Esta cuenta no tiene canales. Añade un sintonizador o una lista de canales en Jellyfin y aparecerán aquí.</string>
+    <string name="live_no_favorites">Aún no tienes canales favoritos. Mantén pulsado un canal para añadir uno.</string>
+    <string name="live_no_info">Sin información del programa</string>
+    <string name="live_next">Después: %1$s, %2$s</string>
+    <string name="player_live">EN VIVO</string>
     <string name="nav_books">Libros</string>
     <string name="row_new_books">Libros nuevos</string>
     <string name="search_books">Libros</string>

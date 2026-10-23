@@ -12,6 +12,7 @@ import org.jellyfin.sdk.api.client.extensions.displayPreferenceApi
 import org.jellyfin.sdk.api.client.extensions.filterApi
 import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
+import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.client.extensions.lyricApi
 import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
 import org.jellyfin.sdk.api.client.extensions.mediaSegmentApi
@@ -42,6 +43,7 @@ import org.jellyfin.sdk.model.api.EncodingContext
 import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemFilter
+import org.jellyfin.sdk.model.api.GetProgramsDto
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.MediaSegmentType
 import org.jellyfin.sdk.model.api.MediaType
@@ -222,6 +224,7 @@ class JellyfinRepository(context: Context) {
         val music = ArrayList<Lib>()
         val musicVideos = ArrayList<Lib>()
         val books = ArrayList<Lib>()
+        val liveTv = ArrayList<Lib>()
         for (view in views) {
             val lib = Lib(view.id, view.name.orEmpty())
             when (view.collectionType) {
@@ -229,11 +232,12 @@ class JellyfinRepository(context: Context) {
                 CollectionType.MUSIC -> music.add(lib)
                 CollectionType.MUSICVIDEOS -> musicVideos.add(lib)
                 CollectionType.BOOKS -> books.add(lib)
+                CollectionType.LIVETV -> liveTv.add(lib)
                 CollectionType.TVSHOWS -> if (animeName.containsMatchIn(lib.name)) anime.add(lib) else series.add(lib)
                 else -> Unit
             }
         }
-        return Libraries(movies, series, anime, music, musicVideos, books)
+        return Libraries(movies, series, anime, music, musicVideos, books, liveTv)
     }
 
     private val richFields = listOf(ItemFields.OVERVIEW, ItemFields.GENRES)
@@ -1251,11 +1255,13 @@ class JellyfinRepository(context: Context) {
         mediaSourceId: String? = null,
         limits: PlayLimits = PlayLimits(),
     ): PlaybackPlan {
+        // A live channel is never played as a file: the server opens the stream and sends it as HLS.
+        val directAllowed = directAllowed && !item.isChannel
         var response = requestPlaybackInfo(session, item, audioIndex, subtitleIndex, startMs, directAllowed, mediaSourceId, limits)
         Log.i(TAG, "PlaybackInfo for ${item.id}: sources=${response.mediaSources.size} error=${response.errorCode} session=${response.playSessionId}")
         var source = response.mediaSources.firstOrNull() ?: error("This title has nothing to play")
         // First start: the server knows the user's subtitle preference, but only delivers a file once a stream is asked for.
-        if (subtitleIndex == null && source.defaultSubtitleStreamIndex != null) {
+        if (subtitleIndex == null && source.defaultSubtitleStreamIndex != null && !item.isChannel) {
             response = requestPlaybackInfo(session, item, audioIndex, source.defaultSubtitleStreamIndex, startMs, directAllowed, mediaSourceId, limits)
             source = response.mediaSources.firstOrNull() ?: source
         }
@@ -1287,9 +1293,65 @@ class JellyfinRepository(context: Context) {
             subtitleUrl = external?.deliveryUrl?.let { session.serverUrl + it },
             subtitleLanguage = external?.language,
             startMs = startMs,
+            liveStreamId = source.liveStreamId?.takeIf { it.isNotBlank() },
             directAllowed = directAllowed,
             info = streamInfo(source, chosenAudio, if (direct) emptyList() else transcodeReasons(transcodingUrl)),
         )
+    }
+
+    // ---- Live TV ----------------------------------------------------------------------------------------------
+
+    private fun toProgram(dto: BaseItemDto, fallbackChannel: UUID? = null): TvProgram? {
+        val start = dto.startDate?.toEpochSecond(java.time.ZoneOffset.UTC)?.times(1000) ?: return null
+        val end = dto.endDate?.toEpochSecond(java.time.ZoneOffset.UTC)?.times(1000) ?: return null
+        if (end <= start) return null
+        return TvProgram(
+            id = dto.id,
+            channelId = dto.channelId ?: fallbackChannel ?: return null,
+            title = dto.name.orEmpty(),
+            episodeTitle = dto.episodeTitle?.takeIf { it.isNotBlank() },
+            overview = dto.overview?.takeIf { it.isNotBlank() },
+            startMs = start,
+            endMs = end,
+        )
+    }
+
+    /** One page of the user's channels, each with what is on now. */
+    suspend fun channels(session: Session, startIndex: Int, limit: Int, favoritesOnly: Boolean = false): Page<TvChannel> {
+        val api = api(session)
+        val result = api.liveTvApi.getLiveTvChannels(
+            userId = userId(session),
+            startIndex = startIndex,
+            limit = limit,
+            isFavorite = if (favoritesOnly) true else null,
+            addCurrentProgram = true,
+            enableUserData = true,
+            sortBy = listOf(ItemSortBy.SORT_NAME),
+            sortOrder = SortOrder.ASCENDING,
+        ).content
+        val channels = result.items.map { dto ->
+            TvChannel(toItem(api, dto), dto.channelNumber?.takeIf { it.isNotBlank() }, dto.currentProgram?.let { toProgram(it, dto.id) })
+        }
+        return Page(channels, result.totalRecordCount.takeIf { startIndex == 0 })
+    }
+
+    /** What is on each of [channelIds] between two moments, in time order (empty for a channel the server has nothing for). */
+    suspend fun programs(session: Session, channelIds: List<UUID>, fromMs: Long, toMs: Long): Map<UUID, List<TvProgram>> {
+        if (channelIds.isEmpty()) return emptyMap()
+        fun at(ms: Long) = java.time.LocalDateTime.ofEpochSecond(ms / 1000, 0, java.time.ZoneOffset.UTC)
+        val found = api(session).liveTvApi.getPrograms(
+            GetProgramsDto(
+                channelIds = channelIds,
+                userId = userId(session),
+                minEndDate = at(fromMs),
+                maxStartDate = at(toMs),
+                sortBy = listOf(ItemSortBy.START_DATE),
+                sortOrder = listOf(SortOrder.ASCENDING),
+                enableImages = false,
+                enableTotalRecordCount = false,
+            ),
+        ).content.items.mapNotNull { toProgram(it) }
+        return found.groupBy { it.channelId }.mapValues { (_, list) -> list.sortedBy { it.startMs } }
     }
 
     /** What the Info panel shows about [source]: its container, bitrate, video and the audio track being played. */
@@ -1358,8 +1420,8 @@ class JellyfinRepository(context: Context) {
         item.id,
         PlaybackInfoDto(
             userId = userId(session),
-            // Jellyfin compares this with its own source id, which is the id without dashes.
-            mediaSourceId = mediaSourceId ?: item.id.toString().replace("-", ""),
+            // Jellyfin compares this with its own source id, which is the id without dashes (a live channel has none to name).
+            mediaSourceId = if (item.isChannel) null else mediaSourceId ?: item.id.toString().replace("-", ""),
             startTimeTicks = startMs * 10_000,
             audioStreamIndex = audioIndex,
             subtitleStreamIndex = subtitleIndex,
@@ -1368,7 +1430,7 @@ class JellyfinRepository(context: Context) {
             enableDirectPlay = directAllowed,
             enableDirectStream = directAllowed,
             enableTranscoding = limits.transcodeAllowed,
-            autoOpenLiveStream = false,
+            autoOpenLiveStream = item.isChannel,
         ),
     ).content
 
@@ -1443,7 +1505,8 @@ class JellyfinRepository(context: Context) {
                     positionTicks = positionMs * 10_000,
                     playSessionId = plan.playSessionId,
                     playMethod = playMethod(plan),
-                    canSeek = true,
+                    liveStreamId = plan.liveStreamId,
+                    canSeek = plan.liveStreamId == null,
                     isPaused = false,
                     isMuted = false,
                     repeatMode = RepeatMode.REPEAT_NONE,
@@ -1464,7 +1527,8 @@ class JellyfinRepository(context: Context) {
                     positionTicks = positionMs * 10_000,
                     playSessionId = plan.playSessionId,
                     playMethod = playMethod(plan),
-                    canSeek = true,
+                    liveStreamId = plan.liveStreamId,
+                    canSeek = plan.liveStreamId == null,
                     isPaused = paused,
                     isMuted = false,
                     repeatMode = RepeatMode.REPEAT_NONE,
@@ -1482,6 +1546,7 @@ class JellyfinRepository(context: Context) {
                     mediaSourceId = plan.mediaSourceId,
                     positionTicks = positionMs * 10_000,
                     playSessionId = plan.playSessionId,
+                    liveStreamId = plan.liveStreamId,
                     failed = false,
                 ),
             )

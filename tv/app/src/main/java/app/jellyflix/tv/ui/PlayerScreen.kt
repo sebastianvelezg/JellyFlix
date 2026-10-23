@@ -116,6 +116,8 @@ class PlayerActions(
     /** The "Next episode" button, shown in the last stretch of an episode. */
     val onNextEpisode: () -> Unit,
     val onExit: () -> Unit,
+    /** A live channel: change to the one before (-1) or after (+1) this one. */
+    val onChannelStep: (Int) -> Unit = {},
 )
 
 /**
@@ -391,10 +393,21 @@ fun PlayerScreen(
                         showControls()
                         true
                     }
-                    // Holding the key skips in bigger and bigger steps, so a long film is crossed in a few seconds.
-                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> { seekBy(-seekStep(event.nativeKeyEvent.repeatCount)); true }
-                    KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { seekBy(seekStep(event.nativeKeyEvent.repeatCount)); true }
-                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { showControls(); true }
+                    // A live channel cannot be skipped through; up and down (or the remote's channel keys) change channel.
+                    KeyEvent.KEYCODE_CHANNEL_UP -> { if (plan.liveStreamId != null) actions.onChannelStep(1); plan.liveStreamId != null }
+                    KeyEvent.KEYCODE_CHANNEL_DOWN -> { if (plan.liveStreamId != null) actions.onChannelStep(-1); plan.liveStreamId != null }
+                    KeyEvent.KEYCODE_DPAD_UP -> { if (plan.liveStreamId != null) actions.onChannelStep(-1) else showControls(); true }
+                    KeyEvent.KEYCODE_DPAD_DOWN -> { if (plan.liveStreamId != null) actions.onChannelStep(1) else showControls(); true }
+                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                        if (plan.liveStreamId != null) showControls()
+                        else {
+                            // Holding the key skips in bigger and bigger steps, so a long film is crossed in a few seconds.
+                            val forward = event.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || event.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD
+                            seekBy((if (forward) 1 else -1) * seekStep(event.nativeKeyEvent.repeatCount))
+                        }
+                        true
+                    }
+                    KeyEvent.KEYCODE_MENU -> { showControls(); true }
                     else -> false
                 }
             },
@@ -562,7 +575,10 @@ private fun Controls(
                     Spacer(Modifier.width(TIME_LABEL_WIDTH + BAR_GAP))
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(BAR_GAP)) {
+            if (plan.liveStreamId != null) {
+                // A live channel has no length: say so instead of a bar.
+                Text(stringResource(R.string.player_live), fontSize = 14.sp, color = Color.White)
+            } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(BAR_GAP)) {
                 Text(formatTime(position), fontSize = 14.sp, color = Color.White, modifier = Modifier.width(TIME_LABEL_WIDTH))
                 Box(
                     Modifier.weight(1f).height(5.dp).background(Color(0x55FFFFFF)).drawBehind {
@@ -584,8 +600,10 @@ private fun Controls(
                     onClick = onTogglePlay,
                     modifier = Modifier.focusRequester(playPause),
                 )
-                Pill(stringResource(R.string.player_back_10), onClick = onBack)
-                Pill(stringResource(R.string.player_forward_10), onClick = onForward)
+                if (plan.liveStreamId == null) {
+                    Pill(stringResource(R.string.player_back_10), onClick = onBack)
+                    Pill(stringResource(R.string.player_forward_10), onClick = onForward)
+                }
                 Pill(stringResource(R.string.player_audio_subtitles), onClick = onTracks)
                 if (chapters.size > 1) Pill(stringResource(R.string.player_chapters), onClick = onChapters)
                 Pill(stringResource(R.string.player_info), onClick = onInfo, selected = showInfo)

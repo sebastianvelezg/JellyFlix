@@ -42,6 +42,10 @@ import app.jellyflix.tv.data.HomeSnapshot
 import app.jellyflix.tv.data.JellyfinRepository
 import app.jellyflix.tv.data.Lib
 import app.jellyflix.tv.data.Libraries
+import app.jellyflix.tv.data.TvChannel
+import app.jellyflix.tv.data.TvProgram
+import app.jellyflix.tv.data.neighbourChannel
+import app.jellyflix.tv.data.nextProgram
 import app.jellyflix.tv.data.Lyrics
 import app.jellyflix.tv.data.MediaItem
 import app.jellyflix.tv.data.PlaybackPlan
@@ -82,6 +86,7 @@ enum class Tab(@StringRes val label: Int) {
     Anime(R.string.nav_anime),
     MusicVideos(R.string.nav_music_videos),
     Books(R.string.nav_books),
+    LiveTv(R.string.nav_live_tv),
     Music(R.string.nav_music),
     Collections(R.string.nav_collections),
     Search(R.string.nav_search),
@@ -187,6 +192,29 @@ class MusicHome {
     var tryThese by mutableStateOf<List<Album>>(emptyList())
     var pick by mutableStateOf<Pick<Album>>(Pick.Loading)
     val list = LazyListState()
+}
+
+/** The Live TV tab: the channels (read a page at a time), what comes after what is on now, and which view is showing. */
+class LiveTvState {
+    val channels = mutableStateListOf<TvChannel>()
+    var total by mutableStateOf(0)
+    var loading by mutableStateOf(false)
+    var loaded by mutableStateOf(false)
+
+    /** The programme after the one on now, by channel (read for the channels on screen, to show "Next"). */
+    var upNext by mutableStateOf<Map<UUID, TvProgram>>(emptyMap())
+    var guide by mutableStateOf(false)
+    var favoritesOnly by mutableStateOf(false)
+    val grid = LazyGridState()
+    val list = LazyListState()
+
+    fun reset() {
+        channels.clear()
+        total = 0
+        loading = false
+        loaded = false
+        upNext = emptyMap()
+    }
 }
 
 /** A paged library list that keeps its place when you open a title and come back. */
@@ -407,6 +435,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (l != null && l.anime.isNotEmpty()) add(Tab.Anime)
                 if (l != null && l.musicVideos.isNotEmpty()) add(Tab.MusicVideos)
                 if (l != null && l.books.isNotEmpty()) add(Tab.Books)
+                if (l != null && l.liveTv.isNotEmpty()) add(Tab.LiveTv)
                 if (l != null && l.music.isNotEmpty()) add(Tab.Music)
                 if (hasCollections) add(Tab.Collections)
                 add(Tab.Search)
@@ -431,6 +460,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val anime = LibraryState(Section.Anime)
     val musicVideos = LibraryState(Section.MusicVideos)
     val books = LibraryState(Section.Books)
+    val liveTv = LiveTvState()
     val collectionList = LibraryState(Section.Collections)
 
     // Music
@@ -660,6 +690,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         pages.clear()
         resetHome()
         for (lib in listOf(movies, series, anime, musicVideos, books, collectionList)) resetLibrary(lib)
+        liveTv.reset()
         results = null
         musicResults = emptyList<Album>() to emptyList()
         query = ""
@@ -719,6 +750,65 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val state = libraryOf(next)
         if (state != null && !state.loaded) loadMore(state)
         if (next == Tab.Music) loadMusic()
+        if (next == Tab.LiveTv && !liveTv.loaded) loadLiveTv()
+    }
+
+    // ---- Live TV ------------------------------------------------------------------------------------------------
+
+    /** Reads the next page of channels (from the start when [restart] is set), then what comes after each one's current programme. */
+    fun loadLiveTv(restart: Boolean = false) {
+        val s = session ?: return
+        if (restart) liveTv.reset()
+        if (liveTv.loading || (liveTv.loaded && liveTv.channels.size >= liveTv.total)) return
+        liveTv.loading = true
+        val favorites = liveTv.favoritesOnly
+        launchSafe {
+            try {
+                val page = io { repo.channels(s, liveTv.channels.size, LIVE_PAGE, favorites) }
+                if (favorites != liveTv.favoritesOnly) return@launchSafe
+                liveTv.channels.addAll(page.items)
+                page.total?.let { liveTv.total = it }
+                liveTv.loaded = true
+                refreshUpNext(page.items)
+            } catch (e: Exception) {
+                fail(e)
+            } finally {
+                liveTv.loading = false
+            }
+        }
+    }
+
+    private fun refreshUpNext(channels: List<TvChannel>) {
+        val s = session ?: return
+        launchSafe {
+            val now = System.currentTimeMillis()
+            val found = runCatching { io { repo.programs(s, channels.map { it.id }, now, now + 3 * 3_600_000L) } }.getOrDefault(emptyMap())
+            liveTv.upNext = liveTv.upNext + found.mapNotNull { (id, programs) -> nextProgram(programs, now)?.let { id to it } }
+        }
+    }
+
+    fun showGuide(guide: Boolean) {
+        liveTv.guide = guide
+    }
+
+    fun toggleLiveFavorites() {
+        liveTv.favoritesOnly = !liveTv.favoritesOnly
+        loadLiveTv(restart = true)
+    }
+
+    /** Watches a channel. */
+    fun watch(channel: TvChannel) = play(channel.item, startMs = 0)
+
+    /** Changes channel from the player: the one [step] places on in the list (the list is read first when it has not been). */
+    fun stepChannel(plan: PlaybackPlan, step: Int) {
+        val s = session ?: return
+        if (busy) return
+        launchSafe {
+            if (liveTv.channels.isEmpty()) {
+                runCatching { io { repo.channels(s, 0, LIVE_PAGE) } }.getOrNull()?.let { liveTv.channels.addAll(it.items) }
+            }
+            neighbourChannel(liveTv.channels, plan.item.id, step)?.let { play(it.item, startMs = 0) }
+        }
     }
 
     /**
@@ -734,6 +824,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Section.MusicVideos, Section.Books, Section.Collections -> return emptyList()
         }
         return newest.filter { it.backdropUrl != null }.take(8)
+    }
+
+    private companion object {
+        const val LIVE_PAGE = 60
     }
 
     fun libraryOf(tab: Tab): LibraryState? = when (tab) {

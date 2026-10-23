@@ -443,3 +443,21 @@ export {
 } from './books'
 export { openComic, type ComicPage } from './comic'
 export { textOf, unpack } from './zip'
+export {
+  channelLogoUrl,
+  CHANNEL_PAGE_SIZE,
+  getChannel,
+  getChannels,
+  getGuide,
+  guideBlocks,
+  guideStart,
+  isOnNow,
+  neighbourChannel,
+  programProgress,
+  toChannel,
+  toProgram,
+  type Channel,
+  type ChannelPage,
+  type GuideBlock,
+  type Program,
+} from './liveTv'
