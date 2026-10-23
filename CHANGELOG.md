@@ -26,6 +26,7 @@ Three new kinds of library (music videos, books and Live TV), a menu you can arr
 ### Fixed
 - A library toolbar (sort, filters, Surprise me) no longer makes the page wider than the screen on medium widths.
 - The PDF reader lets go of its worker when closed before the file opened or when the file cannot be opened; a channel left before it was tuned no longer keeps a stream open on the server; a contents entry inside the open EPUB chapter scrolls to it.
+- Hosting with `npm run serve` or Docker: the PDF reader's worker and decoders are sent with the file types browsers require, so the reader does not fall back to the browser's viewer.
 - Smaller: the web service worker no longer downloads the PDF library when it installs, book downloads need less memory, and the channel list does not poll while a channel is being watched.
 
 ## [1.0.0] - 2026-10-23
