@@ -28,6 +28,7 @@ import {
 } from '../platform/web/appearance'
 import { t } from '../i18n'
 import { ACCENTS, CANVASES, accentColor, resolveAccent, sanitizeTheme, type Canvas } from '../theme/themes'
+import { BannerDrawing, DensityDrawing, NavDrawing, PickCards, UiSizeDrawing } from './LayoutCards'
 import { Card, Toggle } from './SettingsParts'
 
 const POSTER_LABEL: Record<PosterSize, string> = { compact: 'Compact', comfortable: 'Comfortable', large: 'Large' }
@@ -38,42 +39,6 @@ const UI_SIZE_LABEL: Record<UiSize, string> = { small: 'Small', default: 'Defaul
 const DENSITY_LABEL: Record<Density, string> = { comfortable: 'Comfortable', compact: 'Compact' }
 const BANNER_LABEL: Record<BannerSize, string> = { large: 'Large', compact: 'Compact' }
 const NAV_LABEL: Record<NavStyle, string> = { full: 'Icons and names', icons: 'Icons only', text: 'Names only' }
-
-/** A short row of pills where exactly one is chosen (radio buttons that look like a segmented control). */
-function Segmented<T extends string>({
-  name,
-  legend,
-  hint,
-  options,
-  labels,
-  value,
-  onChange,
-}: {
-  name: string
-  legend: string
-  hint?: string
-  options: readonly T[]
-  labels: Record<T, string>
-  value: T
-  onChange: (value: T) => void
-}) {
-  return (
-    <fieldset>
-      <legend className="text-sm font-medium text-neutral-100">{legend}</legend>
-      {hint && <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>}
-      <div className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[.04] p-1">
-        {options.map((option) => (
-          <label key={option} className="cursor-pointer">
-            <input type="radio" name={name} className="peer sr-only" checked={value === option} onChange={() => onChange(option)} />
-            <span className="block rounded-full px-4 py-1.5 text-sm font-medium text-neutral-300 transition hover:text-white peer-checked:bg-white peer-checked:text-black peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-accent)] pointer-coarse:py-3">
-              {t(labels[option])}
-            </span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  )
-}
 
 const ring =
   'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-accent)]'
@@ -247,7 +212,7 @@ export function AppearanceSettings() {
       </Card>
 
       <Card title={t('Layout')} description={t('How much fits on the screen.')}>
-        <Segmented
+        <PickCards
           name="ui-size"
           legend={t('Interface size')}
           hint={t('Scales the text and the controls.')}
@@ -255,24 +220,27 @@ export function AppearanceSettings() {
           labels={UI_SIZE_LABEL}
           value={prefs.uiSize}
           onChange={(uiSize) => save({ uiSize })}
+          draw={(size) => <UiSizeDrawing size={size} />}
         />
-        <Segmented
+        <PickCards
           name="density"
           legend={t('Space between rows')}
           options={DENSITIES}
           labels={DENSITY_LABEL}
           value={prefs.density}
           onChange={(density) => save({ density })}
+          draw={(density) => <DensityDrawing density={density} />}
         />
-        <Segmented
+        <PickCards
           name="banner-size"
           legend={t('Featured banner height')}
           options={BANNER_SIZES}
           labels={BANNER_LABEL}
           value={prefs.banner}
           onChange={(banner) => save({ banner })}
+          draw={(size) => <BannerDrawing size={size} />}
         />
-        <Segmented
+        <PickCards
           name="nav-style"
           legend={t('Menu buttons')}
           hint={t('What Home, Movies, Live TV and the other buttons of the menu show. With both, the names give way to the icons when there is no room.')}
@@ -280,6 +248,7 @@ export function AppearanceSettings() {
           labels={NAV_LABEL}
           value={prefs.nav}
           onChange={(nav) => save({ nav })}
+          draw={(style) => <NavDrawing style={style} />}
         />
       </Card>
 
