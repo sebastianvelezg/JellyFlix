@@ -92,6 +92,30 @@ test('menu buttons: icons and names, icons only, or names only; the buttons keep
   await expect(page.locator('html')).toHaveAttribute('data-nav', 'full')
 })
 
+test('top menu: buttons can be moved and turned off, Home always stays, and it is remembered', async ({ page }) => {
+  mock = await startMock({ ...everything, musicVideos: 2, liveTv: 3 })
+  await page.setViewportSize({ width: 1900, height: 900 }) // wide enough for the names
+  await signIn(page, mock, { start: '/', keep: true })
+  const menu = page.getByRole('navigation', { name: 'Sections' })
+  await expect(menu.getByRole('button')).toHaveText(['Home', 'Movies', 'Series', 'Anime', 'Music videos', 'Live TV', 'Music'])
+
+  await openAppearance(page)
+  const card = page.getByRole('region', { name: 'Top menu' })
+  await expect(card.getByRole('switch', { name: 'Home' })).toBeDisabled()
+  await card.getByRole('button', { name: 'Move Music up' }).click()
+  await card.getByRole('button', { name: 'Move Music up' }).click()
+  await card.getByRole('switch', { name: 'Anime' }).uncheck()
+  await page.getByRole('button', { name: 'Back' }).click()
+  await expect(menu.getByRole('button')).toHaveText(['Home', 'Movies', 'Series', 'Music videos', 'Music', 'Live TV'])
+
+  await page.reload()
+  await expect(menu.getByRole('button')).toHaveText(['Home', 'Movies', 'Series', 'Music videos', 'Music', 'Live TV'])
+  await openAppearance(page)
+  await page.getByRole('region', { name: 'Top menu' }).getByRole('button', { name: 'Restore the menu' }).click()
+  await page.getByRole('button', { name: 'Back' }).click()
+  await expect(menu.getByRole('button')).toHaveText(['Home', 'Movies', 'Series', 'Anime', 'Music videos', 'Live TV', 'Music'])
+})
+
 test('posters: the size setting changes the width of the cards in the rows', async ({ page }) => {
   mock = await startMock(everything)
   await signIn(page, mock, { start: '/' })

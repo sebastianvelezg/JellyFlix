@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { DEFAULT_HOME_LAYOUT, sanitizeHomeLayout, type HomeLayout } from '../../core'
+import { DEFAULT_HOME_LAYOUT, DEFAULT_MENU_LAYOUT, sanitizeHomeLayout, sanitizeMenuLayout, type HomeLayout, type MenuLayout } from '../../core'
 import { DEFAULT_THEME, canvasOf, sanitizeTheme, themeVariables, type ThemeChoice } from '../../theme/themes'
 
 /**
@@ -34,6 +34,8 @@ export interface AppearancePrefs {
   uiSize: UiSize
   banner: BannerSize
   nav: NavStyle
+  /** Which buttons the top menu has, and in what order. */
+  menu: MenuLayout
 }
 
 export const APPEARANCE_DEFAULTS: AppearancePrefs = {
@@ -44,6 +46,7 @@ export const APPEARANCE_DEFAULTS: AppearancePrefs = {
   uiSize: 'default',
   banner: 'large',
   nav: 'full',
+  menu: DEFAULT_MENU_LAYOUT,
 }
 
 export const KEY = 'jellyflix.appearance'
@@ -61,6 +64,7 @@ export function sanitizeAppearance(value: unknown): AppearancePrefs {
     uiSize: UI_SIZES.includes(p.uiSize as UiSize) ? (p.uiSize as UiSize) : 'default',
     banner: BANNER_SIZES.includes(p.banner as BannerSize) ? (p.banner as BannerSize) : 'large',
     nav: NAV_STYLES.includes(p.nav as NavStyle) ? (p.nav as NavStyle) : 'full',
+    menu: sanitizeMenuLayout(p.menu),
   }
 }
 

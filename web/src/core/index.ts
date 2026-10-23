@@ -397,6 +397,18 @@ export {
   type HomeRowId,
 } from './homeLayout'
 export {
+  arrangeMenu,
+  DEFAULT_MENU_LAYOUT,
+  isDefaultMenuLayout,
+  isMenuItemVisible,
+  MENU_IDS,
+  moveMenuItem,
+  sanitizeMenuLayout,
+  toggleMenuItem,
+  type MenuId,
+  type MenuLayout,
+} from './menuLayout'
+export {
   WATCH_LATER_NAMES,
   addToPlaylist,
   addToWatchLater,

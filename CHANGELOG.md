@@ -11,6 +11,9 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
   Where you stopped is remembered in this browser ("Continue reading"). **Audiobooks** play in the music player and go on from where they were left.
   Other formats (Mobi, RAR comics) can be downloaded. Reading and downloading need an account that may download files.
 
+### Web app (more)
+- **Top menu order:** Appearance → Top menu lets you move the buttons at the top (Home, Movies, Series, Live TV…) and turn some off. Home always stays; a button for a library you do not have is left out anyway. It goes into the look backup.
+
 ### Both apps
 - **Menu buttons:** Appearance has a new choice for the buttons at the top (Home, Movies, Live TV…): icons and names, icons only, or names only. With both, the names give way to the icons by themselves when they do not fit, so nothing is cut off.
   On the TV the bar scrolls with the remote, and Search and Settings stay at the right end so Settings is always there. On a phone the bottom bar does the same. The choice goes into the look backup.

@@ -932,6 +932,10 @@ export const es: Record<string, string> = {
   'Zoom in': 'Acercar',
   'Zoom out': 'Alejar',
   'of {total}': 'de {total}',
+  'Top menu': 'Menú de arriba',
+  'Show, hide and reorder the buttons at the top. A button for a kind of library you do not have is left out anyway. Home always stays.':
+    'Muestra, oculta y reordena los botones de arriba. Un botón de una biblioteca que no tienes se omite de todos modos. Inicio siempre se queda.',
+  'Restore the menu': 'Restaurar el menú',
   'Menu buttons': 'Botones del menú',
   'What Home, Movies, Live TV and the other buttons of the menu show. With both, the names give way to the icons when there is no room.':
     'Lo que muestran Inicio, Películas, TV en vivo y los demás botones del menú. Con las dos cosas, los nombres dejan su sitio a los iconos cuando no hay espacio.',

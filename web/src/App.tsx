@@ -6,6 +6,7 @@ import { CardActionsProvider } from './components/cardActions'
 import { AddToPlaylistDialog } from './components/AddToPlaylistDialog'
 import { AdminTools } from './components/admin/AdminTools'
 import { clearActivity } from './platform/web/adminActivity'
+import { useAppearance } from './platform/web/appearance'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
 import { Toaster } from './components/toast'
 import { HomePage } from './components/HomePage'
@@ -20,6 +21,7 @@ import { SearchPage } from './components/SearchPage'
 import { useLanguage } from './components/useLanguage'
 import { clearSwr, swrKey, swrScope, useSwr } from './components/useSwr'
 import {
+  arrangeMenu,
   audiobookStart,
   audiobookTrack,
   getLibrarySections,
@@ -270,7 +272,8 @@ function Shell({
   const available = sections.status === 'ready' ? SECTIONS.filter((x) => sections.data[x].length > 0) : []
   // The main page is only worth having when there is more than one section to mix.
   const hasHome = available.length >= 2
-  const tabs: NavTab[] = hasHome ? ['home', ...available] : available
+  const { menu } = useAppearance()
+  const tabs: NavTab[] = arrangeMenu(hasHome ? ['home', ...available] : available, menu)
   const current: NavTab | null =
     route.page === 'home'
       ? 'home'

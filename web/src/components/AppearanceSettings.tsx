@@ -1,12 +1,18 @@
 import { useState } from 'react'
 import {
   DEFAULT_HOME_LAYOUT,
+  DEFAULT_MENU_LAYOUT,
   HOME_ROW_LABEL,
   isDefaultHomeLayout,
+  isDefaultMenuLayout,
+  isMenuItemVisible,
   isRowVisible,
+  moveMenuItem,
   moveRow,
+  toggleMenuItem,
   toggleRow,
   type HomeRowId,
+  type MenuId,
 } from '../core'
 import {
   APPEARANCE_DEFAULTS,
@@ -29,6 +35,7 @@ import {
 import { t } from '../i18n'
 import { ACCENTS, CANVASES, accentColor, resolveAccent, sanitizeTheme, type Canvas } from '../theme/themes'
 import { BannerDrawing, DensityDrawing, NavDrawing, PickCards, UiSizeDrawing } from './LayoutCards'
+import { TAB_LABELS } from './Header'
 import { Card, Toggle } from './SettingsParts'
 
 const POSTER_LABEL: Record<PosterSize, string> = { compact: 'Compact', comfortable: 'Comfortable', large: 'Large' }
@@ -92,6 +99,13 @@ export function AppearanceSettings() {
   const pickedPreset = ACCENTS.find((a) => a.id === theme.accent)
   const customColor = pickedPreset ? null : accentColor(theme.accent)
   const rowLabel = (id: HomeRowId) => t(HOME_ROW_LABEL[id])
+
+  const { menu } = prefs
+  const moveButton = (id: MenuId, direction: -1 | 1) => {
+    const next = moveMenuItem(menu, id, direction)
+    save({ menu: next })
+    setAnnouncement(t('{row} is now number {position}', { row: t(TAB_LABELS[id]), position: next.order.indexOf(id) + 1 }))
+  }
 
   const move = (id: HomeRowId, direction: -1 | 1) => {
     const next = moveRow(home, id, direction)
@@ -250,6 +264,46 @@ export function AppearanceSettings() {
           onChange={(nav) => save({ nav })}
           draw={(style) => <NavDrawing style={style} />}
         />
+      </Card>
+
+      <Card title={t('Top menu')} description={t('Show, hide and reorder the buttons at the top. A button for a kind of library you do not have is left out anyway. Home always stays.')}>
+        <ul className="divide-y divide-white/10 rounded-2xl border border-white/10">
+          {menu.order.map((id, index) => {
+            const visible = isMenuItemVisible(menu, id)
+            return (
+              <li key={id} className="flex items-center gap-2 px-3 py-2">
+                <label className={`flex min-w-0 flex-1 items-center gap-3 ${id === 'home' ? '' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={visible}
+                    disabled={id === 'home'}
+                    onChange={() => save({ menu: toggleMenuItem(menu, id) })}
+                    className="h-5 w-5 shrink-0 accent-[var(--color-accent)]"
+                  />
+                  <span className={`truncate text-sm ${visible ? 'text-neutral-100' : 'text-neutral-500 line-through'}`}>{t(TAB_LABELS[id])}</span>
+                </label>
+                <button type="button" className="btn-ghost !px-2" aria-label={t('Move {row} up', { row: t(TAB_LABELS[id]) })} disabled={index === 0} onClick={() => moveButton(id, -1)}>
+                  <UpIcon />
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost !px-2"
+                  aria-label={t('Move {row} down', { row: t(TAB_LABELS[id]) })}
+                  disabled={index === menu.order.length - 1}
+                  onClick={() => moveButton(id, 1)}
+                >
+                  <DownIcon />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        <div>
+          <button type="button" className="btn" disabled={isDefaultMenuLayout(menu)} onClick={() => save({ menu: DEFAULT_MENU_LAYOUT })}>
+            {t('Restore the menu')}
+          </button>
+        </div>
       </Card>
 
       <Card title={t('Home page')} description={t('Show, hide and reorder what the home page is made of. Rows for a kind of library you do not have are left out anyway.')}>
