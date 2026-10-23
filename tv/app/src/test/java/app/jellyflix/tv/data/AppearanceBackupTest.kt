@@ -15,6 +15,7 @@ class AppearanceBackupTest {
         posters = PosterSize.Compact,
         home = HomeLayout(banner = false, order = HomeRow.entries.reversed(), hidden = setOf(HomeRow.Favorites)),
         nav = NavStyle.Text,
+        menu = MenuLayout(MenuItem.entries.reversed(), setOf(MenuItem.Books)),
     )
 
     @Test

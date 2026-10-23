@@ -43,6 +43,8 @@ import app.jellyflix.tv.data.HomeSnapshot
 import app.jellyflix.tv.data.JellyfinRepository
 import app.jellyflix.tv.data.Lib
 import app.jellyflix.tv.data.Libraries
+import app.jellyflix.tv.data.MenuItem
+import app.jellyflix.tv.data.MenuLayout
 import app.jellyflix.tv.data.NavStyle
 import app.jellyflix.tv.data.TvChannel
 import app.jellyflix.tv.data.TvProgram
@@ -392,6 +394,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun chooseAccent(id: String) = updateAppearance { it.copy(theme = ThemeChoice(it.theme.canvas, id)) }
     fun choosePosters(size: PosterSize) = updateAppearance { it.copy(posters = size) }
     fun chooseNav(style: NavStyle) = updateAppearance { it.copy(nav = style) }
+    fun updateMenu(change: (MenuLayout) -> MenuLayout) = updateAppearance { it.copy(menu = change(it.menu)) }
     fun updateHome(change: (HomeLayout) -> HomeLayout) = updateAppearance { it.copy(home = change(it.home)) }
 
     /** The server's plugins, read for Settings; null until the first answer. */
@@ -431,19 +434,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val tabs: List<Tab>
         get() {
             val l = libs
-            return buildList {
-                add(Tab.Home)
-                if (l == null || l.movies.isNotEmpty()) add(Tab.Movies)
-                if (l == null || l.series.isNotEmpty()) add(Tab.Series)
-                if (l != null && l.anime.isNotEmpty()) add(Tab.Anime)
-                if (l != null && l.musicVideos.isNotEmpty()) add(Tab.MusicVideos)
-                if (l != null && l.books.isNotEmpty()) add(Tab.Books)
-                if (l != null && l.liveTv.isNotEmpty()) add(Tab.LiveTv)
-                if (l != null && l.music.isNotEmpty()) add(Tab.Music)
-                if (hasCollections) add(Tab.Collections)
-                add(Tab.Search)
-                add(Tab.Settings)
+            val available = buildSet {
+                add(MenuItem.Home)
+                if (l == null || l.movies.isNotEmpty()) add(MenuItem.Movies)
+                if (l == null || l.series.isNotEmpty()) add(MenuItem.Series)
+                if (l != null && l.anime.isNotEmpty()) add(MenuItem.Anime)
+                if (l != null && l.musicVideos.isNotEmpty()) add(MenuItem.MusicVideos)
+                if (l != null && l.books.isNotEmpty()) add(MenuItem.Books)
+                if (l != null && l.liveTv.isNotEmpty()) add(MenuItem.LiveTv)
+                if (l != null && l.music.isNotEmpty()) add(MenuItem.Music)
+                if (hasCollections) add(MenuItem.Collections)
             }
+            // The sections in the order the user chose (the names of both lists are the same), then Search and Settings.
+            return appearance.menu.arrange(available).map { Tab.valueOf(it.name) } + Tab.Search + Tab.Settings
         }
 
     var tab by mutableStateOf(Tab.Home)

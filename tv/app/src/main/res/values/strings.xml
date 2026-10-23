@@ -384,6 +384,9 @@
     <string name="appearance_posters_note">Rows and grids follow: smaller posters fit one more column, larger ones one fewer.</string>
     <string name="appearance_menu">Menu buttons</string>
     <string name="appearance_menu_note">What Home, Movies, Live TV and the other buttons at the top show. With both, the names give way to the icons when there is no room.</string>
+    <string name="appearance_top_menu">Top menu</string>
+    <string name="appearance_top_menu_note">Turn the sections at the top on or off and move them. A section your libraries have nothing for is left out anyway. Home always stays.</string>
+    <string name="appearance_restore_menu">Restore the menu</string>
     <string name="nav_style_full">Icons and names</string>
     <string name="nav_style_icons">Icons only</string>
     <string name="nav_style_text">Names only</string>

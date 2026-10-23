@@ -30,6 +30,12 @@ object AppearanceBackup {
         appearance.put("theme", JSONObject().put("canvas", look.theme.canvas).put("accent", look.theme.accent))
         appearance.put("posterSize", look.posters.name.lowercase())
         appearance.put("nav", look.nav.id)
+        appearance.put(
+            "menu",
+            JSONObject()
+                .put("order", JSONArray(look.menu.order.map { it.id }))
+                .put("hidden", JSONArray(look.menu.hidden.map { it.id })),
+        )
         // Rows only the web client knows (its "music" row) keep their place at the end.
         val foreign = { key: String -> strings(home.optJSONArray(key)).filter { HomeRow.of(it) == null } }
         appearance.put(
@@ -59,6 +65,7 @@ object AppearanceBackup {
                 hidden = strings(home?.optJSONArray("hidden")),
             ),
             nav = NavStyle.of(appearance.optString("nav")),
+            menu = appearance.optJSONObject("menu").let { MenuLayout.sanitized(strings(it?.optJSONArray("order")), strings(it?.optJSONArray("hidden"))) },
         )
     }
 

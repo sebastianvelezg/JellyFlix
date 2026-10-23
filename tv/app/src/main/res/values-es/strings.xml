@@ -384,6 +384,9 @@
     <string name="appearance_posters_note">Las filas y cuadrículas se ajustan: con pósters más pequeños cabe una columna más; con más grandes, una menos.</string>
     <string name="appearance_menu">Botones del menú</string>
     <string name="appearance_menu_note">Lo que muestran Inicio, Películas, TV en vivo y los demás botones de arriba. Con las dos cosas, los nombres dejan su sitio a los iconos cuando no hay espacio.</string>
+    <string name="appearance_top_menu">Menú de arriba</string>
+    <string name="appearance_top_menu_note">Activa o desactiva las secciones de arriba y muévelas. Una sección para la que tus bibliotecas no tienen nada se omite de todos modos. Inicio siempre se queda.</string>
+    <string name="appearance_restore_menu">Restaurar el menú</string>
     <string name="nav_style_full">Iconos y nombres</string>
     <string name="nav_style_icons">Solo iconos</string>
     <string name="nav_style_text">Solo nombres</string>

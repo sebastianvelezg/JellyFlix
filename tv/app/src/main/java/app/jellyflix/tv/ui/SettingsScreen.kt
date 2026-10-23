@@ -56,6 +56,8 @@ import app.jellyflix.tv.data.ACCENTS
 import app.jellyflix.tv.data.CANVASES
 import app.jellyflix.tv.data.FrameRateMode
 import app.jellyflix.tv.data.HomeRow
+import app.jellyflix.tv.data.MenuItem
+import app.jellyflix.tv.data.MenuLayout
 import app.jellyflix.tv.data.NavStyle
 import app.jellyflix.tv.data.PosterSize
 import app.jellyflix.tv.data.accentColor
@@ -294,6 +296,23 @@ private fun AppearanceTab(vm: AppViewModel, first: FocusRequester) {
             { vm.chooseNav(NavStyle.entries[it]) },
             note = stringResource(R.string.appearance_menu_note),
         )
+
+        SectionTitle(stringResource(R.string.appearance_top_menu), Modifier.padding(top = 12.dp), inset = false)
+        Note(stringResource(R.string.appearance_top_menu_note))
+        look.menu.order.forEach { item ->
+            key(item) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (item == MenuItem.Home) {
+                        Text(stringResource(item.label), fontSize = 16.sp, color = Palette.TextDim, modifier = Modifier.width(430.dp).padding(horizontal = 20.dp))
+                    } else {
+                        Toggle(stringResource(item.label), item !in look.menu.hidden, Modifier.width(430.dp)) { vm.updateMenu { it.toggled(item) } }
+                    }
+                    Pill(stringResource(R.string.appearance_up), onClick = { vm.updateMenu { it.moved(item, -1) } })
+                    Pill(stringResource(R.string.appearance_down), onClick = { vm.updateMenu { it.moved(item, 1) } })
+                }
+            }
+        }
+        Pill(stringResource(R.string.appearance_restore_menu), onClick = { vm.updateMenu { MenuLayout() } })
 
         SectionTitle(stringResource(R.string.appearance_home), Modifier.padding(top = 12.dp), inset = false)
         Toggle(stringResource(R.string.appearance_banner), look.home.banner) { vm.updateHome { it.copy(banner = !it.banner) } }

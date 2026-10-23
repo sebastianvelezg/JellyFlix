@@ -290,6 +290,62 @@ enum class NavStyle(val id: String, @StringRes val label: Int) {
     }
 }
 
+/**
+ * The sections of the top bar that can be moved or turned off. [id] is the web client's word for each, so a look saved on one can be
+ * loaded on the other (the web has no Collections button). Search and Settings are not in the list: they always stay at the right end.
+ */
+enum class MenuItem(val id: String, @StringRes val label: Int) {
+    Home("home", R.string.nav_home),
+    Movies("movies", R.string.nav_movies),
+    Series("series", R.string.nav_series),
+    Anime("anime", R.string.nav_anime),
+    MusicVideos("musicvideos", R.string.nav_music_videos),
+    Books("books", R.string.nav_books),
+    LiveTv("livetv", R.string.nav_live_tv),
+    Music("music", R.string.nav_music),
+    Collections("collections", R.string.nav_collections);
+
+    companion object {
+        fun of(id: Any?): MenuItem? = entries.firstOrNull { it.id == id }
+    }
+}
+
+/** The order of the sections and the ones turned off. Home cannot be turned off. A section the account has no library for is left out by the bar anyway. */
+data class MenuLayout(
+    val order: List<MenuItem> = MenuItem.entries,
+    val hidden: Set<MenuItem> = emptySet(),
+) {
+    val isDefault: Boolean get() = hidden.isEmpty() && order == MenuItem.entries
+
+    /** What the bar shows: of [available], in the chosen order, without what is off. */
+    fun arrange(available: Collection<MenuItem>): List<MenuItem> = order.filter { it in available && it !in hidden }
+
+    fun toggled(item: MenuItem): MenuLayout =
+        if (item == MenuItem.Home) this else copy(hidden = if (item in hidden) hidden - item else hidden + item)
+
+    /** Moves a section one place earlier (-1) or later (+1); at the end it stays where it is. */
+    fun moved(item: MenuItem, direction: Int): MenuLayout {
+        val from = order.indexOf(item)
+        val to = from + direction
+        if (from < 0 || to < 0 || to >= order.size) return this
+        val list = order.toMutableList()
+        val moving = list[from]
+        list[from] = list[to]
+        list[to] = moving
+        return copy(order = list)
+    }
+
+    companion object {
+        /** Unknown and repeated sections are dropped, ones the saved copy has never heard of are appended, and Home is never off. */
+        fun sanitized(order: List<Any?>?, hidden: List<Any?>?): MenuLayout {
+            val items = LinkedHashSet<MenuItem>()
+            order?.forEach { id -> MenuItem.of(id)?.let(items::add) }
+            items.addAll(MenuItem.entries)
+            return MenuLayout(items.toList(), hidden.orEmpty().mapNotNull { MenuItem.of(it) }.filter { it != MenuItem.Home }.toSet())
+        }
+    }
+}
+
 /** About how wide (dp) a top bar button is: its padding, the picture, the gap and roughly 8.5dp a letter. */
 fun navButtonWidth(name: String, style: NavStyle): Float = when (style) {
     NavStyle.Icons -> 44f
@@ -317,6 +373,7 @@ data class Appearance(
     val posters: PosterSize = PosterSize.Comfortable,
     val home: HomeLayout = HomeLayout(),
     val nav: NavStyle = NavStyle.Full,
+    val menu: MenuLayout = MenuLayout(),
 ) {
     /** The values as text, to be stored; [decode] reads them back and ignores anything it does not know. */
     fun encode(): Map<String, String> = mapOf(
@@ -327,6 +384,8 @@ data class Appearance(
         "rows" to home.order.joinToString(",") { it.id },
         "hidden" to home.hidden.joinToString(",") { it.id },
         "nav" to nav.id,
+        "menu" to menu.order.joinToString(",") { it.id },
+        "menuHidden" to menu.hidden.joinToString(",") { it.id },
     )
 
     companion object {
@@ -337,6 +396,7 @@ data class Appearance(
                 posters = PosterSize.entries.firstOrNull { it.name == read("posters") } ?: PosterSize.Comfortable,
                 home = HomeLayout.sanitized(read("banner")?.let { it == "true" }, list("rows"), list("hidden")),
                 nav = NavStyle.of(read("nav")),
+                menu = MenuLayout.sanitized(list("menu"), list("menuHidden")),
             )
         }
     }
