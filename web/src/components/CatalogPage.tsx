@@ -323,7 +323,7 @@ function LibraryView({
               />
               {library.name}
             </h1>
-            <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:items-center">
+            <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:max-w-full sm:flex-wrap sm:items-center">
               {libraries.length > 1 && (
                 <label className="flex items-center gap-1.5 text-xs text-neutral-400">
                   <span className="sr-only">{t('Library')}</span>
