@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  closeLiveStream,
   getChannel,
   getChannels,
   negotiatePlayback,
@@ -80,7 +81,11 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
     void (async () => {
       try {
         const plan = await negotiatePlayback(session, id, { live: true, capabilities: detectCapabilities(), maxBitrate: quality * 1_000_000 })
-        if (cancelled) return
+        if (cancelled) {
+          // Left before it was tuned: the stream the server just opened would run on with nobody watching.
+          if (plan.liveStreamId) void closeLiveStream(session, plan.liveStreamId)
+          return
+        }
         const playback = new PlaybackSession(session, plan, 0)
         const attached = attachMedia({
           video: element,
@@ -117,7 +122,9 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
           window.removeEventListener('pagehide', onPageHide)
           const last = device()
           attached.destroy()
-          void playback.stop(last)
+          // A stop is only reported for a stream that played; one that never did is closed directly.
+          if (playback.hasStarted) void playback.stop(last)
+          else if (plan.liveStreamId) void closeLiveStream(session, plan.liveStreamId)
         }
       } catch (e) {
         if (!cancelled) {

@@ -31,10 +31,10 @@ const GUIDE_HOURS = 4
 const GUIDE_HOUR_WIDTH_REM = 12
 const GUIDE_CHANNELS_AT_A_TIME = 20
 
-type Loaded = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; channels: Channel[]; total: number }
+type Loaded = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; channels: Channel[]; total: number; favorites: boolean }
 
 /** The channels of the account, read a page at a time and read again now and then so that "on now" stays true. */
-function useChannels(session: Session, favorites: boolean, wanted: number, all: boolean): { state: Loaded; more: () => void; setFavoriteLocally: (id: string, favorite: boolean) => void } {
+function useChannels(session: Session, favorites: boolean, wanted: number, all: boolean, paused: boolean): { state: Loaded; more: () => void; setFavoriteLocally: (id: string, favorite: boolean) => void } {
   const [state, setState] = useState<Loaded>({ status: 'loading' })
   const [pages, setPages] = useState(wanted)
   // Looking for a channel needs all of them, not just the first page.
@@ -45,18 +45,21 @@ function useChannels(session: Session, favorites: boolean, wanted: number, all: 
     let cancelled = false
     const load = () =>
       getChannels(session, { limit: count, favorites })
-        .then((page) => !cancelled && setState({ status: 'ready', channels: page.channels, total: page.total }))
+        .then((page) => !cancelled && setState({ status: 'ready', channels: page.channels, total: page.total, favorites }))
         .catch((e: unknown) => !cancelled && setState((now) => (now.status === 'ready' ? now : { status: 'error', message: e instanceof Error ? t(e.message) : t('The channels could not be read.') })))
+    // While a channel is being watched the page stays behind it: it is not worth asking the server again until it is back.
+    if (paused) return
     void load()
     const timer = setInterval(() => void load(), REFRESH_MS)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [session, favorites, count, version])
+  }, [session, favorites, count, version, paused])
 
   return {
-    state,
+    // What was read for the other view (all channels, or only favorites) is not shown under this one while this one loads.
+    state: state.status === 'ready' && state.favorites !== favorites ? ({ status: 'loading' } as const) : state,
     more: () => setPages((n) => n + CHANNEL_PAGE_SIZE),
     setFavoriteLocally: (id, favorite) => {
       setState((now) => (now.status === 'ready' ? { ...now, channels: now.channels.map((c) => (c.id === id ? { ...c, favorite } : c)) } : now))
@@ -67,12 +70,12 @@ function useChannels(session: Session, favorites: boolean, wanted: number, all: 
 }
 
 /** Live TV: the channels with what is on each, and the guide of the next hours. */
-export function LiveTvPage({ session, onPlay }: { session: Session; onPlay: (channel: Channel) => void }) {
+export function LiveTvPage({ session, onPlay, paused = false }: { session: Session; onPlay: (channel: Channel) => void; paused?: boolean }) {
   const [view, setView] = useState<View>('channels')
   const [favorites, setFavorites] = useState(false)
   const [filter, setFilter] = useState('')
   const looking = filter.trim() !== ''
-  const { state, more, setFavoriteLocally } = useChannels(session, favorites, CHANNEL_PAGE_SIZE, looking)
+  const { state, more, setFavoriteLocally } = useChannels(session, favorites, CHANNEL_PAGE_SIZE, looking, paused)
   const shown = state.status === 'ready' ? state.channels.filter((c) => matchesChannel(c, filter)) : []
 
   const toggleFavorite = (channel: Channel) => {

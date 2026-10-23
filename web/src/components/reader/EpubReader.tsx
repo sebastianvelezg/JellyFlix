@@ -94,6 +94,14 @@ function EpubView({ book, bookId, title, onExit }: { book: EpubBook; bookId: str
   const go = useCallback(
     (next: number, fragment?: string) => {
       if (next < 0 || next >= book.chapters.length) return
+      if (next === chapterNow.current) {
+        // The chapter is already on screen: no page to load, just move within it.
+        const win = frame.current?.contentWindow
+        const spot = fragment ? frame.current?.contentDocument?.getElementById(fragment) : null
+        if (spot) spot.scrollIntoView()
+        else if (!fragment) win?.scrollTo(0, 0)
+        return
+      }
       pending.current = { fraction: 0, fragment }
       fractionNow.current = 0
       setFraction(0)

@@ -135,5 +135,11 @@ export async function openPdf(data: ArrayBuffer): Promise<PdfDocument> {
     isEvalSupported: false,
     enableXfa: false,
   })
-  return new Document(await task.promise)
+  try {
+    return new Document(await task.promise)
+  } catch (e) {
+    // A password or a damaged file: let the worker go instead of leaving it waiting.
+    void task.destroy()
+    throw e
+  }
 }

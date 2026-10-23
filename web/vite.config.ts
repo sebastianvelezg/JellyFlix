@@ -14,9 +14,9 @@ function serviceWorker(): Plugin {
     apply: 'build',
     generateBundle(_options, bundle) {
       const files = Object.keys(bundle)
-      // The video library (hls.js) is only needed for some streams, and the non-Latin fonts for some languages: they are kept the
-      // first time they are used instead of being downloaded up front.
-      const upFront = files.filter((f) => /\.(js|css)$/.test(f) && !/(^|\/)hls-/.test(f)).concat(files.filter((f) => /inter-latin-wght/.test(f)))
+      // The video library (hls.js) is only needed for some streams, the PDF library (pdf.js) for some books, and the non-Latin fonts for
+      // some languages: they are kept the first time they are used instead of being downloaded up front.
+      const upFront = files.filter((f) => /\.(js|css)$/.test(f) && !/(^|\/)(hls|pdf)-/.test(f)).concat(files.filter((f) => /inter-latin-wght/.test(f)))
       const hash = createHash('sha256')
       for (const f of upFront.sort()) hash.update(f)
       const list = ['./index.html', ...upFront.map((f) => './' + f)]

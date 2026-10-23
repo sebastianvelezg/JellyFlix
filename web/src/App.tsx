@@ -612,7 +612,7 @@ function Shell({
         {(route.page === 'section' && route.section === 'livetv') || route.page === 'live' ? (
           <div hidden={route.page !== 'section'}>
             <Suspense fallback={<PageLoading />}>
-              <LiveTvPage session={session} onPlay={(channel) => go({ page: 'live', id: channel.id })} />
+              <LiveTvPage session={session} paused={route.page === 'live'} onPlay={(channel) => go({ page: 'live', id: channel.id })} />
             </Suspense>
           </div>
         ) : null}

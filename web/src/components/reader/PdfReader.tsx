@@ -27,6 +27,8 @@ export function PdfReader({ data, bookId, title, onExit }: { data: ArrayBuffer; 
     let doc: PdfDocument | null = null
     openPdf(data)
       .then(async (made) => {
+        // Closed before it finished opening: nothing is going to use it.
+        if (cancelled) return made.destroy()
         doc = made
         const ratio = await made.ratio(1)
         if (cancelled) return

@@ -120,6 +120,7 @@ export {
 export type { DeviceCapabilities } from './deviceProfile'
 export {
   describePlayback,
+  closeLiveStream,
   negotiatePlayback,
   PlaybackError,
   TRANSCODE_REASONS,

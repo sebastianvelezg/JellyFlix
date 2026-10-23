@@ -205,6 +205,9 @@ class LiveTvState {
     var loading by mutableStateOf(false)
     var loaded by mutableStateOf(false)
 
+    /** Changes each time the list starts over, so a page that was still on its way for the old list is dropped when it arrives. */
+    var generation = 0
+
     /** The programme after the one on now, by channel (read for the channels on screen, to show "Next"). */
     var upNext by mutableStateOf<Map<UUID, TvProgram>>(emptyMap())
     var guide by mutableStateOf(false)
@@ -213,6 +216,7 @@ class LiveTvState {
     val list = LazyListState()
 
     fun reset() {
+        generation++
         channels.clear()
         total = 0
         loading = false
@@ -768,10 +772,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (liveTv.loading || (liveTv.loaded && liveTv.channels.size >= liveTv.total)) return
         liveTv.loading = true
         val favorites = liveTv.favoritesOnly
+        val generation = liveTv.generation
         launchSafe {
             try {
                 val page = io { repo.channels(s, liveTv.channels.size, LIVE_PAGE, favorites) }
-                if (favorites != liveTv.favoritesOnly) return@launchSafe
+                if (generation != liveTv.generation) return@launchSafe
                 liveTv.channels.addAll(page.items)
                 page.total?.let { liveTv.total = it }
                 liveTv.loaded = true
@@ -779,7 +784,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 fail(e)
             } finally {
-                liveTv.loading = false
+                // Only the load that belongs to the list now showing may say it is done.
+                if (generation == liveTv.generation) liveTv.loading = false
             }
         }
     }
@@ -810,10 +816,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val s = session ?: return
         if (busy) return
         launchSafe {
-            if (liveTv.channels.isEmpty()) {
-                runCatching { io { repo.channels(s, 0, LIVE_PAGE) } }.getOrNull()?.let { liveTv.channels.addAll(it.items) }
+            // The list being browsed (it may be only the favorites); when it does not hold this channel, the first page of all of them.
+            var list: List<TvChannel> = liveTv.channels
+            if (list.none { it.item.id == plan.item.id }) {
+                list = runCatching { io { repo.channels(s, 0, LIVE_PAGE) } }.getOrNull()?.items ?: return@launchSafe
             }
-            neighbourChannel(liveTv.channels, plan.item.id, step)?.let { play(it.item, startMs = 0) }
+            neighbourChannel(list, plan.item.id, step)?.let { play(it.item, startMs = 0) }
         }
     }
 

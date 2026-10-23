@@ -288,3 +288,12 @@ export async function negotiatePlayback(
     mediaType: opts.mediaType,
   })
 }
+
+/** Tells the server a live stream it opened is no longer wanted (a channel left before it ever played). Failures are not worth showing. */
+export async function closeLiveStream(session: Session, liveStreamId: string): Promise<void> {
+  try {
+    await getMediaInfoApi(session.api).closeLiveStream({ liveStreamId })
+  } catch {
+    // The server closes streams nobody is reading on its own after a while.
+  }
+}

@@ -5,7 +5,7 @@ import type { Track } from './music'
 import { ticksToSeconds } from './ticks'
 import { itemImageUrl } from './images'
 
-/** What the reader can show: an EPUB, a PDF (the browser's own viewer) and a comic archive. Other formats can be downloaded. */
+/** What the reader can show: an EPUB, a PDF and a comic archive. Other formats can be downloaded. */
 export type ReadableFormat = 'epub' | 'pdf' | 'cbz'
 
 const FORMAT_NAMES: Record<string, ReadableFormat> = { epub: 'epub', pdf: 'pdf', cbz: 'cbz', zip: 'cbz' }
@@ -83,20 +83,21 @@ export async function downloadBookFile(session: Session, id: string, onProgress?
   const total = Number(response.headers.get('Content-Length'))
   if (!response.body) return response.arrayBuffer()
   const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
+  // When the server says how big the file is, it is read straight into one buffer instead of being collected in pieces and copied.
+  let whole = new Uint8Array(total > 0 ? total : 1 << 20)
   let received = 0
   for (;;) {
     const { done, value } = await reader.read()
     if (done) break
-    chunks.push(value)
+    if (received + value.length > whole.length) {
+      const bigger = new Uint8Array(Math.max(whole.length * 2, received + value.length))
+      bigger.set(whole.subarray(0, received))
+      whole = bigger
+    }
+    whole.set(value, received)
     received += value.length
     onProgress?.(total > 0 ? Math.min(1, received / total) : null)
   }
-  const whole = new Uint8Array(received)
-  let at = 0
-  for (const chunk of chunks) {
-    whole.set(chunk, at)
-    at += chunk.length
-  }
-  return whole.buffer
+  // A buffer of exactly the size read (the caller owns it whole).
+  return received === whole.length ? whole.buffer : whole.slice(0, received).buffer
 }

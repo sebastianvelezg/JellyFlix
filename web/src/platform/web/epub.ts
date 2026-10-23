@@ -184,6 +184,12 @@ const FORBIDDEN = 'script, iframe, frame, frameset, object, embed, applet, form,
 const CSP = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"
 
 /**
+ * The pictures and fonts of the chapter last drawn, already written as `data:` addresses: drawing the same chapter again (the reader
+ * changed the text size or the colours) does not read and encode them all over. Only one chapter's worth is kept.
+ */
+const encoded = new WeakMap<EpubBook, { chapter: number; urls: Map<string, string> }>()
+
+/**
  * The page for one chapter, ready for a sandboxed frame. The pictures and fonts of the book it uses are written into the page itself
  * (as `data:` addresses), so there is nothing to load from anywhere and nothing to clean up afterwards.
  * `extraCss` (the reader's own colours and text size) comes last so that it wins over the book's.
@@ -194,7 +200,12 @@ export function chapterPage(book: EpubBook, index: number, extraCss: string): st
   if (!path || !bytes) throw new Error('That chapter is missing from the book.')
   const doc = new DOMParser().parseFromString(textOf(bytes).replace(SELF_CLOSED, (_m, tag: string, attrs: string | undefined) => `<${tag}${attrs ?? ''}></${tag}>`), 'text/html')
 
-  const made = new Map<string, string>()
+  let kept = encoded.get(book)
+  if (kept?.chapter !== index) {
+    kept = { chapter: index, urls: new Map() }
+    encoded.set(book, kept)
+  }
+  const made = kept.urls
   /** The local address of a file the chapter refers to, or null for a web address or a file the book does not have. */
   const local = (ref: string): string | null => {
     const value = ref.trim()
