@@ -302,6 +302,10 @@ A native app built for a remote control and a TV seen from the sofa: big targets
 <td><img src="docs/screenshots/tv-detail.jpg" alt="TV: a movie's page with its cast"></td>
 <td><img src="docs/screenshots/tv-music.jpg" alt="TV: the Music page"></td>
 </tr>
+<tr>
+<td><img src="docs/screenshots/tv-livetv.jpg" alt="TV: Live TV with the channels, their quality and notes as tags, and the top bar with icons"></td>
+<td><img src="docs/screenshots/tv-menu.jpg" alt="TV: Settings, Appearance: choosing the order of the top menu and turning sections off"></td>
+</tr>
 </table>
 
 <sub>Jellyflix TV running on a Google TV emulator against a real Jellyfin server. Compatibility and testing notes are in [tv/README.md](tv/README.md#testing-and-compatibility).</sub>

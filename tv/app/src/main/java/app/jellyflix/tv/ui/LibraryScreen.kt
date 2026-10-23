@@ -107,7 +107,7 @@ fun LibraryScreen(vm: AppViewModel, lib: LibraryState) {
                 )
                 if (lib.total > 0) {
                     Text(
-                        stringResource(R.string.library_count, lib.total),
+                        titlesLabel(lib.total),
                         color = Palette.TextDim,
                         fontSize = 14.sp,
                         modifier = Modifier.padding(start = 12.dp),

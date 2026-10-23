@@ -278,7 +278,7 @@ fun CollectionScreen(vm: AppViewModel, state: DetailState) {
                     Chip(stringResource(R.string.nav_collections))
                     Text(item.title, fontSize = 38.sp, lineHeight = 44.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     (members?.size ?: item.childCount)?.let {
-                        Text(stringResource(R.string.library_count, it), fontSize = 15.sp, color = Palette.TextDim)
+                        Text(titlesLabel(it), fontSize = 15.sp, color = Palette.TextDim)
                     }
                     item.overview?.takeIf { it.isNotBlank() }?.let {
                         Text(it, fontSize = 16.sp, color = Color(0xFFDDDDDD), maxLines = 5, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))

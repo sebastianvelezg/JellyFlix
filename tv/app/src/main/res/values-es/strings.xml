@@ -25,7 +25,6 @@
     <string name="loading">Cargando…</string>
     <string name="home_empty">Aún no hay nada que mostrar. Añade bibliotecas en Jellyfin y espera a que terminen de escanearse.</string>
     <string name="library_empty">Aún no hay nada aquí.</string>
-    <string name="library_count">%1$d títulos</string>
     <string name="sort_added">Añadido recientemente</string>
     <string name="sort_name">De la A a la Z</string>
     <string name="sort_year">Año</string>

@@ -96,7 +96,7 @@ fun Chip(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun defaultSubtitle(item: MediaItem): String? =
-    if (item.kind == BaseItemKind.BOX_SET) item.childCount?.let { stringResource(R.string.library_count, it) } else item.subtitle
+    if (item.kind == BaseItemKind.BOX_SET) item.childCount?.let { titlesLabel(it) } else item.subtitle
 
 /** "1 title" or "5 titles". */
 @Composable
