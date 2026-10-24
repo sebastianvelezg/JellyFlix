@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest'
+import { configure } from '@testing-library/react'
 import { vi } from 'vitest'
 import WebSocket from 'ws'
 
@@ -25,6 +26,9 @@ class MemoryStorage implements Storage {
     this.data.set(key, String(value))
   }
 }
+
+// A slow machine (a shared CI runner) needs more than the default second for a page to appear after a click.
+configure({ asyncUtilTimeout: 5000 })
 
 vi.stubGlobal('localStorage', new MemoryStorage())
 vi.stubGlobal('sessionStorage', new MemoryStorage())

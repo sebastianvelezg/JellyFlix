@@ -4,7 +4,7 @@
  * whatever is chosen here.
  */
 
-export const HOME_ROW_IDS = ['discover', 'continue', 'nextUp', 'upcoming', 'newSinceVisit', 'watchLater', 'because', 'latestMovies', 'collections', 'playlists', 'newSeries', 'newAnime', 'music'] as const
+export const HOME_ROW_IDS = ['discover', 'continue', 'nextUp', 'upcoming', 'newSinceVisit', 'watchLater', 'because', 'latestMovies', 'collections', 'playlists', 'newSeries', 'newAnime', 'newMusicVideos', 'newBooks', 'music'] as const
 export type HomeRowId = (typeof HOME_ROW_IDS)[number]
 
 /** English names (the interface translates them). */
@@ -21,6 +21,8 @@ export const HOME_ROW_LABEL: Record<HomeRowId, string> = {
   playlists: 'Your playlists',
   newSeries: 'New series',
   newAnime: 'New anime',
+  newMusicVideos: 'New music videos',
+  newBooks: 'New books',
   music: 'Music',
 }
 

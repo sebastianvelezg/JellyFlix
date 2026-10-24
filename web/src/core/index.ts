@@ -67,6 +67,8 @@ export {
   shuffle,
   posterUrl,
   searchMovies,
+  searchBooks,
+  searchMusicVideos,
   searchShows,
   searchTitles,
   SORT_LABELS,
@@ -118,6 +120,7 @@ export {
 export type { DeviceCapabilities } from './deviceProfile'
 export {
   describePlayback,
+  closeLiveStream,
   negotiatePlayback,
   PlaybackError,
   TRANSCODE_REASONS,
@@ -395,6 +398,18 @@ export {
   type HomeRowId,
 } from './homeLayout'
 export {
+  arrangeMenu,
+  DEFAULT_MENU_LAYOUT,
+  isDefaultMenuLayout,
+  isMenuItemVisible,
+  MENU_IDS,
+  moveMenuItem,
+  sanitizeMenuLayout,
+  toggleMenuItem,
+  type MenuId,
+  type MenuLayout,
+} from './menuLayout'
+export {
   WATCH_LATER_NAMES,
   addToPlaylist,
   addToWatchLater,
@@ -429,3 +444,37 @@ export {
 } from './playbackReporting'
 export { MONTHS_SHOWN, STATS_LIMIT, buildStats, getWatchedTitles, type MonthStat, type WatchStats, type WatchedTitle, type WatchedTitles } from './stats'
 export { getTrickplay, pickTrickplay, trickplaySheetUrl, trickplayTile, type TrickplayInfo, type TrickplayTile } from './trickplay'
+export {
+  audiobookStart,
+  audiobookTrack,
+  bookCoverUrl,
+  bookKindLabel,
+  getBooks,
+  downloadBookFile,
+  readableFormat,
+  type ReadableFormat,
+} from './books'
+export { openComic, type ComicPage } from './comic'
+export { textOf, unpack } from './zip'
+export {
+  channelLogoUrl,
+  CHANNEL_PAGE_SIZE,
+  getChannel,
+  CHANNEL_SEARCH_LIMIT,
+  getChannels,
+  getGuide,
+  guideBlocks,
+  guideStart,
+  isOnNow,
+  matchesChannel,
+  neighbourChannel,
+  programProgress,
+  splitChannelName,
+  toChannel,
+  toProgram,
+  type Channel,
+  type ChannelName,
+  type ChannelPage,
+  type GuideBlock,
+  type Program,
+} from './liveTv'

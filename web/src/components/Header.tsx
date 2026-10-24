@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement, type RefObject } from 'react'
 import type { Section, Session } from '../core'
-import { AnimeIcon, CloseIcon, FilmIcon, HomeIcon, LogoMark, MusicIcon, SearchIcon, TvIcon, Wordmark } from './icons'
+import { AnimeIcon, BookIcon, CloseIcon, FilmIcon, HomeIcon, LiveTvIcon, LogoMark, MusicIcon, MusicVideoIcon, SearchIcon, TvIcon, Wordmark } from './icons'
 import { t, tr } from '../i18n'
+import { useAppearance, type NavStyle } from '../platform/web/appearance'
 import { addRecentSearch, clearRecentSearches, readRecentSearches } from '../platform/web/recentSearches'
+import { useLanguage } from './useLanguage'
 
 const SEARCH_DELAY_MS = 300
 
@@ -63,7 +65,7 @@ function SearchBox({ query, onSearch }: { query: string; onSearch: (text: string
   return (
     <form
       role="search"
-      className="group/search relative min-w-0 flex-1 transition-[max-width] duration-300 sm:max-w-xs sm:focus-within:max-w-md lg:max-w-sm lg:focus-within:max-w-lg"
+      className="group/search relative min-w-0 flex-1 transition-[width] duration-300 max-md:sm:max-w-xs md:w-44 md:flex-none md:focus-within:w-64 lg:w-52 lg:focus-within:w-72"
       onSubmit={(e) => {
         e.preventDefault()
         if (text.trim()) setRecents(addRecentSearch(text))
@@ -171,10 +173,119 @@ export const TAB_LABELS: Record<NavTab, string> = {
   movies: tr('Movies'),
   series: tr('Series'),
   anime: tr('Anime'),
+  musicvideos: tr('Music videos'),
+  books: tr('Books'),
+  livetv: tr('Live TV'),
   music: tr('Music'),
 }
 
-/** Home / Movies / Series / Anime / Music. Only sections that have a library are offered, and nothing is shown if there is just one. */
+const TAB_ICONS: Record<NavTab, () => ReactElement> = {
+  home: HomeIcon,
+  movies: FilmIcon,
+  series: TvIcon,
+  anime: AnimeIcon,
+  musicvideos: MusicVideoIcon,
+  books: BookIcon,
+  livetv: LiveTvIcon,
+  music: MusicIcon,
+}
+
+/**
+ * Whether the names of the buttons fit. Looks at the bar (a row that must not wrap): when the names do not fit, the pictures are
+ * kept and the names go (that is `tight`); when even that does not fit, or the names alone are too wide, the bar scrolls
+ * (`overflowing`). The width with the names is remembered while they are hidden, so they come back once there is room again.
+ */
+function useFit(bar: RefObject<HTMLElement | null>, active: boolean) {
+  const [fit, setFit] = useState({ tight: false, overflowing: false })
+  useEffect(() => {
+    const el = bar.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let full = 0
+    let tight = false
+    const measure = () => {
+      if (!tight) full = el.scrollWidth
+      const nextTight = active && full > el.clientWidth + 1
+      const overflowing = el.scrollWidth > el.clientWidth + 1
+      tight = nextTight
+      setFit((now) => (now.tight === nextTight && now.overflowing === overflowing ? now : { tight: nextTight, overflowing }))
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [bar, active])
+  return fit
+}
+
+/** A mask that fades the end of a bar that scrolls, so it is clear there is more. */
+const FADE_END = '[mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]'
+
+/** Brings the current button into view when the bar scrolls. */
+function useShowCurrent(bar: RefObject<HTMLElement | null>, current: NavTab | null) {
+  useEffect(() => {
+    const target = bar.current?.querySelector('[aria-current="page"]')
+    if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+  }, [bar, current])
+}
+
+function Tabs({
+  sections,
+  current,
+  onSelect,
+  className,
+  style,
+}: {
+  sections: NavTab[]
+  current: NavTab | null
+  onSelect: (tab: NavTab) => void
+  className: string
+  style: NavStyle
+}) {
+  const bar = useRef<HTMLElement>(null)
+  const { tight, overflowing } = useFit(bar, style === 'full')
+  useShowCurrent(bar, current)
+  const showName = style === 'text' || (style === 'full' && !tight)
+  const showIcon = style !== 'text'
+  return (
+    <nav
+      ref={bar}
+      aria-label={t('Sections')}
+      className={`no-scrollbar min-w-0 flex-1 items-center gap-0.5 overflow-x-auto ${overflowing ? FADE_END : ''} ${className}`}
+    >
+      {sections.map((section) => {
+        const Pic = TAB_ICONS[section]
+        const label = t(TAB_LABELS[section])
+        return (
+          <button
+            key={section}
+            type="button"
+            aria-label={label}
+            title={showName ? undefined : label}
+            aria-current={section === current ? 'page' : undefined}
+            onClick={() => onSelect(section)}
+            className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full py-1.5 text-sm font-medium transition pointer-coarse:py-3 ${
+              showName ? 'px-3' : 'px-3.5'
+            } ${section === current ? 'text-white' : 'text-neutral-400 hover:text-white'}`}
+          >
+            {showIcon && <Pic />}
+            {showName && <span>{label}</span>}
+            {section === current && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)]"
+              />
+            )}
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+/**
+ * Home / Movies / Series / Anime / Music videos / Books / Live TV / Music. Only sections that have a library are offered, and nothing is
+ * shown if there is just one. What the buttons show (the picture, the name or both) is Settings → Appearance → Menu buttons; with both,
+ * the names make way for the pictures when there is not room for them.
+ */
 export function SectionTabs({
   sections,
   current,
@@ -186,38 +297,61 @@ export function SectionTabs({
   onSelect: (tab: NavTab) => void
   className?: string
 }) {
+  const { nav } = useAppearance()
+  const language = useLanguage()
   if (sections.length < 2) return null
-  return (
-    <nav aria-label={t('Sections')} className={`flex items-center gap-1 ${className}`}>
-      {sections.map((section) => (
-        <button
-          key={section}
-          type="button"
-          aria-current={section === current ? 'page' : undefined}
-          onClick={() => onSelect(section)}
-          className={`relative rounded-full px-3.5 py-1.5 text-sm font-medium transition pointer-coarse:py-3 ${
-            section === current ? 'text-white' : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          {t(TAB_LABELS[section])}
-          {section === current && (
-            <span
-              aria-hidden="true"
-              className="absolute inset-x-3.5 -bottom-px h-0.5 rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)]"
-            />
-          )}
-        </button>
-      ))}
-    </nav>
-  )
+  // The measure starts over when what is measured changes.
+  return <Tabs key={`${nav}:${language}:${sections.join()}`} sections={sections} current={current} onSelect={onSelect} className={className} style={nav} />
 }
 
-const TAB_ICONS: Record<NavTab, () => ReactElement> = {
-  home: HomeIcon,
-  movies: FilmIcon,
-  series: TvIcon,
-  anime: AnimeIcon,
-  music: MusicIcon,
+function BottomTabs({
+  sections,
+  current,
+  onSelect,
+  style,
+}: {
+  sections: NavTab[]
+  current: NavTab | null
+  onSelect: (tab: NavTab) => void
+  style: NavStyle
+}) {
+  const bar = useRef<HTMLElement>(null)
+  const { tight, overflowing } = useFit(bar, style === 'full')
+  useShowCurrent(bar, current)
+  const showName = style === 'text' || (style === 'full' && !tight)
+  const showIcon = style !== 'text'
+  return (
+    <nav
+      ref={bar}
+      aria-label={t('Sections')}
+      className={`no-scrollbar fixed inset-x-0 bottom-0 z-40 flex overflow-x-auto border-t border-white/10 bg-[var(--color-bg)]/90 pb-[var(--safe-bottom)] pl-[var(--safe-x)] pr-[var(--safe-x)] backdrop-blur-xl md:hidden ${
+        overflowing ? FADE_END : ''
+      }`}
+    >
+      {sections.map((section) => {
+        const Pic = TAB_ICONS[section]
+        const active = section === current
+        const label = t(TAB_LABELS[section])
+        return (
+          <button
+            key={section}
+            type="button"
+            aria-label={label}
+            title={showName ? undefined : label}
+            aria-current={active ? 'page' : undefined}
+            onClick={() => onSelect(section)}
+            className={`relative flex h-14 shrink-0 flex-auto flex-col items-center justify-center gap-0.5 whitespace-nowrap px-3 font-medium transition ${
+              showIcon ? 'text-[11px]' : 'text-sm'
+            } ${active ? 'text-[var(--color-accent)]' : 'text-neutral-400 active:text-white'}`}
+          >
+            {active && <span aria-hidden="true" className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)]" />}
+            {showIcon && <Pic />}
+            {showName && <span>{label}</span>}
+          </button>
+        )
+      })}
+    </nav>
+  )
 }
 
 /**
@@ -225,33 +359,10 @@ const TAB_ICONS: Record<NavTab, () => ReactElement> = {
  * tabs used to have there; `--nav-h` (index.css) tells the pages and the floating bars how much room it needs.
  */
 export function BottomNav({ sections, current, onSelect }: { sections: NavTab[]; current: NavTab | null; onSelect: (tab: NavTab) => void }) {
+  const { nav } = useAppearance()
+  const language = useLanguage()
   if (sections.length < 2) return null
-  return (
-    <nav
-      aria-label={t('Sections')}
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-white/10 bg-[var(--color-bg)]/90 pb-[var(--safe-bottom)] pl-[var(--safe-x)] pr-[var(--safe-x)] backdrop-blur-xl md:hidden"
-    >
-      {sections.map((section) => {
-        const TabIcon = TAB_ICONS[section]
-        const active = section === current
-        return (
-          <button
-            key={section}
-            type="button"
-            aria-current={active ? 'page' : undefined}
-            onClick={() => onSelect(section)}
-            className={`relative flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition ${
-              active ? 'text-[var(--color-accent)]' : 'text-neutral-400 active:text-white'
-            }`}
-          >
-            {active && <span aria-hidden="true" className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)]" />}
-            <TabIcon />
-            <span className="max-w-full truncate px-1">{t(TAB_LABELS[section])}</span>
-          </button>
-        )
-      })}
-    </nav>
-  )
+  return <BottomTabs key={`${nav}:${language}:${sections.join()}`} sections={sections} current={current} onSelect={onSelect} style={nav} />
 }
 
 export function Header({
@@ -311,8 +422,8 @@ export function Header({
         </button>
         <SectionTabs sections={sections} current={current} onSelect={onSection} className="hidden md:flex" />
         <SearchBox query={query} onSearch={onSearch} />
-        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-          <div className="hidden min-w-0 text-right text-xs leading-tight md:block">
+        <div className="flex shrink-0 items-center gap-2 max-md:ml-auto sm:gap-3">
+          <div className="hidden min-w-0 text-right text-xs leading-tight 2xl:block">
             <p className="max-w-40 truncate font-medium text-neutral-100">{session.userName}</p>
             <p className="max-w-40 truncate text-neutral-500">{session.serverName}</p>
           </div>
@@ -326,7 +437,7 @@ export function Header({
             <span aria-hidden="true">{initial}</span>
           </button>
           {/* On a phone the search box needs the room; signing out is in Settings (the round button). */}
-          <button type="button" className="btn max-sm:hidden" onClick={onSignOut}>
+          <button type="button" className="btn max-lg:hidden" onClick={onSignOut}>
             {t('Sign out')}
           </button>
         </div>

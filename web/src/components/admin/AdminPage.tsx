@@ -70,7 +70,7 @@ export function AdminPage({ session, onBack }: { session: Session; onBack: () =>
                 tabIndex={tab === id ? 0 : -1}
                 onClick={() => setTab(id)}
                 onKeyDown={onKey}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition pointer-coarse:py-3 ${tab === id ? 'bg-white text-black' : 'text-neutral-400 hover:text-white'}`}
+                className={`tab shrink-0`}
               >
                 {t(TAB_LABEL[id])}
               </button>

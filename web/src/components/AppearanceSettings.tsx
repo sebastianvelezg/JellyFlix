@@ -1,17 +1,24 @@
 import { useState } from 'react'
 import {
   DEFAULT_HOME_LAYOUT,
+  DEFAULT_MENU_LAYOUT,
   HOME_ROW_LABEL,
   isDefaultHomeLayout,
+  isDefaultMenuLayout,
+  isMenuItemVisible,
   isRowVisible,
+  moveMenuItem,
   moveRow,
+  toggleMenuItem,
   toggleRow,
   type HomeRowId,
+  type MenuId,
 } from '../core'
 import {
   APPEARANCE_DEFAULTS,
   BANNER_SIZES,
   DENSITIES,
+  NAV_STYLES,
   POSTER_SIZES,
   UI_SIZES,
   applyAppearance,
@@ -21,11 +28,14 @@ import {
   type AppearancePrefs,
   type BannerSize,
   type Density,
+  type NavStyle,
   type PosterSize,
   type UiSize,
 } from '../platform/web/appearance'
 import { t } from '../i18n'
 import { ACCENTS, CANVASES, accentColor, resolveAccent, sanitizeTheme, type Canvas } from '../theme/themes'
+import { BannerDrawing, DensityDrawing, NavDrawing, PickCards, UiSizeDrawing } from './LayoutCards'
+import { TAB_LABELS } from './Header'
 import { Card, Toggle } from './SettingsParts'
 
 const POSTER_LABEL: Record<PosterSize, string> = { compact: 'Compact', comfortable: 'Comfortable', large: 'Large' }
@@ -35,42 +45,7 @@ const POSTER_DRAW: Record<PosterSize, number> = { compact: 22, comfortable: 28, 
 const UI_SIZE_LABEL: Record<UiSize, string> = { small: 'Small', default: 'Default', large: 'Large' }
 const DENSITY_LABEL: Record<Density, string> = { comfortable: 'Comfortable', compact: 'Compact' }
 const BANNER_LABEL: Record<BannerSize, string> = { large: 'Large', compact: 'Compact' }
-
-/** A short row of pills where exactly one is chosen (radio buttons that look like a segmented control). */
-function Segmented<T extends string>({
-  name,
-  legend,
-  hint,
-  options,
-  labels,
-  value,
-  onChange,
-}: {
-  name: string
-  legend: string
-  hint?: string
-  options: readonly T[]
-  labels: Record<T, string>
-  value: T
-  onChange: (value: T) => void
-}) {
-  return (
-    <fieldset>
-      <legend className="text-sm font-medium text-neutral-100">{legend}</legend>
-      {hint && <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>}
-      <div className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[.04] p-1">
-        {options.map((option) => (
-          <label key={option} className="cursor-pointer">
-            <input type="radio" name={name} className="peer sr-only" checked={value === option} onChange={() => onChange(option)} />
-            <span className="block rounded-full px-4 py-1.5 text-sm font-medium text-neutral-300 transition hover:text-white peer-checked:bg-white peer-checked:text-black peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-accent)] pointer-coarse:py-3">
-              {t(labels[option])}
-            </span>
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  )
-}
+const NAV_LABEL: Record<NavStyle, string> = { full: 'Icons and names', icons: 'Icons only', text: 'Names only' }
 
 const ring =
   'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-accent)]'
@@ -124,6 +99,13 @@ export function AppearanceSettings() {
   const pickedPreset = ACCENTS.find((a) => a.id === theme.accent)
   const customColor = pickedPreset ? null : accentColor(theme.accent)
   const rowLabel = (id: HomeRowId) => t(HOME_ROW_LABEL[id])
+
+  const { menu } = prefs
+  const moveButton = (id: MenuId, direction: -1 | 1) => {
+    const next = moveMenuItem(menu, id, direction)
+    save({ menu: next })
+    setAnnouncement(t('{row} is now number {position}', { row: t(TAB_LABELS[id]), position: next.order.indexOf(id) + 1 }))
+  }
 
   const move = (id: HomeRowId, direction: -1 | 1) => {
     const next = moveRow(home, id, direction)
@@ -244,7 +226,7 @@ export function AppearanceSettings() {
       </Card>
 
       <Card title={t('Layout')} description={t('How much fits on the screen.')}>
-        <Segmented
+        <PickCards
           name="ui-size"
           legend={t('Interface size')}
           hint={t('Scales the text and the controls.')}
@@ -252,23 +234,76 @@ export function AppearanceSettings() {
           labels={UI_SIZE_LABEL}
           value={prefs.uiSize}
           onChange={(uiSize) => save({ uiSize })}
+          draw={(size) => <UiSizeDrawing size={size} />}
         />
-        <Segmented
+        <PickCards
           name="density"
           legend={t('Space between rows')}
           options={DENSITIES}
           labels={DENSITY_LABEL}
           value={prefs.density}
           onChange={(density) => save({ density })}
+          draw={(density) => <DensityDrawing density={density} />}
         />
-        <Segmented
+        <PickCards
           name="banner-size"
           legend={t('Featured banner height')}
           options={BANNER_SIZES}
           labels={BANNER_LABEL}
           value={prefs.banner}
           onChange={(banner) => save({ banner })}
+          draw={(size) => <BannerDrawing size={size} />}
         />
+        <PickCards
+          name="nav-style"
+          legend={t('Menu buttons')}
+          hint={t('What Home, Movies, Live TV and the other buttons of the menu show. With both, the names give way to the icons when there is no room.')}
+          options={NAV_STYLES}
+          labels={NAV_LABEL}
+          value={prefs.nav}
+          onChange={(nav) => save({ nav })}
+          draw={(style) => <NavDrawing style={style} />}
+        />
+      </Card>
+
+      <Card title={t('Top menu')} description={t('Show, hide and reorder the buttons at the top. A button for a kind of library you do not have is left out anyway. Home always stays.')}>
+        <ul className="divide-y divide-white/10 rounded-2xl border border-white/10">
+          {menu.order.map((id, index) => {
+            const visible = isMenuItemVisible(menu, id)
+            return (
+              <li key={id} className="flex items-center gap-2 px-3 py-2">
+                <label className={`flex min-w-0 flex-1 items-center gap-3 ${id === 'home' ? '' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={visible}
+                    disabled={id === 'home'}
+                    onChange={() => save({ menu: toggleMenuItem(menu, id) })}
+                    className="h-5 w-5 shrink-0 accent-[var(--color-accent)]"
+                  />
+                  <span className={`truncate text-sm ${visible ? 'text-neutral-100' : 'text-neutral-500 line-through'}`}>{t(TAB_LABELS[id])}</span>
+                </label>
+                <button type="button" className="btn-ghost !px-2" aria-label={t('Move {row} up', { row: t(TAB_LABELS[id]) })} disabled={index === 0} onClick={() => moveButton(id, -1)}>
+                  <UpIcon />
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost !px-2"
+                  aria-label={t('Move {row} down', { row: t(TAB_LABELS[id]) })}
+                  disabled={index === menu.order.length - 1}
+                  onClick={() => moveButton(id, 1)}
+                >
+                  <DownIcon />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        <div>
+          <button type="button" className="btn" disabled={isDefaultMenuLayout(menu)} onClick={() => save({ menu: DEFAULT_MENU_LAYOUT })}>
+            {t('Restore the menu')}
+          </button>
+        </div>
       </Card>
 
       <Card title={t('Home page')} description={t('Show, hide and reorder what the home page is made of. Rows for a kind of library you do not have are left out anyway.')}>

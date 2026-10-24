@@ -38,6 +38,8 @@ export interface PlaybackPlan {
   defaultAudioIndex?: number
   /** Why the server is transcoding (its own codes, such as `VideoCodecNotSupported`); empty for direct play. */
   transcodeReasons: string[]
+  /** A live channel: the id of the stream the server opened for it (it has no end, no resume point and cannot be sought). */
+  liveStreamId?: string
 }
 
 export class PlaybackError extends Error {
@@ -154,6 +156,7 @@ export function buildPlan(args: {
     subtitleTracks,
     defaultAudioIndex,
     mediaType,
+    liveStreamId: source.LiveStreamId ?? undefined,
   }
 
   if (source.SupportsDirectPlay) {
@@ -234,6 +237,8 @@ export interface NegotiateOptions {
   mediaType?: MediaType
   /** Do not stream faster than this, in bits per second; the server transcodes a file that is above it. */
   maxBitrate?: number
+  /** A live TV channel: the server opens the stream itself, and always sends it as HLS (a live feed cannot be played as a file). */
+  live?: boolean
 }
 
 /**
@@ -246,7 +251,8 @@ export async function negotiatePlayback(
   itemId: string,
   opts: NegotiateOptions,
 ): Promise<PlaybackPlan> {
-  const forceTranscode = opts.forceTranscode === true
+  const live = opts.live === true
+  const forceTranscode = opts.forceTranscode === true || live
   let response: PlaybackInfoResponse
   try {
     const result = await getMediaInfoApi(session.api).getPostedPlaybackInfo({
@@ -259,7 +265,7 @@ export async function negotiatePlayback(
         AudioStreamIndex: opts.audioStreamIndex,
         // -1 = no subtitle stream: subtitles are rendered client-side, never burned in.
         SubtitleStreamIndex: -1,
-        AutoOpenLiveStream: false,
+        AutoOpenLiveStream: live,
         EnableDirectPlay: !forceTranscode,
         EnableDirectStream: !forceTranscode,
         EnableTranscoding: true,
@@ -281,4 +287,13 @@ export async function negotiatePlayback(
     requestedAudioIndex: opts.audioStreamIndex,
     mediaType: opts.mediaType,
   })
+}
+
+/** Tells the server a live stream it opened is no longer wanted (a channel left before it ever played). Failures are not worth showing. */
+export async function closeLiveStream(session: Session, liveStreamId: string): Promise<void> {
+  try {
+    await getMediaInfoApi(session.api).closeLiveStream({ liveStreamId })
+  } catch {
+    // The server closes streams nobody is reading on its own after a while.
+  }
 }

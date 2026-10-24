@@ -1,6 +1,7 @@
 package app.jellyflix.tv
 
 import android.app.Application
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -42,6 +43,13 @@ import app.jellyflix.tv.data.HomeSnapshot
 import app.jellyflix.tv.data.JellyfinRepository
 import app.jellyflix.tv.data.Lib
 import app.jellyflix.tv.data.Libraries
+import app.jellyflix.tv.data.MenuItem
+import app.jellyflix.tv.data.MenuLayout
+import app.jellyflix.tv.data.NavStyle
+import app.jellyflix.tv.data.TvChannel
+import app.jellyflix.tv.data.TvProgram
+import app.jellyflix.tv.data.neighbourChannel
+import app.jellyflix.tv.data.nextProgram
 import app.jellyflix.tv.data.Lyrics
 import app.jellyflix.tv.data.MediaItem
 import app.jellyflix.tv.data.PlaybackPlan
@@ -75,15 +83,18 @@ import java.io.IOException
 import java.util.UUID
 
 /** The sections of the top bar. Only those the account has are shown (see [AppViewModel.tabs]). */
-enum class Tab(@StringRes val label: Int) {
-    Home(R.string.nav_home),
-    Movies(R.string.nav_movies),
-    Series(R.string.nav_series),
-    Anime(R.string.nav_anime),
-    Music(R.string.nav_music),
-    Collections(R.string.nav_collections),
-    Search(R.string.nav_search),
-    Settings(R.string.nav_settings),
+enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
+    Home(R.string.nav_home, R.drawable.ic_nav_home),
+    Movies(R.string.nav_movies, R.drawable.ic_nav_movies),
+    Series(R.string.nav_series, R.drawable.ic_nav_series),
+    Anime(R.string.nav_anime, R.drawable.ic_nav_anime),
+    MusicVideos(R.string.nav_music_videos, R.drawable.ic_nav_music_videos),
+    Books(R.string.nav_books, R.drawable.ic_nav_books),
+    LiveTv(R.string.nav_live_tv, R.drawable.ic_nav_live_tv),
+    Music(R.string.nav_music, R.drawable.ic_nav_music),
+    Collections(R.string.nav_collections, R.drawable.ic_nav_collections),
+    Search(R.string.nav_search, R.drawable.ic_nav_search),
+    Settings(R.string.nav_settings, R.drawable.ic_nav_settings),
 }
 
 /** Pages that sit on top of the tabs; Back pops them. */
@@ -187,6 +198,33 @@ class MusicHome {
     val list = LazyListState()
 }
 
+/** The Live TV tab: the channels (read a page at a time), what comes after what is on now, and which view is showing. */
+class LiveTvState {
+    val channels = mutableStateListOf<TvChannel>()
+    var total by mutableStateOf(0)
+    var loading by mutableStateOf(false)
+    var loaded by mutableStateOf(false)
+
+    /** Changes each time the list starts over, so a page that was still on its way for the old list is dropped when it arrives. */
+    var generation = 0
+
+    /** The programme after the one on now, by channel (read for the channels on screen, to show "Next"). */
+    var upNext by mutableStateOf<Map<UUID, TvProgram>>(emptyMap())
+    var guide by mutableStateOf(false)
+    var favoritesOnly by mutableStateOf(false)
+    val grid = LazyGridState()
+    val list = LazyListState()
+
+    fun reset() {
+        generation++
+        channels.clear()
+        total = 0
+        loading = false
+        loaded = false
+        upNext = emptyMap()
+    }
+}
+
 /** A paged library list that keeps its place when you open a title and come back. */
 class LibraryState(val section: Section) {
     val items = mutableStateListOf<MediaItem>()
@@ -243,6 +281,8 @@ class HomeState {
     var newMovies by mutableStateOf<List<MediaItem>>(emptyList())
     var newSeries by mutableStateOf<List<MediaItem>>(emptyList())
     var newAnime by mutableStateOf<List<MediaItem>>(emptyList())
+    var newMusicVideos by mutableStateOf<List<MediaItem>>(emptyList())
+    var newBooks by mutableStateOf<List<MediaItem>>(emptyList())
     var collections by mutableStateOf<List<MediaItem>>(emptyList())
     var watchLater by mutableStateOf<List<MediaItem>>(emptyList())
     var playlists by mutableStateOf<List<VideoPlaylist>>(emptyList())
@@ -357,6 +397,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun chooseCanvas(id: String) = updateAppearance { it.copy(theme = it.theme.copy(canvas = id)) }
     fun chooseAccent(id: String) = updateAppearance { it.copy(theme = ThemeChoice(it.theme.canvas, id)) }
     fun choosePosters(size: PosterSize) = updateAppearance { it.copy(posters = size) }
+    fun chooseNav(style: NavStyle) = updateAppearance { it.copy(nav = style) }
+    fun updateMenu(change: (MenuLayout) -> MenuLayout) = updateAppearance { it.copy(menu = change(it.menu)) }
     fun updateHome(change: (HomeLayout) -> HomeLayout) = updateAppearance { it.copy(home = change(it.home)) }
 
     /** The server's plugins, read for Settings; null until the first answer. */
@@ -396,16 +438,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val tabs: List<Tab>
         get() {
             val l = libs
-            return buildList {
-                add(Tab.Home)
-                if (l == null || l.movies.isNotEmpty()) add(Tab.Movies)
-                if (l == null || l.series.isNotEmpty()) add(Tab.Series)
-                if (l != null && l.anime.isNotEmpty()) add(Tab.Anime)
-                if (l != null && l.music.isNotEmpty()) add(Tab.Music)
-                if (hasCollections) add(Tab.Collections)
-                add(Tab.Search)
-                add(Tab.Settings)
+            val available = buildSet {
+                add(MenuItem.Home)
+                if (l == null || l.movies.isNotEmpty()) add(MenuItem.Movies)
+                if (l == null || l.series.isNotEmpty()) add(MenuItem.Series)
+                if (l != null && l.anime.isNotEmpty()) add(MenuItem.Anime)
+                if (l != null && l.musicVideos.isNotEmpty()) add(MenuItem.MusicVideos)
+                if (l != null && l.books.isNotEmpty()) add(MenuItem.Books)
+                if (l != null && l.liveTv.isNotEmpty()) add(MenuItem.LiveTv)
+                if (l != null && l.music.isNotEmpty()) add(MenuItem.Music)
+                if (hasCollections) add(MenuItem.Collections)
             }
+            // The sections in the order the user chose (the names of both lists are the same), then Search and Settings.
+            return appearance.menu.arrange(available).map { Tab.valueOf(it.name) } + Tab.Search + Tab.Settings
         }
 
     var tab by mutableStateOf(Tab.Home)
@@ -423,6 +468,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val movies = LibraryState(Section.Movies)
     val series = LibraryState(Section.Series)
     val anime = LibraryState(Section.Anime)
+    val musicVideos = LibraryState(Section.MusicVideos)
+    val books = LibraryState(Section.Books)
+    val liveTv = LiveTvState()
     val collectionList = LibraryState(Section.Collections)
 
     // Music
@@ -551,6 +599,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 home.newMovies = cached.newMovies
                 home.newSeries = cached.newSeries
                 home.newAnime = cached.newAnime
+                home.newMusicVideos = cached.newMusicVideos
+                home.newBooks = cached.newBooks
                 home.collections = cached.collections
             }
         }
@@ -649,7 +699,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         hasCollections = false
         pages.clear()
         resetHome()
-        for (lib in listOf(movies, series, anime, collectionList)) resetLibrary(lib)
+        for (lib in listOf(movies, series, anime, musicVideos, books, collectionList)) resetLibrary(lib)
+        liveTv.reset()
         results = null
         musicResults = emptyList<Album>() to emptyList()
         query = ""
@@ -665,6 +716,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         home.newMovies = emptyList()
         home.newSeries = emptyList()
         home.newAnime = emptyList()
+        home.newMusicVideos = emptyList()
+        home.newBooks = emptyList()
         home.collections = emptyList()
         home.watchLater = emptyList()
         home.playlists = emptyList()
@@ -707,11 +760,74 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val state = libraryOf(next)
         if (state != null && !state.loaded) loadMore(state)
         if (next == Tab.Music) loadMusic()
+        if (next == Tab.LiveTv && !liveTv.loaded) loadLiveTv()
+    }
+
+    // ---- Live TV ------------------------------------------------------------------------------------------------
+
+    /** Reads the next page of channels (from the start when [restart] is set), then what comes after each one's current programme. */
+    fun loadLiveTv(restart: Boolean = false) {
+        val s = session ?: return
+        if (restart) liveTv.reset()
+        if (liveTv.loading || (liveTv.loaded && liveTv.channels.size >= liveTv.total)) return
+        liveTv.loading = true
+        val favorites = liveTv.favoritesOnly
+        val generation = liveTv.generation
+        launchSafe {
+            try {
+                val page = io { repo.channels(s, liveTv.channels.size, LIVE_PAGE, favorites) }
+                if (generation != liveTv.generation) return@launchSafe
+                liveTv.channels.addAll(page.items)
+                page.total?.let { liveTv.total = it }
+                liveTv.loaded = true
+                refreshUpNext(page.items)
+            } catch (e: Exception) {
+                fail(e)
+            } finally {
+                // Only the load that belongs to the list now showing may say it is done.
+                if (generation == liveTv.generation) liveTv.loading = false
+            }
+        }
+    }
+
+    private fun refreshUpNext(channels: List<TvChannel>) {
+        val s = session ?: return
+        launchSafe {
+            val now = System.currentTimeMillis()
+            val found = runCatching { io { repo.programs(s, channels.map { it.id }, now, now + 3 * 3_600_000L) } }.getOrDefault(emptyMap())
+            liveTv.upNext = liveTv.upNext + found.mapNotNull { (id, programs) -> nextProgram(programs, now)?.let { id to it } }
+        }
+    }
+
+    fun showGuide(guide: Boolean) {
+        liveTv.guide = guide
+    }
+
+    fun toggleLiveFavorites() {
+        liveTv.favoritesOnly = !liveTv.favoritesOnly
+        loadLiveTv(restart = true)
+    }
+
+    /** Watches a channel. */
+    fun watch(channel: TvChannel) = play(channel.item, startMs = 0)
+
+    /** Changes channel from the player: the one [step] places on in the list (the list is read first when it has not been). */
+    fun stepChannel(plan: PlaybackPlan, step: Int) {
+        val s = session ?: return
+        if (busy) return
+        launchSafe {
+            // The list being browsed (it may be only the favorites); when it does not hold this channel, the first page of all of them.
+            var list: List<TvChannel> = liveTv.channels
+            if (list.none { it.item.id == plan.item.id }) {
+                list = runCatching { io { repo.channels(s, 0, LIVE_PAGE) } }.getOrNull()?.items ?: return@launchSafe
+            }
+            neighbourChannel(list, plan.item.id, step)?.let { play(it.item, startMs = 0) }
+        }
     }
 
     /**
      * The banner at the top of Movies, Series and Anime: the newest titles the Home already read (so it costs no request), those with
-     * a backdrop. None for Collections, while a filter is on (the newest titles would not match it), or when the banner is turned off.
+     * a backdrop. None for Music videos and Collections, while a filter is on (the newest titles would not match it), or when the banner is turned off.
      */
     fun sectionBanner(lib: LibraryState): List<MediaItem> {
         if (!appearance.home.banner || lib.filters.isActive) return emptyList()
@@ -719,15 +835,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Section.Movies -> home.newMovies
             Section.Series -> home.newSeries
             Section.Anime -> home.newAnime
-            Section.Collections -> return emptyList()
+            Section.MusicVideos, Section.Books, Section.Collections -> return emptyList()
         }
         return newest.filter { it.backdropUrl != null }.take(8)
+    }
+
+    private companion object {
+        const val LIVE_PAGE = 60
     }
 
     fun libraryOf(tab: Tab): LibraryState? = when (tab) {
         Tab.Movies -> movies
         Tab.Series -> series
         Tab.Anime -> anime
+        Tab.MusicVideos -> musicVideos
+        Tab.Books -> books
         Tab.Collections -> collectionList
         else -> null
     }
@@ -738,6 +860,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Section.Movies -> l.movies
             Section.Series -> l.series
             Section.Anime -> l.anime
+            Section.MusicVideos -> l.musicVideos
+            Section.Books -> l.books
             Section.Collections -> emptyList()
         }
     }
@@ -764,7 +888,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }.getOrDefault(false)
                 }
             }
-            if (!l.hasVideo) {
+            if (!l.hasTitles) {
                 home.lineup = emptyList()
                 return@launchSafe
             }
@@ -786,6 +910,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             launchSafe {
                 home.newAnime = if (l.anime.isEmpty()) emptyList() else io { repo.latest(s, BaseItemKind.SERIES, l.anime) }
+                saveHomeLater()
+            }
+            launchSafe {
+                home.newMusicVideos = if (l.musicVideos.isEmpty()) emptyList() else io { repo.latest(s, BaseItemKind.MUSIC_VIDEO, l.musicVideos) }
+                saveHomeLater()
+            }
+            launchSafe {
+                home.newBooks = if (l.books.isEmpty()) emptyList() else runCatching { io { repo.latestBooks(s, l.books) } }.getOrDefault(home.newBooks)
                 saveHomeLater()
             }
             launchSafe {
@@ -823,7 +955,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val s = session ?: return
         launchSafe {
             kotlinx.coroutines.coroutineScope {
-                val resuming = async { runCatching { io { repo.continueAll(s) } }.getOrNull() }
+                val withVideos = libs?.musicVideos?.isNotEmpty() == true
+                val resuming = async { runCatching { io { repo.continueAll(s, withVideos) } }.getOrNull() }
                 val upNext = async { runCatching { io { repo.nextUp(s) } }.getOrNull() }
                 resuming.await()?.let { home.continueRow = it }
                 upNext.await()?.let { home.nextUp = it }
@@ -848,6 +981,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             delay(1500)
             val snapshot = HomeSnapshot(
                 l, home.lineup.orEmpty(), home.continueRow, home.nextUp, home.newMovies, home.newSeries, home.newAnime, home.collections,
+                home.newMusicVideos, home.newBooks,
             )
             io { HomeCache.save(getApplication(), s, snapshot) }
         }
@@ -944,7 +1078,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 // A library list needs the libraries first (a restored session reads them on its own).
                 val known = libs ?: io { repo.libraries(s) }.also { libs = it }
-                val where = libsFor(lib.section).takeIf { known.hasVideo } ?: emptyList()
+                val where = libsFor(lib.section).takeIf { known.hasTitles } ?: emptyList()
                 val page = io { repo.library(s, lib.section, where, sort, lib.startIndex + lib.items.size, PAGE_SIZE, narrowedBy = lib.filters) }
                 // The sort may have changed (or a letter been chosen) while this was loading; if so the result belongs to the old list.
                 if (sort == lib.sort && generation == lib.generation) {
@@ -968,7 +1102,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (lib.sort != SortOption.Name) return
         lib.letter = letter.takeIf { it != "#" }
         val generation = ++lib.generation
-        val where = libsFor(lib.section).takeIf { known.hasVideo } ?: emptyList()
+        val where = libsFor(lib.section).takeIf { known.hasTitles } ?: emptyList()
         launchSafe {
             try {
                 val index = if (letter == "#") 0 else io { repo.libraryCountBefore(s, lib.section, where, letter, lib.filters) }
@@ -1160,8 +1294,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         nowPlayingPanel = panel
     }
 
-    fun playSongs(songs: List<Song>, start: Int = 0, shuffle: Boolean = false) {
-        ensureMusic()?.play(songs, start, shuffle)
+    fun playSongs(songs: List<Song>, start: Int = 0, shuffle: Boolean = false, startMs: Long = 0L) {
+        ensureMusic()?.play(songs, start, shuffle, startMs)
+    }
+
+    /** Plays an audiobook in the music player, from [startMs] (where it was left by default). */
+    fun listen(book: MediaItem, startMs: Long = book.resumeMs) {
+        if (book.isAudiobook) playSongs(listOf(book.toAudiobookSong()), 0, false, startMs)
     }
 
     fun playAlbum(album: Album, shuffle: Boolean = false) {
@@ -1274,12 +1413,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         home.newMovies = home.newMovies.p()
         home.newSeries = home.newSeries.p()
         home.newAnime = home.newAnime.p()
+        home.newMusicVideos = home.newMusicVideos.p()
+        home.newBooks = home.newBooks.p()
         home.collections = home.collections.p()
         home.watchLater = home.watchLater.p()
         home.favorites = home.favorites.p()
         home.sinceVisit = home.sinceVisit.p()
         home.because = home.because?.let { (seed, similar) -> seed to similar.p() }
-        for (lib in listOf(movies, series, anime, collectionList)) {
+        for (lib in listOf(movies, series, anime, musicVideos, books, collectionList)) {
             for (i in lib.items.indices) if (lib.items[i].id == id) lib.items[i] = change(lib.items[i])
         }
         for (page in pages) {
@@ -1293,7 +1434,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (session == null) return
         val choices = ArrayList<DialogChoice>()
         choices += DialogChoice(str(R.string.menu_open)) { open(item) }
-        val watchable = item.kind == BaseItemKind.MOVIE || item.kind == BaseItemKind.SERIES || item.kind == BaseItemKind.EPISODE
+        val watchable = item.kind == BaseItemKind.MOVIE || item.kind == BaseItemKind.SERIES || item.kind == BaseItemKind.EPISODE || item.kind == BaseItemKind.MUSIC_VIDEO
+        val markable = watchable || item.isBook || item.isAudiobook
         if (item.isPlayable && item.resumeMs >= MIN_RESUME_MS) choices += DialogChoice(str(R.string.menu_start_over)) { play(item, 0) }
         if (inList != null) {
             val entries = inList.state.entries.orEmpty()
@@ -1303,7 +1445,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (at > 0) choices += DialogChoice(str(R.string.menu_move_earlier)) { moveInPlaylist(inList.state, inList.entry, -1) }
             if (at in 0 until entries.lastIndex) choices += DialogChoice(str(R.string.menu_move_later)) { moveInPlaylist(inList.state, inList.entry, +1) }
         }
-        if (watchable) {
+        if (markable) {
             choices += DialogChoice(str(if (item.played) R.string.menu_mark_unwatched else R.string.menu_mark_watched)) { markPlayed(item, !item.played) }
         }
         choices += DialogChoice(str(if (item.favorite) R.string.menu_unfavorite else R.string.menu_favorite)) { markFavorite(item, !item.favorite) }
@@ -1637,7 +1779,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 errorRes = R.string.error_direct_only
             } catch (e: Exception) {
                 fail(e)
-                errorRes = if (e.message.isNullOrBlank()) R.string.error_play else null
+                // Say what could not be played: a channel that is off the air is not a failure of the app.
+                if (errorRes == R.string.error_generic) errorRes = if (item.isChannel) R.string.error_channel else R.string.error_play
             } finally {
                 busy = false
             }

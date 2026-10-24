@@ -4,6 +4,7 @@ import {
   clearBrowsePrefs,
   clearSeriesPrefs,
   countSeriesPrefs,
+  QUALITY_CHOICES,
   readPlayerPrefs,
   readUiPrefs,
   writePlayerPrefs,
@@ -182,9 +183,7 @@ export function SettingsPage({
             tabIndex={tab === id ? 0 : -1}
             onClick={() => setTab(id)}
             onKeyDown={onTabKey}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition pointer-coarse:py-3 ${
-              tab === id ? 'bg-white text-black' : 'text-neutral-400 hover:text-white'
-            }`}
+            className={`tab shrink-0`}
           >
             {t(TAB_LABEL[id])}
           </button>
@@ -291,6 +290,26 @@ export function SettingsPage({
               <option value="large">{t('Large')}</option>
             </select>
           </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label htmlFor="max-quality" className="text-sm font-medium text-neutral-100">
+              {t('Maximum quality')}
+            </label>
+            <select
+              id="max-quality"
+              className="select"
+              value={player.maxBitrateMbps}
+              onChange={(e) => updatePlayer({ maxBitrateMbps: Number(e.target.value) })}
+            >
+              {QUALITY_CHOICES.map((mbps) => (
+                <option key={mbps} value={mbps}>
+                  {mbps === 0 ? t('Original quality') : t('Up to {mbps} Mbps', { mbps })}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="-mt-2 text-xs text-neutral-500">
+            {t('Above the limit the server sends a smaller picture. Useful on a slow connection. You can also change it while you watch.')}
+          </p>
           <Row label={t('Subtitles in the next movie')}>
             {subtitleLanguage}{' '}
             {player.subtitleLanguage && (

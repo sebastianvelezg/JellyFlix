@@ -50,6 +50,7 @@ export interface HomeActions {
   onPlay: (item: Movie | Episode) => void
   onPlayShow: (show: Movie) => void
   onOpenMovie: (movie: Movie) => void
+  onOpenBook: (book: Movie) => void
   onOpenShow: (show: Movie) => void
   onOpenSeries: (seriesId: string) => void
   onOpenAlbum: (id: string) => void
@@ -81,6 +82,8 @@ export function HomePage({
   const movieLibraries = sections.movies
   const seriesLibraries = sections.series
   const animeLibraries = sections.anime
+  const musicVideoLibraries = sections.musicvideos
+  const bookLibraries = sections.books
   const showLibraries = useMemo(() => [...seriesLibraries, ...animeLibraries], [seriesLibraries, animeLibraries])
   const hasVideo = movieLibraries.length + showLibraries.length > 0
   // Which rows, in what order: chosen in Settings → Appearance. (This page stays open behind Settings, so it follows changes made there.)
@@ -99,6 +102,14 @@ export function HomePage({
   const recentAnime = useSwr(
     keyOf('recent-anime', animeLibraries),
     useCallback(() => read(animeLibraries, (ids) => getLatestTitles(session, 'series', ids)), [session, animeLibraries]),
+  ).state
+  const recentMusicVideos = useSwr(
+    keyOf('recent-musicvideo', musicVideoLibraries),
+    useCallback(() => read(musicVideoLibraries, (ids) => getLatestTitles(session, 'musicvideo', ids)), [session, musicVideoLibraries]),
+  ).state
+  const recentBooks = useSwr(
+    keyOf('recent-book', bookLibraries),
+    useCallback(() => read(bookLibraries, (ids) => getLatestTitles(session, 'book', ids)), [session, bookLibraries]),
   ).state
   const poolMovies = useSwr(
     keyOf('pool-movie', movieLibraries),
@@ -135,7 +146,7 @@ export function HomePage({
   const { onPlay, onPlayShow, onOpenMovie, onOpenShow, onOpenSeries } = actions
   const openAny = (title: Movie) => (isEpisode(title) ? onOpenSeries(title.seriesId) : title.isSeries ? onOpenShow(title) : onOpenMovie(title))
 
-  if (sections.movies.length + sections.series.length + sections.anime.length + sections.music.length === 0) {
+  if (sections.movies.length + sections.series.length + sections.anime.length + sections.musicvideos.length + sections.books.length + sections.music.length === 0) {
     return (
       <p className="py-24 text-center text-neutral-400">
         {t('This account has no libraries yet. Add one in Jellyfin (movies, series or music) and it will show up here.')}
@@ -162,8 +173,15 @@ export function HomePage({
         onOpenAlbum={actions.onOpenAlbum}
       />
     ),
-    continue: hasVideo && (
-      <ContinueAll session={session} playbackVersion={playbackVersion} overrides={overrides} onPlay={onPlay} onOpen={openAny} />
+    continue: (hasVideo || musicVideoLibraries.length > 0) && (
+      <ContinueAll
+        session={session}
+        playbackVersion={playbackVersion}
+        withMusicVideos={musicVideoLibraries.length > 0}
+        overrides={overrides}
+        onPlay={onPlay}
+        onOpen={openAny}
+      />
     ),
     nextUp:
       showLibraries.length > 0 && (
@@ -226,6 +244,20 @@ export function HomePage({
         ))}
       </Row>
     ),
+    newMusicVideos: recentMusicVideos.status === 'ready' && recentMusicVideos.data.length > 0 && (
+      <Row title={t('New music videos')} action={<SeeAll onClick={() => actions.onSection('musicvideos')} label={t('Music videos')} />}>
+        {recentMusicVideos.data.map((m) => (
+          <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpenMovie} />
+        ))}
+      </Row>
+    ),
+    newBooks: recentBooks.status === 'ready' && recentBooks.data.length > 0 && (
+      <Row title={t('New books')} action={<SeeAll onClick={() => actions.onSection('books')} label={t('Books')} />}>
+        {recentBooks.data.map((m) => (
+          <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={actions.onOpenBook} />
+        ))}
+      </Row>
+    ),
     music: sections.music.length > 0 && (
       <LazyMount height={300}>
         <MusicRows
@@ -274,20 +306,22 @@ function SeeAll({ onClick, label }: { onClick: () => void; label: string }) {
 function ContinueAll({
   session,
   playbackVersion,
+  withMusicVideos,
   overrides,
   onPlay,
   onOpen,
 }: {
   session: Session
   playbackVersion: number
+  withMusicVideos: boolean
   overrides: Record<string, Movie>
   onPlay: (item: Movie) => void
   onOpen: (item: Movie) => void
 }) {
   // `playbackVersion` is part of the callback identity so the row is read again after playback ends (`fresh: 0`:
   // what is remembered is shown at once, but never trusted).
-  const load = useCallback(() => getContinueAll(session).then((rows) => ({ rows, playbackVersion })), [session, playbackVersion])
-  const { state } = useSwr(swrKey(swrScope(session), 'home', 'continue'), load, { fresh: 0 })
+  const load = useCallback(() => getContinueAll(session, undefined, withMusicVideos).then((rows) => ({ rows, playbackVersion })), [session, withMusicVideos, playbackVersion])
+  const { state } = useSwr(swrKey(swrScope(session), 'home', 'continue', withMusicVideos ? 'mv' : ''), load, { fresh: 0 })
   if (state.status !== 'ready') return null
   const items = state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0)
   if (items.length === 0) return null

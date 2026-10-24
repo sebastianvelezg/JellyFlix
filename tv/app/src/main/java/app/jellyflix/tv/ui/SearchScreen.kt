@@ -60,11 +60,13 @@ fun SearchScreen(vm: AppViewModel) {
         )
         val results = vm.results
         val (albums, artists) = vm.musicResults
-        val titles = results?.filter { it.kind != BaseItemKind.BOX_SET }.orEmpty()
+        val titles = results?.filter { it.kind != BaseItemKind.BOX_SET && it.kind != BaseItemKind.MUSIC_VIDEO && !it.isBook && !it.isAudiobook }.orEmpty()
+        val books = results?.filter { it.isBook || it.isAudiobook }.orEmpty()
         val collections = results?.filter { it.kind == BaseItemKind.BOX_SET }.orEmpty()
+        val videos = results?.filter { it.kind == BaseItemKind.MUSIC_VIDEO }.orEmpty()
         when {
             results == null -> Hint(stringResource(R.string.search_prompt))
-            titles.isEmpty() && collections.isEmpty() && albums.isEmpty() && artists.isEmpty() ->
+            titles.isEmpty() && collections.isEmpty() && videos.isEmpty() && books.isEmpty() && albums.isEmpty() && artists.isEmpty() ->
                 Hint(stringResource(R.string.search_none, vm.query.trim()))
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -79,6 +81,16 @@ fun SearchScreen(vm: AppViewModel) {
                 if (collections.isNotEmpty()) item {
                     Section(stringResource(R.string.search_collections)) {
                         items(collections.size, key = { collections[it].id }) { i -> MediaCard(collections[i], landscape = false, onClick = { vm.open(collections[i]) }) }
+                    }
+                }
+                if (videos.isNotEmpty()) item {
+                    Section(stringResource(R.string.search_music_videos)) {
+                        items(videos.size, key = { videos[it].id }) { i -> MediaCard(videos[i], landscape = true, onClick = { vm.open(videos[i]) }) }
+                    }
+                }
+                if (books.isNotEmpty()) item {
+                    Section(stringResource(R.string.search_books)) {
+                        items(books.size, key = { books[it].id }) { i -> MediaCard(books[i], landscape = false, onClick = { vm.open(books[i]) }) }
                     }
                 }
                 if (albums.isNotEmpty()) item {

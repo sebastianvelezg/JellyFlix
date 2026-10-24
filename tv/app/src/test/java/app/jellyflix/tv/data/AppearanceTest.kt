@@ -111,6 +111,8 @@ class AppearanceTest {
             theme = ThemeChoice("cocoa", "amber"),
             posters = PosterSize.Large,
             home = HomeLayout(banner = false, order = HomeRow.entries.reversed(), hidden = setOf(HomeRow.Because, HomeRow.NewAnime)),
+            nav = NavStyle.Icons,
+            menu = MenuLayout(MenuItem.entries.reversed(), setOf(MenuItem.Books, MenuItem.Music)),
         )
         val stored = look.encode()
         assertEquals(look, Appearance.decode { stored[it] })
@@ -121,6 +123,45 @@ class AppearanceTest {
         assertEquals(PosterSize.Comfortable, decoded.posters)
         assertEquals(HomeRow.Continue, decoded.home.order.first())
         assertFalse(decoded.home.banner)
+        assertEquals(NavStyle.Full, decoded.nav)
+    }
+
+    @Test
+    fun theTopMenuFollowsTheChosenOrderAndLeavesOutWhatIsOffOrMissing() {
+        val layout = MenuLayout().moved(MenuItem.Music, -1).toggled(MenuItem.Series)
+        // Music went before Live TV; Series is off; the account has no anime, books or collections.
+        assertEquals(
+            listOf(MenuItem.Home, MenuItem.Movies, MenuItem.Music, MenuItem.LiveTv),
+            layout.arrange(setOf(MenuItem.Home, MenuItem.Movies, MenuItem.Series, MenuItem.LiveTv, MenuItem.Music)),
+        )
+        assertTrue(MenuLayout().isDefault)
+        assertFalse(layout.isDefault)
+        // Home never goes off or out of the list; the ends stay where they are.
+        assertEquals(MenuLayout(), MenuLayout().toggled(MenuItem.Home))
+        assertEquals(MenuLayout(), MenuLayout().moved(MenuItem.Home, -1))
+        assertEquals(MenuLayout(), MenuLayout().moved(MenuItem.Collections, 1))
+        // What was saved is cleaned up: unknown and repeated names go, missing ones come last, Home is on.
+        val saved = MenuLayout.sanitized(listOf("music", "nope", "music", "books"), listOf("home", "books", 7))
+        assertEquals(listOf(MenuItem.Music, MenuItem.Books), saved.order.take(2))
+        assertEquals(MenuItem.entries.toSet(), saved.order.toSet())
+        assertEquals(setOf(MenuItem.Books), saved.hidden)
+    }
+
+    @Test
+    fun theMenuShowsNamesOnlyWhileTheyFit() {
+        val names = listOf("Home", "Movies", "Series", "Music videos", "Books", "Live TV", "Music", "Collections", "Search", "Settings")
+        // A wide screen keeps the names; a narrow one keeps the pictures.
+        assertEquals(NavStyle.Full, navStyleFor(NavStyle.Full, names, 1400f))
+        assertEquals(NavStyle.Icons, navStyleFor(NavStyle.Full, names, 700f))
+        // Few sections fit where many do not.
+        assertEquals(NavStyle.Full, navStyleFor(NavStyle.Full, names.take(4), 700f))
+        // What was chosen is never changed by the room: names alone scroll, pictures alone always fit.
+        assertEquals(NavStyle.Text, navStyleFor(NavStyle.Text, names, 100f))
+        assertEquals(NavStyle.Icons, navStyleFor(NavStyle.Icons, names, 5000f))
+        assertTrue(navButtonWidth("Movies", NavStyle.Icons) < navButtonWidth("Movies", NavStyle.Text))
+        assertTrue(navButtonWidth("Movies", NavStyle.Text) < navButtonWidth("Movies", NavStyle.Full))
+        assertEquals(NavStyle.Full, NavStyle.of("nonsense"))
+        assertEquals(NavStyle.Text, NavStyle.of("text"))
     }
 
     @Test

@@ -110,7 +110,8 @@ function DetailsContent({
 
   const resumeSeconds = ticksToSeconds(movie.resumeTicks)
   const runtime = formatRuntime(ticksToSeconds(movie.runtimeTicks))
-  const backdrop = backdropImageUrl(session.serverUrl, movie)
+  // A music video's picture is wide: it fills the back of the page and there is no poster.
+  const backdrop = backdropImageUrl(session.serverUrl, movie) ?? (movie.musicVideo ? posterUrl(session.serverUrl, movie, 1600) : null)
 
   const similar = useCallback(() => getSimilarMovies(session, movie.id), [session, movie.id])
   const similarState = useSwr(swrKey(swrScope(session), 'similar-movies', movie.id), similar, { fresh: 10 * 60_000 }).state
@@ -123,10 +124,12 @@ function DetailsContent({
         poster={posterUrl(session.serverUrl, movie, 450)}
         name={movie.name}
         onBack={onBack}
+        noPoster={movie.musicVideo}
       >
           <h1 className="rise text-balance text-4xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_24px_rgba(0,0,0,0.8)] sm:text-6xl">
             {movie.name}
           </h1>
+          {movie.artist && <p className="rise rise-2 mt-2 text-lg font-medium text-neutral-200">{movie.artist}</p>}
           {movie.tagline && <p className="rise rise-2 mt-2 text-base italic text-neutral-300">{movie.tagline}</p>}
 
           <div className="rise rise-2 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-neutral-200">

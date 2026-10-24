@@ -16,12 +16,15 @@ export function TitleHero({
   poster,
   name,
   onBack,
+  noPoster = false,
   children,
 }: {
   session: Session
   backdrop: string | null
   poster: string | null
   name: string
+  /** Leave the poster out (a music video has a wide picture, which is the backdrop instead). */
+  noPoster?: boolean
   onBack: () => void
   children: ReactNode
 }) {
@@ -49,7 +52,7 @@ export function TitleHero({
 
       <div className="gutter-x relative flex w-full items-end justify-between gap-10 pb-10 pt-44">
         <div className="min-w-0 max-w-3xl flex-1">{children}</div>
-        <div className="rise rise-3 hidden w-52 shrink-0 lg:block xl:w-60">
+        <div className={`rise rise-3 hidden w-52 shrink-0 xl:w-60 ${noPoster ? '' : 'lg:block'}`}>
           <div className="aspect-[2/3] overflow-hidden rounded-2xl bg-[var(--color-surface-2)] shadow-[0_24px_70px_-12px_var(--glow)] ring-1 ring-white/15">
             <Img
               session={session}

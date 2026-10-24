@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import {
+  bookKindLabel,
   episodeCode,
   formatTime,
   getMovieDetails,
@@ -99,10 +100,16 @@ export function MovieCard({
   onOpen: (movie: Movie) => void
 }) {
   const progress = progressPercent(movie)
-  const label = `${movie.name}${movie.year ? ` (${movie.year})` : ''}`
+  const title = movie.musicVideo && movie.artist ? t('{name} by {artist}', { name: movie.name, artist: movie.artist }) : movie.name
+  // A book's card says what kind it is (EPUB, PDF, Audiobook...) and a music video's, who it is by.
+  const kindLabel = movie.book ? t(bookKindLabel(movie)) : undefined
+  const label = `${title}${movie.year || kindLabel ? ` (${[kindLabel, movie.year].filter(Boolean).join(', ')})` : ''}`
   const hover = usePrefetchOnHover(session, movie.id)
   const remember = useCardActions()
   const runtime = movie.runtimeTicks ? formatRuntime(ticksToSeconds(movie.runtimeTicks)) : undefined
+  // A music video's picture is a wide frame, not a poster; the artist goes under the title.
+  const wide = !!movie.musicVideo
+  const subtext = wide ? [movie.artist, movie.year].filter(Boolean).join(' · ') : movie.book ? [kindLabel, movie.year].filter(Boolean).join(' · ') : movie.year
 
   return (
     <div className="group/card relative">
@@ -113,10 +120,10 @@ export function MovieCard({
       aria-label={t('Open {label}', { label })}
       {...hover}
     >
-      <div className={`aspect-[2/3] ${frame}`}>
+      <div className={`${wide ? 'aspect-video' : 'aspect-[2/3]'} ${frame}`}>
         <Img
           session={session}
-          src={posterUrl(session.serverUrl, movie)}
+          src={wide ? wideImageUrl(session.serverUrl, { ...movie, backdropTag: undefined }) : posterUrl(session.serverUrl, movie)}
           className="h-full w-full object-cover"
           fallback={<Placeholder name={movie.name} />}
         />
@@ -148,7 +155,7 @@ export function MovieCard({
         {progress > 0 && <ProgressBar percent={progress} />}
       </div>
       <p className="mt-2.5 truncate text-sm font-medium text-neutral-100 transition group-hover:text-white">{movie.name}</p>
-      <Subtext as="p" className="block min-h-4 text-xs text-neutral-500" text={movie.year} />
+      <Subtext as="p" className="block min-h-4 truncate text-xs text-neutral-500" text={subtext} />
     </button>
     {remember && <CardMenu session={session} movie={movie} onOpen={onOpen} onChange={remember} />}
     </div>
@@ -158,7 +165,7 @@ export function MovieCard({
 /** A poster card sized for horizontal rows. */
 export function RowCard(props: { session: Session; movie: Movie; onOpen: (movie: Movie) => void }) {
   return (
-    <div className="w-[var(--poster-w)] shrink-0 snap-start">
+    <div className={`shrink-0 snap-start ${props.movie.musicVideo ? 'w-[calc(var(--poster-w)*1.75)]' : 'w-[var(--poster-w)]'}`}>
       <MovieCard {...props} />
     </div>
   )
@@ -221,10 +228,10 @@ export function ContinueCard({
   )
 }
 
-export function CardSkeleton() {
+export function CardSkeleton({ wide = false }: { wide?: boolean }) {
   return (
     <div aria-hidden="true">
-      <div className="skeleton aspect-[2/3] w-full" />
+      <div className={`skeleton w-full ${wide ? 'aspect-video' : 'aspect-[2/3]'}`} />
       <div className="skeleton mt-2.5 h-3.5 w-3/4 !rounded-md" />
       <div className="skeleton mt-1.5 h-3 w-1/4 !rounded-md" />
     </div>

@@ -193,6 +193,14 @@ body {
     @apply inline-flex items-center rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-accent)];
   }
 
+  /* The tabs of Settings, Administration and the editor: the chosen one takes the accent, like the chosen card of a setting. */
+  .tab {
+    @apply whitespace-nowrap rounded-full border border-transparent px-4 py-2 text-sm font-medium text-neutral-400 transition hover:bg-white/[.06] hover:text-white pointer-coarse:py-3;
+  }
+  .tab[aria-selected='true'] {
+    @apply border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white shadow-[0_0_18px_-6px_var(--glow)];
+  }
+
   /* ---- surfaces ----------------------------------------------------------------------------- */
   .glass {
     @apply border border-white/10 bg-white/[.04] backdrop-blur-xl;
@@ -238,6 +246,10 @@ body {
   display: grid;
   gap: 2rem 1rem;
   grid-template-columns: repeat(auto-fill, minmax(var(--grid-min), 1fr));
+}
+
+.wide-grid {
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--grid-min) * 1.75), 1fr));
 }
 
 /* We draw our own clear button in the search box. */

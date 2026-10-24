@@ -1,6 +1,6 @@
 # Jellyflix Web
 
-An independent, open-source web client for your own [Jellyfin](https://jellyfin.org) server: movies, series, anime, music and collections, a streaming-style home page, a full player,
+An independent, open-source web client for your own [Jellyfin](https://jellyfin.org) server: movies, series, anime, music videos, books (with a reader), live TV, music and collections, a streaming-style home page, a full player,
 tools for server administrators and an English / Spanish interface. It is a static single-page app with no backend, no database, no analytics and no cloud dependency:
 your browser talks directly to the Jellyfin server you type in.
 
@@ -21,12 +21,13 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
   a new one every ten seconds. It waits while you hover or focus it, and never moves with "reduce motion".
 - **Discover something new**: a random movie (preferring unwatched), a series you have never started (its button plays episode 1, never a special) and a random album (or shuffle the whole library). Press **Another** for a different pick.
 - Rows that follow you: **Continue watching** (movies and episodes together), **Next up**, **Because you watched…**, **New since your last visit**, **Coming up** (episodes about to air), **Watch later**, your playlists and favorites,
-  the latest movies, collections, new series, new anime and new music.
+  the latest movies, collections, new series, new anime, new music videos, new books and new music.
 - **Surprise me** opens a random unwatched movie; "Top rated in *genre*" rows change on every visit.
 - Search across movies, series, episodes, collections, albums, artists and songs (press `/`), with recent searches and result filters.
 
 ### Your libraries
-- **Movies, Series, Anime** (a TV library whose name contains *Anime*), **Music** and **Collections**, each with its own banner and rows; the tabs appear according to the libraries your account has.
+- **Movies, Series, Anime** (a TV library whose name contains *Anime*), **Music videos**, **Books**, **Live TV**, **Music** and **Collections**, each with its own page; the tabs appear according to the libraries your account has.
+- **The menu is yours:** Settings → Appearance chooses whether the buttons at the top show icons and names, only icons or only names (with both, the names give way to the icons when there is no room), their order, and which ones are shown. Home always stays.
 - Poster grids with infinite scroll, sort (title, recently added, year, rating), **filters** (watched, favorites, genre, decade, minimum rating, age rating, tag, 4K) and an **A–Z jump**. Sort and filter choices are remembered.
 - **Title pages** with backdrop, cast (click someone to see all their titles in your library), file info, audio and subtitle lists, similar titles, a line that says what **Play** will give ("1080p HEVC · English · AAC · 5.1"),
   Play / Resume / Start over, watched and favorite toggles that change instantly and sync with the server.
@@ -44,6 +45,19 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - A **quality limit** and an explanation of how the video is playing and why the server converts it. Playlists play through.
 - Progress is reported to Jellyfin (start, every ten seconds, pause, seek, stop); resume where you left off. Reporting failures never interrupt playback.
 - Keyboard: **Space/K** play/pause, **←/→ or J/L** ±10 s, **↑/↓** volume, **0–9** jump, **M** mute, **C** subtitles, **F** fullscreen, **N** next episode, **S** skip, **P** picture-in-picture, **Esc** back. Press `?` anywhere for the full list.
+
+### Books
+- A library of type **Books** (books and audiobooks together) has the same sort, filters and A–Z jump as the others, a page for each book (author, description, Read / Listen, Download, mark as read, favorite) and "New books" on Home.
+- **A reader of its own**, in a full-screen layer that keeps your place in this browser ("Continue reading"):
+  - **EPUB**: one chapter at a time, a table of contents, text size and dark, light or sepia pages. The chapter is shown in a frame that runs no scripts and cannot reach the network: pictures and fonts come from inside the book, links to other sites open in a new tab.
+  - **PDF**: drawn by [pdf.js](https://mozilla.github.io/pdf.js/) (loaded only when a PDF is opened) on dark, light or sepia pages, with zoom, the table of contents, a jump to any page and the place you stopped; only the pages near the screen are kept in memory. A file it cannot open (a password, a damaged file) falls back to the browser's own viewer, which is also one click away for selecting text, searching and printing.
+  - **Comics (CBZ)**: a page at a time, fit height or width, left to right or right to left for manga.
+  - Files are unpacked in the browser with limits on their size, so a damaged or hostile file is refused instead of filling the memory of the tab. Other formats (Mobi, RAR comics) can be downloaded.
+- **Audiobooks** play in the music player and go on from where they were left. Reading and downloading need an account that may download files.
+
+### Music videos and Live TV
+- **Music videos** have wide cards with the artist under the title, a page of their own, the usual player, search, a "New music videos" row on Home and a place in "Continue watching".
+- **Live TV** lists your channels with what is on each (their quality and notes in the name are shown as small tags), has a search by name or number, favorites, and a **guide** (a time grid of the next hours). Watching a channel opens the stream your server provides, with no seek bar (it is live), the arrow keys for the channel before and after, a quality choice, and the usual reports to the server. Recording and timers are not built.
 
 ### Music
 - Its own home (Jump back in, Recently added, Playlists, Discover, Most played, Favorite songs) and **Albums, Artists, Songs, Playlists** with sort, genre, favorites and search. **Shuffle all** plays a random mix.
@@ -354,11 +368,11 @@ is unchanged; credentials stay in your shell and nothing is written to disk.
 - **Jellyfin:** developed against 12.x; the SDK targets 10.10 and newer. Plugin routes (Intro Skipper, Playback Reporting…) are only used when the server has them.
 - **Browsers:** developed and tested in Chrome. Edge, Firefox and Safari are expected to work and are not regularly tested. HLS needs MSE (hls.js) or native HLS (Safari).
 - **Media:** direct play of what the browser can decode (H.264 / AAC everywhere; HEVC where the browser supports it, and 10-bit HEVC only when it reports Main10); everything else is converted by the server. DTS and TrueHD audio and image-based subtitles are not supported.
-- **Not built:** live TV, several saved servers or users, a version picker, subtitle search and download, instant mix, gapless or crossfade playback, an equalizer, styled `.ass` subtitles, casting (Chromecast, AirPlay), offline mode.
+- **Not built:** recording and timers for live TV, a reader for Mobi and RAR comics, several saved servers or users, a version picker, subtitle search and download, instant mix, gapless or crossfade playback, an equalizer, styled `.ass` subtitles, casting (Chromecast, AirPlay), offline mode.
 - "Play on…" needs the other app to be open and cannot wake it; it lists any controllable device of your account, so an official Jellyfin web tab left open also appears.
 - On an iPhone or iPad, Safari lets a page start sound or video only after a tap, so a title sent to it may open ready and need one tap on Play.
 
 ## License
 
-[MIT](../LICENSE), the same as the rest of the repository. Runtime dependencies: `@jellyfin/sdk` (MPL-2.0, used unmodified as a library), `hls.js` (Apache-2.0), `axios`, `react`, `react-dom` (MIT), Inter (SIL OFL 1.1).
+[MIT](../LICENSE), the same as the rest of the repository. Runtime dependencies: `@jellyfin/sdk` (MPL-2.0, used unmodified as a library), `hls.js`, `pdfjs-dist` and `fflate` (Apache-2.0 / MIT), `axios`, `react`, `react-dom` (MIT), Inter (SIL OFL 1.1).
 Build and test tooling (Tailwind CSS, Vite, Vitest, Playwright, ESLint) is MIT or Apache-2.0. See [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

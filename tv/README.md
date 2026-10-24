@@ -19,7 +19,7 @@ What differs is how it is used: everything is built for a remote control and a T
 - **Sign in with a code (Quick Connect)** or with server address, user and password; the session and the last address are remembered. The screen shows a large six-digit code; you type it in Jellyfin on a phone or computer
   (user menu, Quick Connect, or the web client's Settings → Devices) and the TV signs in by itself, so nothing is typed with the remote. The server needs Quick Connect on (Dashboard → General).
 - A rejected token (revoked from the Jellyfin dashboard) returns to the sign-in screen with a message; a network failure shows a message instead of closing the app.
-- The tabs depend on the libraries the account has: Home, Movies, Series, Anime, Music, Collections, Search, Settings.
+- The tabs depend on the libraries the account has: Home, Movies, Series, Anime, Music videos, Books, Live TV, Music, Collections, Search, Settings. Appearance → Top menu changes their order and turns some off (Home stays; Search and Settings always stay at the right end), and Appearance → Menu buttons shows icons and names, only icons or only names. The bar scrolls with the remote, so Settings is always reachable.
 
 ### Home and discovery
 - A rotating **banner** (the newest titles plus random picks, movies and series in turns, ten seconds each, paused while the remote is on it, the next picture loaded ahead), then **Discover something new** (a random movie, a series you never started,
@@ -32,6 +32,11 @@ What differs is how it is used: everything is built for a remote control and a T
   <img src="../docs/screenshots/tv-discover.jpg" alt="Discover something new: a random movie, series and album" width="49%">
   <img src="../docs/screenshots/tv-movies.jpg" alt="The Movies page with its banner and sort choices" width="49%">
 </p>
+
+### Music videos, books and Live TV
+- **Music videos**: a tab with wide cards (the artist under the title), a title page, the usual player, search, a "New music videos" row on Home and a place in Continue watching.
+- **Books**: a tab with books and audiobooks. **Audiobooks** play in the music player from where they were left. Books to read are not shown on the TV: choosing one says so and points to the web app or a phone.
+- **Live TV**: your channels with what is on each (quality and notes of the name as small tags), "now and next", a guide view, and favorites. Watching a channel opens the stream your server provides: no seek bar, OK shows the controls, up and down (or the remote's channel keys) change channel, and a channel the server cannot play shows a message. Recording and timers are not built.
 
 ### Your libraries
 - **Movies, Series, Anime, Collections**: poster grids (six across at 1080p), sort by recently added, name, year or rating, more titles loading as you scroll. A long title scrolls by itself while its poster has the remote.
@@ -244,7 +249,7 @@ Jellyfin returns playlist ids without dashes, so they are never parsed as UUIDs.
 - **Devices:** Android TV and Google TV running Android 9 or newer. The emulator only offers software decoders and one 60 Hz mode, so a few things can only be confirmed on a real TV: HDR and Dolby decisions, 4K, the automatic frame-rate switch,
   a screen that crops the picture (the *Screen margin* setting) and the version picker for merged titles. If you try one of these, please [open an issue](https://github.com/sebastianvelezg/JellyFlix/issues/new/choose) with what you saw.
 - **Servers:** developed against Jellyfin 12.x. Skip intro / recap / credits need segments from the server (for example the Intro Skipper plugin); without them the buttons simply do not appear.
-- **Not built:** voice search, music playing after you leave the app, server discovery on the network, searching and downloading subtitles, live TV. Administration tools are on the web app only, on purpose.
+- **Not built:** voice search, music playing after you leave the app, server discovery on the network, searching and downloading subtitles, recording and timers for live TV, a reader for books. Administration tools are on the web app only, on purpose.
 
 ## License
 

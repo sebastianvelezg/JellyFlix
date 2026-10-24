@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest'
  */
 describe('totals', () => {
   const dir = new URL('.', import.meta.url)
-  const files = readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+  // The Live TV lists (`/LiveTv/Channels`) are not among the lists that `withoutTotals` strips, so they always come with their total.
+  const files = readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && f !== 'liveTv.ts')
 
   it('every list that is read for its total asks for it', () => {
     const readers = files.filter((f) => /\.TotalRecordCount/.test(readFileSync(new URL(f, dir), 'utf8')))

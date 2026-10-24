@@ -19,10 +19,13 @@ export interface MovieLibrary {
   name: string
 }
 
-/** What a library is shown as: Jellyfin only knows "movies", "tvshows" and "music"; anime is a TV library named like anime. */
-export type Section = 'movies' | 'series' | 'anime' | 'music'
+/**
+ * What a library is shown as: Jellyfin knows "movies", "tvshows", "music" and "musicvideos"; anime is a TV library named like anime.
+ * Books (and audiobooks) are a library of type "Books"; Live TV is the server's one "live TV" view.
+ */
+export type Section = 'movies' | 'series' | 'anime' | 'musicvideos' | 'books' | 'livetv' | 'music'
 
-/** The sections that list movies or series (everything except music). */
+/** The sections that list titles in a catalog page: everything except music (which has its own pages). */
 export type VideoSection = Exclude<Section, 'music'>
 
 /** The user's libraries, grouped by section. Libraries that are still being scanned are included (they are just empty). */
@@ -52,6 +55,30 @@ export interface Movie {
   unwatchedCount?: number
   /** When it was last played (ms since the epoch), to order mixed lists such as "Continue watching". */
   lastPlayedAt?: number
+  /** True for a music video: it is drawn as a wide card and its artist is shown under the title. */
+  musicVideo?: boolean
+  /** Music videos: who performs it ("Artist" or "Artist & Artist"). */
+  artist?: string
+  /** A book to read, or an audiobook to listen to. */
+  book?: 'book' | 'audiobook'
+  /** Books: the file's format in lower case ("epub", "pdf", "cbz"), when the server says. */
+  format?: string
+  /** Books: who wrote it, when the list says (a title page reads it from the credits). */
+  author?: string
+}
+
+/** The format of a book's file: the container the server reports, or the extension of its path. */
+function formatOf(dto: BaseItemDto): string | undefined {
+  const container = dto.Container?.split(',')[0]?.trim().toLowerCase()
+  if (container) return container
+  const extension = /\.([a-z0-9]{2,5})$/i.exec(dto.Path ?? '')?.[1]
+  return extension?.toLowerCase()
+}
+
+/** Who a music video is by: its artists, joined the way a song's are. */
+function artistsOf(dto: BaseItemDto): string | undefined {
+  const names = (dto.Artists ?? []).filter((a): a is string => !!a)
+  return names.length > 0 ? names.join(', ') : undefined
 }
 
 export interface MoviePage {
@@ -100,6 +127,10 @@ export function toMovie(dto: BaseItemDto): Movie | null {
     isSeries: dto.Type === BaseItemKind.Series ? true : undefined,
     unwatchedCount: dto.Type === BaseItemKind.Series ? (dto.UserData?.UnplayedItemCount ?? undefined) : undefined,
     lastPlayedAt: toTime(dto.UserData?.LastPlayedDate),
+    ...(dto.Type === BaseItemKind.MusicVideo ? { musicVideo: true, artist: artistsOf(dto) } : {}),
+    ...(dto.Type === BaseItemKind.Book || dto.Type === BaseItemKind.AudioBook
+      ? { book: dto.Type === BaseItemKind.Book ? ('book' as const) : ('audiobook' as const), format: formatOf(dto), author: artistsOf(dto) ?? dto.AlbumArtist ?? undefined }
+      : {}),
   }
 }
 
@@ -160,11 +191,14 @@ const FILTERS: Record<WatchFilter, ItemFilter[] | undefined> = {
 
 export async function getLibrarySections(session: Session): Promise<LibrarySections> {
   const { data } = await getUserViewApi(session.api).getUserViews({ userId: session.userId })
-  const sections: LibrarySections = { movies: [], series: [], anime: [], music: [] }
+  const sections: LibrarySections = { movies: [], series: [], anime: [], musicvideos: [], books: [], livetv: [], music: [] }
   for (const view of data.Items ?? []) {
     if (!view.Id) continue
     if (view.CollectionType === CollectionType.Movies) sections.movies.push({ id: view.Id, name: view.Name ?? 'Movies' })
     else if (view.CollectionType === CollectionType.Music) sections.music.push({ id: view.Id, name: view.Name ?? 'Music' })
+    else if (view.CollectionType === CollectionType.Musicvideos) sections.musicvideos.push({ id: view.Id, name: view.Name ?? 'Music videos' })
+    else if (view.CollectionType === CollectionType.Books) sections.books.push({ id: view.Id, name: view.Name ?? 'Books' })
+    else if (view.CollectionType === CollectionType.Livetv) sections.livetv.push({ id: view.Id, name: view.Name ?? 'Live TV' })
     else if (view.CollectionType === CollectionType.Tvshows) {
       const name = view.Name ?? 'Series'
       sections[isAnimeLibraryName(name) ? 'anime' : 'series'].push({ id: view.Id, name })
@@ -178,10 +212,12 @@ export async function getMovieLibraries(session: Session): Promise<MovieLibrary[
 }
 
 /** What a browse/search call looks for. */
-export type TitleKind = 'movie' | 'series'
+export type TitleKind = 'movie' | 'series' | 'musicvideo' | 'book'
 const KIND_TYPES: Record<TitleKind, BaseItemKind[]> = {
   movie: [BaseItemKind.Movie],
   series: [BaseItemKind.Series],
+  musicvideo: [BaseItemKind.MusicVideo],
+  book: [BaseItemKind.Book, BaseItemKind.AudioBook],
 }
 
 /** One page of titles (movies or series). Paged (not "everything") so large libraries stay responsive. */
@@ -308,13 +344,17 @@ export const searchMovies = (session: Session, term: string, opts: { startIndex?
   searchTitles(session, 'movie', term, opts)
 export const searchShows = (session: Session, term: string, opts: { startIndex?: number; limit?: number } = {}) =>
   searchTitles(session, 'series', term, opts)
+export const searchMusicVideos = (session: Session, term: string, opts: { startIndex?: number; limit?: number } = {}) =>
+  searchTitles(session, 'musicvideo', term, opts)
+export const searchBooks = (session: Session, term: string, opts: { startIndex?: number; limit?: number } = {}) =>
+  searchTitles(session, 'book', term, opts)
 
-/** Partially watched movies, most recently watched first (Jellyfin's "Continue Watching"). */
-export async function getContinueWatching(session: Session, limit = 12): Promise<Movie[]> {
+/** Partially watched movies (or music videos, or audiobooks), most recently watched first (Jellyfin's "Continue Watching"). */
+export async function getContinueWatching(session: Session, limit = 12, kind: 'movie' | 'musicvideo' | 'book' = 'movie'): Promise<Movie[]> {
   const { data } = await getLibraryApi(session.api).getResumeItems({
     userId: session.userId,
     limit,
-    includeItemTypes: [BaseItemKind.Movie],
+    includeItemTypes: KIND_TYPES[kind],
     enableUserData: true,
     enableImages: true,
     enableImageTypes: [ImageType.Primary, ImageType.Backdrop],
@@ -324,11 +364,11 @@ export async function getContinueWatching(session: Session, limit = 12): Promise
 }
 
 /**
- * Newest additions to a library. For series this is a plain list sorted by date added: Jellyfin's "latest" endpoint
- * is built around new episodes and answered with nothing at all for series on a real server.
+ * Newest additions to a library. For series (and music videos) this is a plain list sorted by date added: Jellyfin's
+ * "latest" endpoint is built around new episodes and answered with nothing at all for series on a real server.
  */
 export async function getRecentTitles(session: Session, kind: TitleKind, libraryId: string, limit = 16): Promise<Movie[]> {
-  if (kind === 'series') return (await getTitlePage(session, 'series', { libraryId, startIndex: 0, limit, sort: 'added', withTotal: false })).movies
+  if (kind !== 'movie') return (await getTitlePage(session, kind, { libraryId, startIndex: 0, limit, sort: 'added', withTotal: false })).movies
   const { data } = await getLibraryApi(session.api).getLatestMedia({
     userId: session.userId,
     parentId: libraryId,

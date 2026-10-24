@@ -213,7 +213,7 @@ private fun AlbumGrid(vm: AppViewModel) {
             AlbumSort.entries.forEach { sort ->
                 Pill(stringResource(sort.label), onClick = { vm.sortAlbums(sort) }, selected = vm.albumSort == sort)
             }
-            if (list.total > 0) Text(stringResource(R.string.library_count, list.total), color = Palette.TextDim, fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp))
+            if (list.total > 0) Text(titlesLabel(list.total), color = Palette.TextDim, fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp))
         }
         ListBody(list) {
             LazyVerticalGrid(

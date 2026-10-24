@@ -4,6 +4,8 @@ import { CardSkeleton, MovieCard } from './MovieCard'
 import { PagedView } from './PagedView'
 
 const GRID = 'poster-grid'
+/** Music videos are wide frames: fewer, larger columns. */
+const WIDE_GRID = 'poster-grid wide-grid'
 
 /**
  * A responsive poster grid of movies or series, loading one page at a time (see {@link PagedView}).
@@ -17,6 +19,7 @@ export function PagedGrid({
   onTotal,
   summary,
   onOpen,
+  wide = false,
 }: {
   session: Session
   /** Fetches movies starting at `startIndex`. */
@@ -30,6 +33,8 @@ export function PagedGrid({
   /** Optional line above the grid, e.g. "60 of 402 movies". */
   summary?: (shown: number, total: number) => string
   onOpen: (movie: Movie) => void
+  /** Wide cards (music videos) instead of posters. */
+  wide?: boolean
 }) {
   const loadItems = useCallback(
     (startIndex: number) => load(startIndex).then((page) => ({ items: page.movies, total: page.total })),
@@ -38,8 +43,8 @@ export function PagedGrid({
   return (
     <PagedView
       load={loadItems}
-      className={GRID}
-      placeholder={<CardSkeleton />}
+      className={wide ? WIDE_GRID : GRID}
+      placeholder={<CardSkeleton wide={wide} />}
       noun="movies"
       itemClassName="cv-card"
       emptyMessage={emptyMessage}

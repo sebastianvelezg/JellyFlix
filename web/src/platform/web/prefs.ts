@@ -41,7 +41,7 @@ export interface BrowsePrefs {
 }
 
 /** The limits the player offers, in megabits per second (0 = original quality). */
-export const QUALITY_CHOICES = [0, 20, 8, 4, 2] as const
+export const QUALITY_CHOICES = [0, 40, 20, 10, 8, 4, 2] as const
 
 const PLAYER_KEY = 'jellyflix.player'
 const BROWSE_KEY = 'jellyflix.browse'
@@ -109,7 +109,7 @@ export function writeBrowsePrefs(patch: Partial<BrowsePrefs>, section: Section =
 
 /** Forgets sort, filter and library choices for every section. */
 export function clearBrowsePrefs(): void {
-  for (const section of ['movies', 'series', 'anime'] as const) {
+  for (const section of ['movies', 'series', 'anime', 'musicvideos', 'books'] as const) {
     try {
       localStorage.removeItem(browseKey(section))
     } catch {
@@ -149,6 +149,7 @@ export function clearSeriesPrefs(): void {
   try {
     localStorage.removeItem(SERIES_KEY)
     localStorage.removeItem(SYNC_KEY)
+    localStorage.removeItem(BOOKS_KEY)
   } catch {
     // Preferences are a convenience only.
   }
@@ -165,6 +166,77 @@ export function writeSeriesPrefs(seriesId: string, patch: SeriesPrefs): void {
   // Most recently used last; the oldest entries are dropped so this never grows without bound.
   const kept = Object.entries(others).slice(-(SERIES_LIMIT - 1))
   write(SERIES_KEY, Object.fromEntries([...kept, [seriesId, { ...previous, ...patch }]]))
+}
+
+const BOOKS_KEY = 'jellyflix.books'
+const BOOKS_LIMIT = 100
+
+/** Where you stopped in a book: how far through it ("percent", 0 to 100), the reader's own place, and when. */
+export interface BookProgress {
+  percent: number
+  /** What the reader needs to come back to the spot ("3:0.42" for chapter 3, 42% down; "12" for page 12). */
+  place: string
+  at: number
+}
+
+function cleanProgress(value: unknown): BookProgress | undefined {
+  const p = value as Partial<BookProgress> | null
+  if (!p || typeof p.place !== 'string' || typeof p.percent !== 'number' || !Number.isFinite(p.percent) || typeof p.at !== 'number') return undefined
+  return { percent: Math.min(100, Math.max(0, p.percent)), place: p.place.slice(0, 40), at: p.at }
+}
+
+export function readBookProgress(bookId: string): BookProgress | undefined {
+  return cleanProgress(read<Record<string, unknown>>(BOOKS_KEY, {})[bookId])
+}
+
+/** A book counts as finished from here on: it is opened at the beginning again, and is no longer in "Continue reading". */
+export const BOOK_FINISHED_PERCENT = 98
+
+/** The place to open a book at: where you stopped, unless you had finished it. */
+export function readResumePlace(bookId: string): string | undefined {
+  const progress = readBookProgress(bookId)
+  return progress && progress.percent < BOOK_FINISHED_PERCENT ? progress.place : undefined
+}
+
+/** Every book with a place saved, the most recently read first. */
+export function readAllBookProgress(): Array<[string, BookProgress]> {
+  return Object.entries(read<Record<string, unknown>>(BOOKS_KEY, {}))
+    .map(([id, value]) => [id, cleanProgress(value)] as const)
+    .filter((entry): entry is [string, BookProgress] => entry[1] !== undefined)
+    .sort((a, b) => b[1].at - a[1].at)
+}
+
+/** Remembers the place in a book. The oldest are dropped so this never grows without bound. */
+export function writeBookProgress(bookId: string, progress: Omit<BookProgress, 'at'>): void {
+  const others = Object.entries(read<Record<string, unknown>>(BOOKS_KEY, {})).filter(([id]) => id !== bookId)
+  write(BOOKS_KEY, Object.fromEntries([...others.slice(-(BOOKS_LIMIT - 1)), [bookId, { ...progress, at: Date.now() }]]))
+}
+
+export type ReaderTheme = 'dark' | 'light' | 'sepia'
+export const READER_THEMES: ReaderTheme[] = ['dark', 'light', 'sepia']
+
+/** How the book reader looks: the text size (percent of normal), the page colours, and a comic read right to left. */
+export interface ReaderPrefs {
+  textSize: number
+  theme: ReaderTheme
+  rightToLeft: boolean
+}
+
+const READER_KEY = 'jellyflix.reader'
+const READER_DEFAULTS: ReaderPrefs = { textSize: 100, theme: 'dark', rightToLeft: false }
+export const READER_TEXT_SIZES = { min: 70, max: 220, step: 10 }
+
+export function readReaderPrefs(): ReaderPrefs {
+  const p = read(READER_KEY, READER_DEFAULTS)
+  return {
+    textSize: Number.isFinite(p.textSize) ? Math.min(READER_TEXT_SIZES.max, Math.max(READER_TEXT_SIZES.min, Math.round(p.textSize))) : 100,
+    theme: READER_THEMES.includes(p.theme) ? p.theme : 'dark',
+    rightToLeft: p.rightToLeft === true,
+  }
+}
+
+export function writeReaderPrefs(patch: Partial<ReaderPrefs>): void {
+  write(READER_KEY, { ...readReaderPrefs(), ...patch })
 }
 
 /** Interface preferences. */

@@ -65,7 +65,7 @@ fun HomeScreen(vm: AppViewModel) {
             // No banner: leave room for the top bar.
             else -> item { Column(Modifier.fillMaxWidth().height(if (layout.banner) 80.dp else 104.dp)) {} }
         }
-        if (libs != null && libs.hasVideo) {
+        if (libs != null && libs.hasTitles) {
             // The rows come in the order chosen in Settings, Appearance; the ones turned off are not drawn.
             for (id in layout.visible) when (id) {
                 HomeRow.Discover -> item(key = "discover") { Discover(vm) }
@@ -83,6 +83,8 @@ fun HomeScreen(vm: AppViewModel) {
                 HomeRow.Collections -> row(vm, R.string.row_collections, home.collections)
                 HomeRow.NewSeries -> row(vm, R.string.row_new_series, home.newSeries)
                 HomeRow.NewAnime -> row(vm, R.string.row_new_anime, home.newAnime)
+                HomeRow.NewMusicVideos -> row(vm, R.string.row_new_music_videos, home.newMusicVideos, landscape = true)
+                HomeRow.NewBooks -> row(vm, R.string.row_new_books, home.newBooks)
             }
         }
     }

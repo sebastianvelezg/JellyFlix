@@ -59,7 +59,7 @@ A banner mixing movies and series, *Discover something new* (a random movie, a s
 
 **Your whole library**
 
-Movies, series, anime, collections and music, each with a banner, sort, filters (genre, decade, rating, 4K…), an A–Z jump, cast pages and search. Music keeps playing while you browse.
+Movies, series, anime, music videos, books, collections and music, each with a banner, sort, filters (genre, decade, rating, 4K…), an A–Z jump, cast pages and search. Music keeps playing while you browse.
 
 </td>
 <td width="33%" valign="top">
@@ -139,6 +139,29 @@ Switchable in Settings in both apps, with a test that keeps every text translate
 
 </td>
 </tr>
+<tr>
+<td valign="top">
+
+**Books and audiobooks**
+
+A Books library gets its own tab. The web app reads **EPUB**, **PDF** and **comics (CBZ)** in its own reader (dark, light or sepia pages) and remembers where you stopped; audiobooks play in the music player on both apps.
+
+</td>
+<td valign="top">
+
+**Live TV**
+
+Your channels with what is on each, a guide, favorites and the live stream your server provides: channel up and down on the arrow keys or the remote, and a quality choice on the web.
+
+</td>
+<td valign="top">
+
+**A menu that is yours**
+
+The buttons at the top can show icons and names, only icons or only names, in the order you want, and the ones you do not use can be turned off. The bar scrolls instead of cutting anything off.
+
+</td>
+</tr>
 </table>
 
 ### What each app has
@@ -146,13 +169,15 @@ Switchable in Settings in both apps, with a test that keeps every text translate
 | | **Jellyflix Web** | **Jellyflix TV** |
 |---|---|---|
 | Home banner, Discover, rows that follow you | ✅ | ✅ |
-| Movies, Series, Anime, Music, Collections | ✅ | ✅ |
+| Movies, Series, Anime, Music videos, Music, Collections | ✅ | ✅ |
+| Books and audiobooks | ✅ reads EPUB, PDF and CBZ; plays audiobooks | ✅ plays audiobooks (books to read are for the web) |
+| Live TV: channels, guide, favorites | ✅ | ✅ |
 | Filters, A–Z jump, search | ✅ | ✅ |
 | A menu on every title (watched, favorite, Watch later, playlists) | ✅ "⋯" | ✅ hold OK |
 | Playlists, Watch later, New since your last visit, Coming up | ✅ | ✅ |
 | Music, lyrics, queue, sleep timer | ✅ | ✅ |
 | Seek-bar pictures, skip intro / credits, chapters, audio and subtitle tracks | ✅ | ✅ |
-| Appearance: backgrounds, accents, poster size, home rows | ✅ (+ any colour) | ✅ |
+| Appearance: backgrounds, accents, poster size, home rows, top menu (icons or names, order, hide) | ✅ (+ any colour) | ✅ |
 | Back up your look on the server | ✅ | ✅ |
 | Your stats, and Playback Reporting data | ✅ | ✅ |
 | Sign in with a code (Quick Connect) | ✅ (and approve a code) | ✅ |
@@ -186,14 +211,19 @@ Settings → **Appearance**, in both apps. The choices stay on the device; the w
 
 - **Six backgrounds:** true black, charcoal, midnight, dusk, pine and cocoa.
 - **Accent colours:** eight presets, and on the web any colour you pick. Text on the accent is adjusted automatically so it stays readable, and every preset is tested for WCAG contrast on every background.
+- **The top menu:** icons and names, only icons or only names (with both, the names give way to the icons when they do not fit), the order of the buttons and which ones show. Home always stays.
 - **Poster size:** compact, comfortable or large; rows and grids fit one more or one fewer column. On the web also the interface size, the space between rows and the banner height.
-- **Your Home page:** the banner and every row on or off, in the order you want (Discover, Continue watching, Next up, Watch later, playlists, favorites, New since your last visit, Coming up, the latest movies, collections, new series, new anime, new music…).
+- **Your Home page:** the banner and every row on or off, in the order you want (Discover, Continue watching, Next up, Watch later, playlists, favorites, New since your last visit, Coming up, the latest movies, collections, new series, new anime, new music videos, new books, new music…).
 - **Take it with you:** back your look up on your own Jellyfin server and load it on another device (a button, nothing automatic); the web app can also export and import all its settings as a file.
 
 <table>
 <tr>
 <td width="50%"><img src="docs/screenshots/web-appearance.jpg" alt="Web: Settings, Appearance"></td>
 <td width="50%"><img src="docs/screenshots/tv-appearance.jpg" alt="TV: Settings, Appearance"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/web-layout.jpg" alt="Web: Settings, Appearance, Layout chosen from drawn cards, and the menu buttons"></td>
+<td><img src="docs/screenshots/tv-menu.jpg" alt="TV: choosing the order of the top menu"></td>
 </tr>
 </table>
 
@@ -244,6 +274,14 @@ A fast, installable web app that talks directly from your browser to your Jellyf
 <td><img src="docs/screenshots/web-series.jpg" alt="Web: a series page with its episodes"></td>
 <td><img src="docs/screenshots/web-music.jpg" alt="Web: the music page with albums to jump back into"></td>
 </tr>
+<tr>
+<td><img src="docs/screenshots/web-books.jpg" alt="Web: the Books tab with covers, the kind of each book and its year"></td>
+<td><img src="docs/screenshots/web-reader.jpg" alt="Web: the PDF reader on dark pages, with zoom, page colours and a jump to any page"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/web-livetv.jpg" alt="Web: Live TV with the channels, their quality and notes as small tags"></td>
+<td><img src="docs/screenshots/web-top-menu.jpg" alt="Web: Settings, Appearance, Top menu: show, hide and reorder the buttons at the top"></td>
+</tr>
 </table>
 
 <p align="center"><img src="docs/screenshots/web-mobile.jpg" alt="Web on a phone" width="260"></p>
@@ -275,6 +313,10 @@ A native app built for a remote control and a TV seen from the sofa: big targets
 <tr>
 <td><img src="docs/screenshots/tv-detail.jpg" alt="TV: a movie's page with its cast"></td>
 <td><img src="docs/screenshots/tv-music.jpg" alt="TV: the Music page"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/tv-livetv.jpg" alt="TV: Live TV with the channels, their quality and notes as tags, and the top bar with icons"></td>
+<td><img src="docs/screenshots/tv-menu.jpg" alt="TV: Settings, Appearance: choosing the order of the top menu and turning sections off"></td>
 </tr>
 </table>
 
@@ -354,6 +396,12 @@ When a file's format is not playable by the device, Jellyfin converts it on the 
 </details>
 
 <details>
+<summary><b>Can I read books with it?</b></summary>
+
+On the web app, yes: EPUB, PDF and comic archives (CBZ) open in its own reader, which keeps your place in this browser. Audiobooks play in the music player on both apps. The TV app does not show books to read; it says so and points to the web app or a phone. Other formats (Mobi, RAR comics) can be downloaded. Your account has to be allowed to download files.
+</details>
+
+<details>
 <summary><b>Is it on the Play Store / App Store?</b></summary>
 
 Not at the moment. The TV app is installed by sideloading and the web app is hosted by you.
@@ -367,9 +415,10 @@ No, only Jellyfin.
 
 ## 🛣️ What could come next
 
-Jellyflix 1.0 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
+Jellyflix 1.1 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
 
-- **Playback:** subtitle search through your server's plugin (opt-in), SyncPlay (watch together), live TV, a version picker on the web.
+- **Playback:** subtitle search through your server's plugin (opt-in), SyncPlay (watch together), recording and timers for live TV, a version picker on the web.
+- **Books:** a reader for the TV app, Mobi and RAR comics.
 - **Sign in:** find servers on the network, several servers and users.
 - **Reach:** Fire TV, more languages, a public demo of the web app.
 - **Quality:** browser tests in CI, a mock server the TV app can use, and testing on more physical TVs (HDR, 4K and frame-rate switching vary a lot between models).

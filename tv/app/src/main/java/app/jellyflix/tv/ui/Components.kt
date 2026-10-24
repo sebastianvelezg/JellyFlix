@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,6 +48,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import app.jellyflix.tv.R
 import app.jellyflix.tv.data.MediaItem
+import app.jellyflix.tv.data.NavStyle
 import coil3.compose.AsyncImage
 import org.jellyfin.sdk.model.api.BaseItemKind
 import java.util.UUID
@@ -93,7 +96,7 @@ fun Chip(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun defaultSubtitle(item: MediaItem): String? =
-    if (item.kind == BaseItemKind.BOX_SET) item.childCount?.let { stringResource(R.string.library_count, it) } else item.subtitle
+    if (item.kind == BaseItemKind.BOX_SET) item.childCount?.let { titlesLabel(it) } else item.subtitle
 
 /** "1 title" or "5 titles". */
 @Composable
@@ -123,6 +126,8 @@ fun MediaCard(
     subtitle: String? = defaultSubtitle(item),
     /** Long-press OK: by default the card menu (open, watched, favorite, Watch later, playlists). */
     onLongClick: (() -> Unit)? = null,
+    /** Show the whole picture on a plain background instead of filling the card (a channel's logo, which must not be cut). */
+    contain: Boolean = false,
 ) {
     val cardMenu = LocalCardMenu.current
     val width = (if (landscape) 250.dp else 150.dp) * Posters.scale
@@ -159,7 +164,7 @@ fun MediaCard(
             ),
             glow = CardDefaults.glow(focusedGlow = Glow(elevationColor = Palette.Accent.copy(alpha = 0.45f), elevation = 18.dp)),
         ) {
-            Box(Modifier.fillMaxSize().background(Palette.Surface)) {
+            Box(Modifier.fillMaxSize().background(if (contain) Color(0xFF34343A) else Palette.Surface)) {
                 val image = if (landscape) item.landscapeUrl else item.posterUrl
                 if (image == null) {
                     Text(
@@ -172,8 +177,8 @@ fun MediaCard(
                 AsyncImage(
                     model = image,
                     contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    contentScale = if (contain) ContentScale.Fit else ContentScale.Crop,
+                    modifier = if (contain) Modifier.fillMaxSize().padding(14.dp) else Modifier.fillMaxSize(),
                 )
                 if (item.played) {
                     Text(
@@ -247,6 +252,43 @@ fun Pill(
             textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center else null,
             modifier = (if (centered) Modifier.fillMaxWidth() else Modifier).padding(horizontal = 18.dp, vertical = 9.dp),
         )
+    }
+}
+
+/**
+ * A button of the top bar: its picture, its name, or both ([style]). A screen reader always gets the name, so the picture alone is
+ * still a labelled button.
+ */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun NavPill(
+    label: String,
+    icon: Int,
+    style: NavStyle,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.semantics { contentDescription = label },
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(50)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (selected) Palette.Accent.copy(alpha = 0.28f) else Palette.Surface3,
+            contentColor = Color.White,
+            focusedContainerColor = Color.White,
+            focusedContentColor = Color.Black,
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+    ) {
+        Row(
+            Modifier.padding(horizontal = if (style == NavStyle.Icons) 11.dp else 16.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (style != NavStyle.Text) androidx.tv.material3.Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(22.dp))
+            if (style != NavStyle.Icons) Text(label, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 

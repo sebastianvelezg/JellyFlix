@@ -14,6 +14,8 @@ class AppearanceBackupTest {
         theme = ThemeChoice("midnight", "violet"),
         posters = PosterSize.Compact,
         home = HomeLayout(banner = false, order = HomeRow.entries.reversed(), hidden = setOf(HomeRow.Favorites)),
+        nav = NavStyle.Text,
+        menu = MenuLayout(MenuItem.entries.reversed(), setOf(MenuItem.Books)),
     )
 
     @Test
@@ -32,6 +34,7 @@ class AppearanceBackupTest {
         assertEquals("midnight", saved.getJSONObject("theme").getString("canvas"))
         assertEquals("violet", saved.getJSONObject("theme").getString("accent"))
         assertEquals("compact", saved.getString("posterSize"))
+        assertEquals("text", saved.getString("nav"))
         assertEquals(false, saved.getJSONObject("home").getBoolean("banner"))
     }
 

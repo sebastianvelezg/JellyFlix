@@ -25,6 +25,9 @@ const serverUrl = (process.env.JELLYFIN_URL ?? '').trim()
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  // The PDF reader's worker is a module file (.mjs) and its decoders are WebAssembly: a browser refuses both with another type.
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.wasm': 'application/wasm',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json',
   '.webmanifest': 'application/manifest+json',

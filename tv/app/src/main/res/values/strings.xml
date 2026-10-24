@@ -25,7 +25,6 @@
     <string name="loading">Loading…</string>
     <string name="home_empty">Nothing to show yet. Add libraries in Jellyfin and let them finish scanning.</string>
     <string name="library_empty">There is nothing here yet.</string>
-    <string name="library_count">%1$d titles</string>
     <string name="sort_added">Recently added</string>
     <string name="sort_name">A to Z</string>
     <string name="sort_year">Year</string>
@@ -63,6 +62,7 @@
     <string name="player_pause">Pause</string>
     <string name="player_play">Play</string>
     <string name="error_play">Could not start playback.</string>
+    <string name="error_channel">This channel did not start. It may be off the air or blocked where the server is. Try another one.</string>
     <string name="error_nothing_to_play">There is nothing to play yet.</string>
 
     <!-- Settings -->
@@ -73,6 +73,28 @@
 
     <string name="dismiss">OK</string>
     <string name="nav_anime">Anime</string>
+    <string name="nav_music_videos">Music videos</string>
+    <string name="row_new_music_videos">New music videos</string>
+    <string name="search_music_videos">Music videos</string>
+    <string name="nav_live_tv">Live TV</string>
+    <string name="live_channels">Channels</string>
+    <string name="live_guide">Guide</string>
+    <string name="live_favorites">Favorites</string>
+    <string name="live_empty">This account has no channels. Add a tuner or a channel list in Jellyfin and they will appear here.</string>
+    <string name="live_no_favorites">You have no favorite channels yet. Long-press a channel to add one.</string>
+    <string name="live_no_info">No programme information</string>
+    <string name="live_next">Next: %1$s, %2$s</string>
+    <string name="player_live">LIVE</string>
+    <string name="nav_books">Books</string>
+    <string name="row_new_books">New books</string>
+    <string name="search_books">Books</string>
+    <string name="listen">Listen</string>
+    <string name="mark_listened">Mark as listened</string>
+    <string name="mark_not_listened">Mark as not listened</string>
+    <string name="mark_book_read">Mark as read</string>
+    <string name="mark_book_unread">Mark as not read</string>
+    <string name="book_kind">book</string>
+    <string name="book_hint">This is a %1$s file. Read it in the Jellyflix web app or on your phone; this TV plays audiobooks.</string>
     <string name="nav_collections">Collections</string>
     <string name="row_new_anime">New anime</string>
     <string name="row_because">Because you watched %1$s</string>
@@ -359,6 +381,14 @@
     <string name="appearance_accent">Accent colour</string>
     <string name="appearance_posters">Poster size</string>
     <string name="appearance_posters_note">Rows and grids follow: smaller posters fit one more column, larger ones one fewer.</string>
+    <string name="appearance_menu">Menu buttons</string>
+    <string name="appearance_menu_note">What Home, Movies, Live TV and the other buttons at the top show. With both, the names give way to the icons when there is no room.</string>
+    <string name="appearance_top_menu">Top menu</string>
+    <string name="appearance_top_menu_note">Turn the sections at the top on or off and move them. A section your libraries have nothing for is left out anyway. Home always stays.</string>
+    <string name="appearance_restore_menu">Restore the menu</string>
+    <string name="nav_style_full">Icons and names</string>
+    <string name="nav_style_icons">Icons only</string>
+    <string name="nav_style_text">Names only</string>
     <string name="appearance_home">Home</string>
     <string name="appearance_banner">Show the banner at the top of Home, Movies and Series</string>
     <string name="appearance_rows_note">Turn each row on or off and move it. A row your libraries have nothing for is left out anyway.</string>

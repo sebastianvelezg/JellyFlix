@@ -4,7 +4,7 @@ import axios, { type AxiosError, type AxiosRequestConfig } from 'axios'
 import { createGate, priorityOf } from './requestGate'
 
 export const CLIENT_NAME = 'Jellyflix Web'
-export const CLIENT_VERSION = '1.0.0'
+export const CLIENT_VERSION = '1.1.0'
 
 const REQUEST_TIMEOUT_MS = 15_000
 
