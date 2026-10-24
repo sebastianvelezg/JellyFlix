@@ -77,5 +77,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // A shared CI runner is several times slower than a laptop: the long tests of the whole app need room.
+    testTimeout: 20_000,
   },
 })
