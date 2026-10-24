@@ -221,6 +221,10 @@ Settings → **Appearance**, in both apps. The choices stay on the device; the w
 <td width="50%"><img src="docs/screenshots/web-appearance.jpg" alt="Web: Settings, Appearance"></td>
 <td width="50%"><img src="docs/screenshots/tv-appearance.jpg" alt="TV: Settings, Appearance"></td>
 </tr>
+<tr>
+<td><img src="docs/screenshots/web-layout.jpg" alt="Web: Settings, Appearance, Layout chosen from drawn cards, and the menu buttons"></td>
+<td><img src="docs/screenshots/tv-menu.jpg" alt="TV: choosing the order of the top menu"></td>
+</tr>
 </table>
 
 ## 🛠️ For server administrators
@@ -269,6 +273,14 @@ A fast, installable web app that talks directly from your browser to your Jellyf
 <tr>
 <td><img src="docs/screenshots/web-series.jpg" alt="Web: a series page with its episodes"></td>
 <td><img src="docs/screenshots/web-music.jpg" alt="Web: the music page with albums to jump back into"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/web-books.jpg" alt="Web: the Books tab with covers, the kind of each book and its year"></td>
+<td><img src="docs/screenshots/web-reader.jpg" alt="Web: the PDF reader on dark pages, with zoom, page colours and a jump to any page"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/web-livetv.jpg" alt="Web: Live TV with the channels, their quality and notes as small tags"></td>
+<td><img src="docs/screenshots/web-top-menu.jpg" alt="Web: Settings, Appearance, Top menu: show, hide and reorder the buttons at the top"></td>
 </tr>
 </table>
 
