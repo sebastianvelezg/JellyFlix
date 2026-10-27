@@ -6,6 +6,7 @@ import { ConnectForm } from './components/ConnectForm'
 import { DetailsPage } from './components/DetailsPage'
 import { CardActionsProvider, PlayVideoProvider, type PlayVideo } from './components/cardActions'
 import { recallPlayList, rememberPlayList } from './components/playQueues'
+import { leaveFullscreen, pageInFullscreen } from './components/player/fullscreen'
 import { AddToPlaylistDialog } from './components/AddToPlaylistDialog'
 import { AdminTools } from './components/admin/AdminTools'
 import { clearActivity } from './platform/web/adminActivity'
@@ -365,6 +366,13 @@ function Shell({
   const video: PlayRoute | null = route.page === 'play' ? route : docked
   const mini = route.page !== 'play'
   const barShown = mini && !!video
+  // Full screen belongs to the player: it goes on from one video to the next, and ends when the player does (or becomes the bar).
+  const hadVideo = useRef(false)
+  useEffect(() => {
+    if (hadVideo.current && !video && pageInFullscreen()) leaveFullscreen()
+    hadVideo.current = !!video
+  }, [video])
+  useEffect(() => () => (pageInFullscreen() ? leaveFullscreen() : undefined), [])
   // A song starting while a video waits in the bar takes its place (the music's own bar comes back).
   if (barShown && musicState.status === 'playing') setDocked(null)
 

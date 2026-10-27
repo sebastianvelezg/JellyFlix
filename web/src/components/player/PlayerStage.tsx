@@ -40,6 +40,7 @@ import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
 import { Controls } from './Controls'
 import { DOCK_BAR_CLASS, DOCK_BUTTON, DOCK_THUMB_CLASS } from './dock'
+import { enterFullscreen, inFullscreen, leaveFullscreen } from './fullscreen'
 import { SubtitleOverlay, type SubtitleStyle } from './SubtitleOverlay'
 import { SubtitleSearchDialog } from './SubtitleSearchDialog'
 import { useSubtitleTrack } from './useSubtitleTrack'
@@ -178,7 +179,8 @@ export function PlayerStage({
   const offsetNow = useRef(subtitleOffset)
   const [syncNote, setSyncNote] = useState<string | null>(null)
   const syncNoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [fullscreen, setFullscreen] = useState(false)
+  // (A video that follows another one starts in full screen when the one before was.)
+  const [fullscreen, setFullscreen] = useState(inFullscreen)
   const [awake, setAwake] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -297,7 +299,7 @@ export function PlayerStage({
   // The mini bar is not a full-screen element, and it does not take the keyboard: it gives both back, and takes them again when opened.
   useEffect(() => {
     if (mini) {
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
+      leaveFullscreen()
       const active = document.activeElement
       if (active instanceof HTMLElement && containerRef.current?.contains(active)) active.blur()
     } else {
@@ -394,13 +396,12 @@ export function PlayerStage({
   }, [playback, device, plan, fallback, onRequest, countdownSeconds])
 
   useEffect(() => {
-    const container = containerRef.current
-    const onChange = () => setFullscreen(document.fullscreenElement === container)
+    const onChange = () => setFullscreen(inFullscreen())
     document.addEventListener('fullscreenchange', onChange)
     return () => {
       document.removeEventListener('fullscreenchange', onChange)
       if (hideTimer.current) clearTimeout(hideTimer.current)
-      if (document.fullscreenElement && document.fullscreenElement === container) void document.exitFullscreen().catch(() => undefined)
+      // Full screen is not left here: the next video (a new player) goes on in it. Leaving the player ends it (see the app).
     }
   }, [])
 
@@ -450,8 +451,8 @@ export function PlayerStage({
   }, [])
 
   const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
-    else void containerRef.current?.requestFullscreen().catch(() => undefined)
+    if (document.fullscreenElement) leaveFullscreen()
+    else enterFullscreen()
   }, [])
 
   const chooseSubtitle = useCallback(

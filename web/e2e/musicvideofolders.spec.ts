@@ -177,3 +177,34 @@ test('a playlist of music videos can be shuffled (and the section has no Playlis
   await expect(page).toHaveURL(/#\/play\/mv000[12]\?list=vp\d+&shuffle=[0-9a-z]{8}$/)
   await waitPlaying(page)
 })
+
+test('the next video keeps the screen as it was: a window stays a window, full screen stays full screen until Back', async ({ page }) => {
+  mock = await startMock(options)
+  await signIn(page, mock)
+  const full = () => page.evaluate(() => !!document.fullscreenElement)
+  await page.goto('/#/folder/mvf0001')
+  await page.getByRole('button', { name: 'Play folder', exact: true }).click()
+  await waitPlaying(page)
+
+  // Not in full screen: the next one is not either.
+  await nearEnd(page)
+  await expect(playing(page, 'Test Music Video 002')).toBeVisible({ timeout: 15_000 })
+  await waitPlaying(page)
+  expect(await full()).toBe(false)
+
+  // In full screen: the next one goes on in it.
+  await page.mouse.move(400, 400)
+  await player(page).getByRole('button', { name: 'Fullscreen' }).click()
+  await expect.poll(full).toBe(true)
+  await nearEnd(page)
+  await expect(playing(page, 'Test Music Video 003')).toBeVisible({ timeout: 15_000 })
+  await waitPlaying(page)
+  expect(await full()).toBe(true)
+  await page.mouse.move(420, 420)
+  await expect(player(page).getByRole('button', { name: 'Exit fullscreen' })).toBeVisible()
+
+  // Leaving the player leaves full screen (the video goes on in the bar).
+  await player(page).getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.getByRole('region', { name: /^Video mini player/ })).toBeVisible()
+  await expect.poll(full).toBe(false)
+})
