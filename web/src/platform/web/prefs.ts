@@ -24,6 +24,8 @@ export interface PlayerPrefs {
   autoplayNext: boolean
   /** How many seconds the "Up next" countdown runs before the next title starts by itself. */
   autoplayCountdown: number
+  /** Play a queue again from its first title after the last one (a folder of music videos, a playlist, a collection). */
+  repeatQueue: boolean
   /** Cinema mode: the picture fades in from black, the controls get out of the way sooner and also while paused. */
   cinemaMode: boolean
   /** Music: seconds the end of a song fades into the start of the next one (0 = no crossfade). */
@@ -73,6 +75,7 @@ const PLAYER_DEFAULTS: PlayerPrefs = {
   autoplayNext: true,
   autoplayCountdown: 8,
   cinemaMode: false,
+  repeatQueue: false,
   crossfadeSeconds: 0,
   gapless: true,
   visualizer: false,
@@ -110,6 +113,7 @@ export function readPlayerPrefs(): PlayerPrefs {
     autoplayNext: p.autoplayNext !== false,
     autoplayCountdown: (COUNTDOWN_CHOICES as readonly number[]).includes(p.autoplayCountdown) ? p.autoplayCountdown : 8,
     cinemaMode: p.cinemaMode === true,
+    repeatQueue: p.repeatQueue === true,
     crossfadeSeconds: (CROSSFADE_CHOICES as readonly number[]).includes(p.crossfadeSeconds) ? p.crossfadeSeconds : 0,
     gapless: p.gapless !== false,
     visualizer: p.visualizer === true,

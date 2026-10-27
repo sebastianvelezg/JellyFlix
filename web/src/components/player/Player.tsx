@@ -48,6 +48,7 @@ export function Player({
   startAt,
   next = null,
   onNext,
+  repeat,
   onExit,
 }: {
   session: Session
@@ -60,6 +61,8 @@ export function Player({
   /** What follows this one (the next episode, or the next title of the playlist), once known. */
   next?: Movie | null
   onNext?: () => void
+  /** Present when this is part of a queue: the choice to play it again from the start after the last title. */
+  repeat?: { enabled: boolean; onChange: (enabled: boolean) => void }
   onExit: () => void
 }) {
   const [request, setRequest] = useState<Request>({ nonce: 0 })
@@ -226,6 +229,7 @@ export function Player({
         subtitleIndex={subtitleIndex}
         next={next}
         onNext={onNext}
+        repeat={repeat}
         extras={extras}
         localSubtitle={localSubtitle}
         subtitleFileError={subtitleFileError}

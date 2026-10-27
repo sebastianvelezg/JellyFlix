@@ -19,10 +19,25 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/book/<id>         book page (read it, listen to it, download it); #/read/<id> the reader
  *   #/person/<id>?name= a person's filmography
  *   #/play/<id>         player (add ?start=0 to start over instead of resuming, or ?start=<seconds> to begin there;
- *                       ?list=<playlist id> or ?collection=<collection id> goes on to the next title of it when this one ends)
+ *                       ?list=<playlist id>, ?collection=<collection id>, ?folder=<folder id> or ?library=<library id> goes on to the
+ *                       next title of it when this one ends; &shuffle=<seed> plays that queue in a random order)
+ *   #/folder/<id>       a folder of music videos
  */
 export const MUSIC_TABS = ['home', 'albums', 'artists', 'songs', 'playlists'] as const
 export type MusicTab = (typeof MUSIC_TABS)[number]
+
+/**
+ * What a title is played as part of, so that the next one follows it: a playlist, a collection, a folder of music videos (and
+ * everything below it) or a whole library of music videos. `shuffle` is a seed: the queue is put in a random order that is the
+ * same on every page of the queue.
+ */
+export interface PlayQueueRef {
+  listId?: string
+  collectionId?: string
+  folderId?: string
+  libraryId?: string
+  shuffle?: string
+}
 
 export type Route =
   | { page: 'home' }
@@ -31,6 +46,7 @@ export type Route =
   | { page: 'collection'; id: string }
   | { page: 'lists' }
   | { page: 'list'; id: string }
+  | { page: 'folder'; id: string }
   | { page: 'section'; section: 'series' | 'anime' | 'musicvideos' | 'books' | 'livetv' }
   | { page: 'show'; id: string }
   | { page: 'settings' }
@@ -46,7 +62,7 @@ export type Route =
   | { page: 'read'; id: string }
   | { page: 'live'; id: string }
   | { page: 'person'; id: string; name: string }
-  | { page: 'play'; id: string; startOver: boolean; startAt?: number; listId?: string; collectionId?: string }
+  | ({ page: 'play'; id: string; startOver: boolean; startAt?: number } & PlayQueueRef)
 
 export function formatRoute(route: Route): string {
   switch (route.page) {
@@ -62,6 +78,8 @@ export function formatRoute(route: Route): string {
       return '#/lists'
     case 'list':
       return `#/list/${encodeURIComponent(route.id)}`
+    case 'folder':
+      return `#/folder/${encodeURIComponent(route.id)}`
     case 'section':
       return `#/${route.section}`
     case 'show':
@@ -95,6 +113,9 @@ export function formatRoute(route: Route): string {
       else if (route.startOver) params.set('start', '0')
       if (route.listId) params.set('list', route.listId)
       if (route.collectionId) params.set('collection', route.collectionId)
+      if (route.folderId) params.set('folder', route.folderId)
+      if (route.libraryId) params.set('library', route.libraryId)
+      if (route.shuffle) params.set('shuffle', route.shuffle)
       const query = params.toString()
       return `#/play/${encodeURIComponent(route.id)}${query ? `?${query}` : ''}`
     }
@@ -115,6 +136,7 @@ export function parseRoute(hash: string): Route {
     if (kind === 'collection' && decoded) return { page: 'collection', id: decoded }
     if (kind === 'lists' && !decoded) return { page: 'lists' }
     if (kind === 'list' && decoded) return { page: 'list', id: decoded }
+    if (kind === 'folder' && decoded) return { page: 'folder', id: decoded }
     if (kind === 'settings' && !decoded) return { page: 'settings' }
     if (kind === 'stats' && !decoded) return { page: 'stats' }
     if (kind === 'admin' && !decoded) return { page: 'admin' }
@@ -133,6 +155,9 @@ export function parseRoute(hash: string): Route {
       const start = params.get('start')
       const listId = params.get('list')
       const collectionId = params.get('collection')
+      const folderId = params.get('folder')
+      const libraryId = params.get('library')
+      const shuffle = params.get('shuffle')
       const seconds = start === null ? NaN : Number(start)
       return {
         page: 'play',
@@ -141,6 +166,9 @@ export function parseRoute(hash: string): Route {
         ...(Number.isFinite(seconds) && seconds > 0 ? { startAt: seconds } : {}),
         ...(listId ? { listId } : {}),
         ...(collectionId ? { collectionId } : {}),
+        ...(folderId ? { folderId } : {}),
+        ...(libraryId ? { libraryId } : {}),
+        ...(shuffle ? { shuffle } : {}),
       }
     }
   } catch {

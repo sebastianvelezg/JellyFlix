@@ -487,3 +487,4 @@ export {
   type GuideBlock,
   type Program,
 } from './liveTv'
+export * from './musicVideos'

@@ -6,6 +6,7 @@ import { SortOrder } from '@jellyfin/sdk/lib/generated-client/models/sort-order'
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api'
 import { itemImageUrl } from './images'
 import type { Session } from './jellyfin'
+import { nextInQueue } from './musicVideos'
 import { toMovie, type Movie } from './library'
 import type { Page } from './music'
 
@@ -117,9 +118,7 @@ export function collectionPlayTarget<T extends Pick<Movie, 'played' | 'resumeTic
 
 /** The title that follows `currentId` in a collection (a series is not played through, so it is skipped); null after the last one. Pure. */
 export function nextInCollection<T extends Pick<Movie, 'id' | 'isSeries'>>(items: readonly T[], currentId: string): T | null {
-  const at = items.findIndex((m) => m.id === currentId)
-  if (at < 0) return null
-  return items.slice(at + 1).find((m) => !m.isSeries) ?? null
+  return nextInQueue(items, currentId, false)
 }
 
 /** Collections whose name matches the text (for search). */

@@ -45,6 +45,8 @@ export interface MockOptions {
   animeCount?: number
   /** Videos in a "Music videos" library (each by one of three artists). 0 = no such library. */
   musicVideos?: number
+  /** Folders inside the "Music videos" library: the videos are split between this many folders (the last video of the second one sits in a folder inside it). 0 = a flat library. */
+  musicVideoFolders?: number
   /** Books in a "Books" library: bk0001 is an EPUB, then a PDF, a comic (CBZ) and a Mobi file, and so on. 0 = none. */
   books?: number
   /** Audiobooks in the same library (the 30 seconds of audio of the test media). */
@@ -382,14 +384,32 @@ function episodeDto(show: string, season: number, episode: number, user: UserSta
 }
 
 /** The DTO for any id the mock knows (movie, series, season or episode), or undefined. */
-function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; books?: number; audiobooks?: number; liveTv?: number; trickplay?: boolean }, full = false) {
+function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; musicVideoFolders?: number; books?: number; audiobooks?: number; liveTv?: number; trickplay?: boolean }, full = false) {
   const { movieCount } = counts
   if (CHANNEL_ID.test(id)) return Number(id.slice(2)) <= (counts.liveTv ?? 0) ? channelDto(Number(id.slice(2)), user) : undefined
   if (BOOK_ID.test(id)) return Number(id.slice(2)) <= (counts.books ?? 0) ? bookDto(Number(id.slice(2)), user, full) : undefined
   if (AUDIOBOOK_ID.test(id)) return Number(id.slice(2)) <= (counts.audiobooks ?? 0) ? audiobookDto(Number(id.slice(2)), user, full) : undefined
   if (MUSIC_VIDEO_ID.test(id)) {
     const at = Number(id.slice(2))
-    return at >= 1 && at <= (counts.musicVideos ?? 0) ? musicVideoDto(at, user, full) : undefined
+    return at >= 1 && at <= (counts.musicVideos ?? 0)
+      ? musicVideoDto(at, user, full, musicVideoParent(at, counts.musicVideos ?? 0, counts.musicVideoFolders ?? 0))
+      : undefined
+  }
+  if (MV_FOLDER_ID.test(id)) {
+    const k = Number(id.slice(3))
+    const exists = id === MV_NESTED ? (counts.musicVideoFolders ?? 0) >= 2 : k >= 1 && k <= (counts.musicVideoFolders ?? 0)
+    if (!exists) return undefined
+    const inside = Array.from({ length: counts.musicVideos ?? 0 }, (_, i) => i + 1).filter((n) => musicVideoParent(n, counts.musicVideos ?? 0, counts.musicVideoFolders ?? 0) === id).length
+    return {
+      Id: id,
+      Name: mvFolderName(id),
+      SortName: mvFolderName(id).toLowerCase(),
+      Type: 'Folder',
+      IsFolder: true,
+      ParentId: mvFolderParent(id),
+      ChildCount: inside + (id === mvFolderId(2) && (counts.musicVideoFolders ?? 0) >= 2 ? 1 : 0),
+      UserData: { IsFavorite: false, Played: false, PlaybackPositionTicks: 0 },
+    }
   }
   const box = COLLECTION_ID.exec(id)
   if (box && Number(box[1]) >= 1 && Number(box[1]) <= counts.collections) return collectionDto(Number(box[1]), user, full)
@@ -449,10 +469,30 @@ const MUSIC_VIDEO_ID = /^mv\d{4}$/
 const musicVideoId = (n: number) => `mv${String(n).padStart(4, '0')}`
 const musicVideoName = (n: number) => `Test Music Video ${String(n).padStart(3, '0')}`
 
-function musicVideoDto(n: number, user: UserState, full = false) {
+// The folders of the music video library: "mvf0001"... (the videos are split in blocks), and "mvf0099" inside the second one.
+const MV_FOLDER_ID = /^mvf\d{4}$/
+const mvFolderId = (k: number) => `mvf${String(k).padStart(4, '0')}`
+const MV_NESTED = mvFolderId(99)
+const mvFolderName = (id: string) => (id === MV_NESTED ? 'Nested' : `Folder ${id.slice(3)}`)
+
+/** Where a music video lives: a folder id, or the library when the library has no folders (or the video is past the last block). */
+function musicVideoParent(n: number, total: number, folders: number): string {
+  if (folders <= 0) return 'lib-musicvideos'
+  const size = Math.ceil(total / folders)
+  const index = Math.ceil(n / size)
+  if (index > folders) return 'lib-musicvideos'
+  // The last video of the second folder is one level deeper.
+  if (folders >= 2 && index === 2 && n === Math.min(2 * size, total)) return MV_NESTED
+  return mvFolderId(index)
+}
+const mvFolderParent = (id: string) => (id === MV_NESTED ? mvFolderId(2) : 'lib-musicvideos')
+
+function musicVideoDto(n: number, user: UserState, full = false, parentId = 'lib-musicvideos') {
   const id = musicVideoId(n)
   return {
     Id: id,
+    ParentId: parentId,
+    Path: `/media/musicvideos/${parentId === 'lib-musicvideos' ? '' : parentId === MV_NESTED ? `${mvFolderName(mvFolderId(2))}/${mvFolderName(MV_NESTED)}/` : `${mvFolderName(parentId)}/`}${musicVideoName(n)}.mkv`,
     Name: musicVideoName(n),
     SortName: musicVideoName(n).toLowerCase(),
     ProductionYear: 1990 + (n % 30),
@@ -653,8 +693,8 @@ const STREAMS = [
 ]
 
 export async function startMockJellyfin(options: MockOptions = {}): Promise<MockServer> {
-  const opts = { username: 'tester', password: 'secret', movieCount: 130, playMode: 'direct', seriesCount: 0, animeCount: 0, musicVideos: 0, books: 0, audiobooks: 0, liveTv: 0, musicArtists: 0, collections: 0, ...options } as Required<
-    Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicVideos' | 'books' | 'audiobooks' | 'liveTv' | 'musicArtists' | 'collections'>
+  const opts = { username: 'tester', password: 'secret', movieCount: 130, playMode: 'direct', seriesCount: 0, animeCount: 0, musicVideos: 0, musicVideoFolders: 0, books: 0, audiobooks: 0, liveTv: 0, musicArtists: 0, collections: 0, ...options } as Required<
+    Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicVideos' | 'musicVideoFolders' | 'books' | 'audiobooks' | 'liveTv' | 'musicArtists' | 'collections'>
   > &
     MockOptions
   const requests: RecordedRequest[] = []
@@ -1281,7 +1321,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         return json(res, 200, { Items: found, TotalRecordCount: found.length, StartIndex: 0 })
       }
       // Like Jellyfin: looking items up by id works for every type; browsing needs a type (the client always sends one).
-      const types = list('includeItemTypes') ?? (ids ? ['Movie', 'Series', 'Season', 'Episode', 'MusicVideo', 'Book', 'AudioBook'] : ['Movie'])
+      const types = list('includeItemTypes') ?? (ids ? ['Movie', 'Series', 'Season', 'Episode', 'MusicVideo', 'Folder', 'Book', 'AudioBook'] : ['Movie'])
       interface Row {
         id: string
         name: string
@@ -1294,6 +1334,8 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         /** Music: what kind of item, which album/artists it belongs to, and its order in the album. */
         type?: string
         parent?: string
+        /** Music videos and their folders: the folder (or library) that holds it. */
+        mvParent?: string
         artistIds?: string[]
         artist?: string
         album?: string
@@ -1326,10 +1368,18 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
           })
         }
       }
+      if (types.includes('Folder') && opts.musicVideoFolders > 0) {
+        const folderIds = [...Array.from({ length: opts.musicVideoFolders }, (_, i) => mvFolderId(i + 1)), ...(opts.musicVideoFolders >= 2 ? [MV_NESTED] : [])]
+        for (const id of folderIds) {
+          rows.push({ id, name: mvFolderName(id).toLowerCase(), lib: 'lib-musicvideos', mvParent: mvFolderParent(id), type: 'Folder', year: 0, created: 0, rating: 0, backdrop: false, people: [] })
+        }
+      }
       if (types.includes('MusicVideo')) {
         for (let n = 1; n <= opts.musicVideos; n += 1) {
           rows.push({
             id: musicVideoId(n),
+            mvParent: musicVideoParent(n, opts.musicVideos, opts.musicVideoFolders),
+            type: 'MusicVideo',
             name: musicVideoName(n).toLowerCase(),
             lib: 'lib-musicvideos',
             genre: GENRES[n % 3],
@@ -1400,6 +1450,16 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         // What is inside a collection: its movies, sorted below like any other listing.
         const members = collectionMembers(query.parentId, opts.movieCount)
         selected = selected.filter((r) => members.includes(r.id))
+      } else if (query.parentId && selected.some((r) => r.mvParent !== undefined) && (MV_FOLDER_ID.test(query.parentId) || query.recursive !== 'true')) {
+        // The folders of the music video library: what is directly inside, or everything below when asked recursively.
+        const under = (id: string | undefined, ancestor: string): boolean => id === ancestor || (id !== undefined && id !== 'lib-musicvideos' && under(mvFolderParent(id), ancestor))
+        selected = selected.filter((r) =>
+          r.mvParent === undefined
+            ? r.lib === query.parentId
+            : query.recursive === 'true'
+              ? under(r.mvParent, query.parentId as string)
+              : r.mvParent === query.parentId,
+        )
       } else if (query.parentId) selected = selected.filter((r) => r.lib === query.parentId || r.parent === query.parentId)
       // Playlists of songs and of videos live apart: ask for one kind of them.
       const mediaTypes = list('mediaTypes')
@@ -1632,6 +1692,19 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       const count = prefix === 'a' ? opts.animeCount : opts.seriesCount
       const items = [n + 1, n + 2].filter((x) => x <= count).map((x) => showDto(showId(prefix, x), user))
       return json(res, 200, { Items: items, TotalRecordCount: items.length, StartIndex: 0 })
+    }
+    const ancestors = /^\/Items\/([^/]+)\/Ancestors$/.exec(path)
+    if (ancestors && req.method === 'GET') {
+      if (!needAuth()) return
+      const chain: unknown[] = []
+      let at: string | undefined = ancestors[1] as string
+      while (at && at !== 'lib-musicvideos') {
+        at = (dtoFor(at, user, opts) as { ParentId?: string } | undefined)?.ParentId
+        if (at && at !== 'lib-musicvideos') chain.push(dtoFor(at, user, opts))
+      }
+      chain.push({ Id: 'lib-musicvideos', Name: 'Music videos', Type: 'CollectionFolder' })
+      chain.push({ Id: 'root', Name: 'Media Folders', Type: 'AggregateFolder' })
+      return json(res, 200, chain)
     }
     // Like Jellyfin 12.2 on a real server: /Genres is empty, the genres are only in the query filters.
     if (path === '/Genres') {

@@ -86,6 +86,7 @@ export function PlayerStage({
   subtitleIndex,
   next = null,
   onNext,
+  repeat,
   extras,
   localSubtitle,
   subtitleFileError,
@@ -109,6 +110,8 @@ export function PlayerStage({
   /** What plays after this: the next episode, or the next title of the playlist being played. */
   next?: Movie | null
   onNext?: () => void
+  /** Present when this is part of a queue: play it again from the start after the last title. */
+  repeat?: { enabled: boolean; onChange: (enabled: boolean) => void }
   /** Intro/credits segments and chapters (empty when the server has none). */
   extras: PlaybackExtras
   /** A subtitle file the viewer loaded from their device (instead of one of the server's tracks), already as a blob URL. */
@@ -164,7 +167,8 @@ export function PlayerStage({
   const [ended, setEnded] = useState(false)
   const [upNextDismissed, setUpNextDismissed] = useState(false)
   // After a title ends the next one starts by itself once this many seconds have counted down (chosen in Settings).
-  const [countdownSeconds] = useState(initialPrefs.autoplayCountdown)
+  // (One music video after another is meant to flow, so its countdown is short.)
+  const [countdownSeconds] = useState(movie.musicVideo ? Math.min(initialPrefs.autoplayCountdown, 3) : initialPrefs.autoplayCountdown)
   const [secondsLeft, setSecondsLeft] = useState(countdownSeconds)
   const [autoplay, setAutoplay] = useState(initialPrefs.autoplayNext)
   // Cinema mode: the picture fades in from black, and the controls leave when you are not using them, even while paused.
@@ -826,6 +830,7 @@ export function PlayerStage({
         trickplay={trickplay}
         pictureInPicture={canPip ? { active: pip, onToggle: togglePip } : undefined}
         nextEpisode={next ? { label: `${isEpisode(next) ? episodeCode(next) : ''} ${next.name}`.trim(), onPlay: () => void goNext() } : undefined}
+        repeatQueue={repeat}
         cinemaMode={{
           enabled: cinema,
           onChange: (on) => {

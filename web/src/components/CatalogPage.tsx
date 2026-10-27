@@ -1,5 +1,5 @@
 import { StateMessage } from './StateMessage'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import {
   FILTER_LABELS,
   getContinueEpisodes,
@@ -126,7 +126,7 @@ export function CatalogPage({
   sections,
   retrySections,
   ...common
-}: CatalogCommon & { section: Section; sections: AsyncState<LibrarySections>; retrySections: () => void }) {
+}: CatalogCommon & { section: Section; sections: AsyncState<LibrarySections>; retrySections: () => void; /** Something shown right under the banner (the music video views). */ toolbar?: ReactNode }) {
   if (sections.status === 'loading') {
     return (
       <p role="status" className="py-24 text-center text-neutral-400">
@@ -162,7 +162,8 @@ function LibraryView({
   onOpenSeries,
   onOpenCollection,
   onSeeCollections,
-}: CatalogCommon & { section: Section; libraries: MovieLibrary[] }) {
+  toolbar,
+}: CatalogCommon & { section: Section; libraries: MovieLibrary[]; toolbar?: ReactNode }) {
   const kind = kindOf(section)
   const copy = copyFor(kind)
   const [prefs] = useState(() => readBrowsePrefs(section))
@@ -251,6 +252,7 @@ function LibraryView({
         />
       )}
       <div className={`space-y-9 ${showRows && (bannerPending || featured.length > 0) ? 'relative -mt-14' : 'pt-6'}`}>
+        {toolbar}
         {showRows && (
           <>
             {kind !== 'series' ? (
