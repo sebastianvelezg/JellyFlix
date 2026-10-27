@@ -3,6 +3,23 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 Jellyflix Web and Jellyflix TV are released together and share one version number.
 
+## [Unreleased]
+
+A better video player, music that flows from one song to the next, mixes made for you, and more varied suggestions.
+
+### Web app
+- **Subtitles from the internet:** the subtitle menu has a *Search online…* button. It asks the subtitle plugin of your server (Open Subtitles and the like) in a language you choose, lists what it found (matches for your exact file first, machine translations last) and saves the one you pick on the server, next to the video. The video starts again where you were with the new subtitle on. Needs an account that may manage subtitles.
+- **Cinema mode** (Settings -> Playback, or in the player's menu): the picture fades in from black and out at the very end, and the controls leave sooner, also while paused.
+- **Up next:** the card now shows in the last 20 seconds of a long title (so you can jump straight to the next one during the credits), the countdown after a title has a bar and its length (3 to 15 seconds) is chosen in Settings.
+- **Collections play through:** the Play button of a collection goes on to the next film of the saga, like a playlist does.
+- **Gapless playback and crossfade for music** (Settings -> Playback -> Music): the next song is made ready before the one playing ends, so there is no pause between songs (also when the server converts them), and with a crossfade length chosen the old song fades out while the new one fades in.
+- **Mix of the day and radio:** the music home has a *Made for you* row with a mix of the day (your favourites, the radios of the artists you play most and a few surprises; the same all day, with a button to make another) and the radio of your top artists. Artist and album pages have a *Radio* button and every song a *Start a radio* action, all from the server's instant mix.
+- **Visualizer:** a button in the full-screen player draws bars that move with the real sound over the cover. While it is on, songs are loaded in a way that lets the browser read their sound; where that is not possible the bars move to a made-up rhythm. They stand still when paused or when the system asks for less motion.
+- **More varied suggestions:** up to three rows on the main page, each from a different starting point (a few of the titles you finished lately, and one favourite: *Because you liked X*), alternating, with no title in two rows.
+
+### TV app
+- The same more varied suggestions on Home: *Because you watched X* for several recent titles and *Because you liked X* for a favourite.
+
 ## [1.1.0] - 2026-10-23
 
 Three new kinds of library (music videos, books and Live TV), a menu you can arrange, and a tidier look. Web and TV get all of it together.

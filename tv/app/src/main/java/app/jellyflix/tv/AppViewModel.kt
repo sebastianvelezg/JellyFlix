@@ -57,6 +57,7 @@ import app.jellyflix.tv.data.Chapter
 import app.jellyflix.tv.data.DirectOnlyException
 import app.jellyflix.tv.data.Playlist
 import app.jellyflix.tv.data.PluginsReport
+import app.jellyflix.tv.data.Recommendation
 import app.jellyflix.tv.data.Section
 import app.jellyflix.tv.data.TvSettings
 import app.jellyflix.tv.data.Segment
@@ -291,8 +292,8 @@ class HomeState {
     var sinceVisit by mutableStateOf<List<MediaItem>>(emptyList())
     /** Episodes about to air, soonest first. */
     var upcoming by mutableStateOf<List<UpcomingEpisode>>(emptyList())
-    /** "Because you watched X": the title's name and what is like it. */
-    var because by mutableStateOf<Pair<String, List<MediaItem>>?>(null)
+    /** Rows of suggestions ("Because you watched X", "Because you liked X"). */
+    var because by mutableStateOf<List<Recommendation>>(emptyList())
     var pickMovie by mutableStateOf<Pick<MediaItem>>(Pick.Loading)
     var pickSeries by mutableStateOf<Pick<FreshSeries>>(Pick.Loading)
     val list = LazyListState()
@@ -724,7 +725,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         home.favorites = emptyList()
         home.sinceVisit = emptyList()
         home.upcoming = emptyList()
-        home.because = null
+        home.because = emptyList()
         home.pickMovie = Pick.Loading
         home.pickSeries = Pick.Loading
         home.heroIndex = 0
@@ -925,7 +926,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 saveHomeLater()
             }
             launchSafe {
-                runCatching { io { repo.becauseYouWatched(s) } }.getOrNull()?.let { (seed, similar) -> home.because = seed.title to similar }
+                runCatching { io { repo.recommendations(s) } }.getOrNull()?.let { home.because = it }
             }
             refreshOrganised()
             refreshNews(l)
@@ -1419,7 +1420,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         home.watchLater = home.watchLater.p()
         home.favorites = home.favorites.p()
         home.sinceVisit = home.sinceVisit.p()
-        home.because = home.because?.let { (seed, similar) -> seed to similar.p() }
+        home.because = home.because.map { it.copy(items = it.items.p()) }
         for (lib in listOf(movies, series, anime, musicVideos, books, collectionList)) {
             for (i in lib.items.indices) if (lib.items[i].id == id) lib.items[i] = change(lib.items[i])
         }

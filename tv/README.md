@@ -24,7 +24,7 @@ What differs is how it is used: everything is built for a remote control and a T
 ### Home and discovery
 - A rotating **banner** (the newest titles plus random picks, movies and series in turns, ten seconds each, paused while the remote is on it, the next picture loaded ahead), then **Discover something new** (a random movie, a series you never started,
   a random album, each with Play / Details / a refresh button), Continue watching, Next up, **Watch later**, your **playlists** and **favorites**, **New since your last visit**, **Coming up** (episodes about to air, with "Today", "Tomorrow" or the date),
-  Latest movies, Collections, New series, New anime and **Because you watched X**. Each row is left out when it would be empty. Back from a title lands on the poster you left.
+  Latest movies, Collections, New series, New anime and **Because you watched X** and **Because you liked X** (several rows, each from a different title). Each row is left out when it would be empty. Back from a title lands on the poster you left.
 - **Movies, Series and Anime** open with a banner of their newest titles, then the sort and filter choices and the poster grid, as one page. **Music** opens with a wide random album. Every page starts clear of the top bar, so a focused button is never cut by it.
 - **Search** across movies, series, collections, albums and artists.
 

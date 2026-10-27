@@ -98,6 +98,7 @@
     <string name="nav_collections">Colecciones</string>
     <string name="row_new_anime">Anime nuevo</string>
     <string name="row_because">Porque viste %1$s</string>
+    <string name="row_liked">Porque te gustó %1$s</string>
     <string name="row_collections">Colecciones</string>
     <string name="discover_title">Descubre algo nuevo</string>
     <string name="pick_movie">Película al azar</string>

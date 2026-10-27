@@ -27,6 +27,7 @@ import app.jellyflix.tv.AppViewModel
 import app.jellyflix.tv.R
 import app.jellyflix.tv.data.HomeRow
 import app.jellyflix.tv.data.MediaItem
+import app.jellyflix.tv.data.RecommendationKind
 import app.jellyflix.tv.data.UpcomingEpisode
 import app.jellyflix.tv.data.VideoPlaylist
 import app.jellyflix.tv.data.daysUntil
@@ -75,8 +76,11 @@ fun HomeScreen(vm: AppViewModel) {
                 HomeRow.Upcoming -> if (home.upcoming.isNotEmpty()) item(key = "upcoming") { UpcomingRow(vm, home.upcoming) }
                 HomeRow.WatchLater -> row(vm, R.string.row_watch_later, home.watchLater)
                 HomeRow.Playlists -> if (home.playlists.isNotEmpty()) item(key = "playlists") { PlaylistsRow(vm, home.playlists) }
-                HomeRow.Because -> home.because?.let { (seed, similar) ->
-                    item(key = "because") { MediaRow(vm, stringResource(R.string.row_because, seed), similar, landscape = false) }
+                HomeRow.Because -> for (rec in home.because) {
+                    item(key = "because-${rec.kind}-${rec.seed}") {
+                        val title = if (rec.kind == RecommendationKind.LIKED) R.string.row_liked else R.string.row_because
+                        MediaRow(vm, stringResource(title, rec.seed), rec.items, landscape = false)
+                    }
                 }
                 HomeRow.LatestMovies -> row(vm, R.string.row_new_movies, home.newMovies)
                 HomeRow.Favorites -> row(vm, R.string.row_favorites, home.favorites)

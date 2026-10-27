@@ -20,7 +20,7 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - **Home** is the first tab when you have at least two kinds of library. One **banner** mixes movies and series: the two newest titles, then six picked at random from your whole library (unwatched, rated 6 or more, with a backdrop),
   a new one every ten seconds. It waits while you hover or focus it, and never moves with "reduce motion".
 - **Discover something new**: a random movie (preferring unwatched), a series you have never started (its button plays episode 1, never a special) and a random album (or shuffle the whole library). Press **Another** for a different pick.
-- Rows that follow you: **Continue watching** (movies and episodes together), **Next up**, **Because you watched…**, **New since your last visit**, **Coming up** (episodes about to air), **Watch later**, your playlists and favorites,
+- Rows that follow you: **Continue watching** (movies and episodes together), **Next up**, **Because you watched…** and **Because you liked…** (several rows, each from a different title), **New since your last visit**, **Coming up** (episodes about to air), **Watch later**, your playlists and favorites,
   the latest movies, collections, new series, new anime, new music videos, new books and new music.
 - **Surprise me** opens a random unwatched movie; "Top rated in *genre*" rows change on every visit.
 - Search across movies, series, episodes, collections, albums, artists and songs (press `/`), with recent searches and result filters.

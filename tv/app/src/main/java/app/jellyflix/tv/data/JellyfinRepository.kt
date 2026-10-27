@@ -588,30 +588,68 @@ class JellyfinRepository(context: Context) {
     }
 
     /**
-     * "Because you watched X": the title you finished most recently (a series, when it was an episode) and what the server finds
-     * similar to it that you have not seen. Null when there is nothing worth a row.
+     * Rows of suggestions from different starting points: a few of the titles you finished most recently ("Because you watched X";
+     * a series when it was an episode) and one of your favourites ("Because you liked X"), each with what the server finds similar
+     * that you have not seen and that is not already in another row. Empty when nothing has been watched yet.
      */
-    suspend fun becauseYouWatched(session: Session): Pair<MediaItem, List<MediaItem>>? {
+    suspend fun recommendations(session: Session, rows: Int = Recommendations.ROWS): List<Recommendation> = coroutineScope {
         val api = api(session)
         val userId = userId(session)
-        val last = api.libraryApi.getItems(
-            userId = userId,
-            includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.EPISODE),
-            recursive = true,
-            filters = listOf(ItemFilter.IS_PLAYED),
-            sortBy = listOf(ItemSortBy.DATE_PLAYED),
-            sortOrder = listOf(SortOrder.DESCENDING),
-            limit = 1,
-            enableTotalRecordCount = false,
-        ).content.items.firstOrNull() ?: return null
-        val seedId = if (last.type == BaseItemKind.EPISODE) last.seriesId ?: return null else last.id
-        val similar = api.libraryApi.getSimilarItems(itemId = seedId, userId = userId, limit = 24).content.items
-            .filter { it.userData?.played != true }
-            .map { toItem(api, it) }
-            .take(16)
-        if (similar.size < 4) return null
-        val seed = if (last.type == BaseItemKind.EPISODE) last.seriesName.orEmpty() else last.name.orEmpty()
-        return toItem(api, last).copy(title = seed) to similar
+        val played = async {
+            runCatching {
+                api.libraryApi.getItems(
+                    userId = userId,
+                    includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.EPISODE),
+                    recursive = true,
+                    filters = listOf(ItemFilter.IS_PLAYED),
+                    sortBy = listOf(ItemSortBy.DATE_PLAYED),
+                    sortOrder = listOf(SortOrder.DESCENDING),
+                    limit = 40,
+                    enableTotalRecordCount = false,
+                ).content.items
+            }.getOrDefault(emptyList())
+        }
+        val favorites = async {
+            runCatching {
+                api.libraryApi.getItems(
+                    userId = userId,
+                    includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+                    recursive = true,
+                    filters = listOf(ItemFilter.IS_FAVORITE),
+                    sortBy = listOf(ItemSortBy.RANDOM),
+                    limit = 6,
+                    enableTotalRecordCount = false,
+                ).content.items
+            }.getOrDefault(emptyList())
+        }
+        val watchedSeeds = Recommendations.distinctSeeds(
+            played.await().mapNotNull { dto ->
+                if (dto.type == BaseItemKind.EPISODE) dto.seriesId?.let { Recommendations.Seed(it, dto.seriesName.orEmpty()) }
+                else Recommendations.Seed(dto.id, dto.name.orEmpty())
+            },
+        ).take(rows + 2)
+        if (watchedSeeds.isEmpty()) return@coroutineScope emptyList()
+        val likedSeeds = favorites.await().shuffled()
+            .filter { fav -> watchedSeeds.none { it.id == fav.id } }
+            .take(3)
+            .map { Recommendations.Seed(it.id, it.name.orEmpty()) }
+
+        suspend fun similarTo(seed: Recommendations.Seed): List<MediaItem> =
+            runCatching { api.libraryApi.getSimilarItems(itemId = seed.id, userId = userId, limit = 24).content.items.map { toItem(api, it) } }
+                .getOrDefault(emptyList())
+        val watchedLists = watchedSeeds.map { async { similarTo(it) } }
+        val likedLists = likedSeeds.map { async { similarTo(it) } }
+
+        val used = watchedSeeds.map { it.id }.toMutableSet()
+        val liked = likedSeeds.withIndex().firstNotNullOfOrNull { (i, seed) ->
+            Recommendations.take(RecommendationKind.LIKED, seed, likedLists[i].await(), used)
+        }
+        val watched = mutableListOf<Recommendation>()
+        for ((i, seed) in watchedSeeds.withIndex()) {
+            if (watched.size >= rows - (if (liked != null) 1 else 0)) break
+            Recommendations.take(RecommendationKind.WATCHED, seed, watchedLists[i].await(), used)?.let { watched += it }
+        }
+        Recommendations.arrange(watched, liked)
     }
 
     /** The lyrics the server has for a song (its own tags or a lyrics plugin); null when it has none. */
