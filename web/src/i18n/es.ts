@@ -1318,6 +1318,7 @@ export const es: Record<string, string> = {
   'Radio': 'Radio',
   'Play {name}': 'Reproducir {name}',
   'Start a radio from {name}': 'Iniciar una radio a partir de {name}',
+  'Visualizer': 'Visualizador',
 }
 
 /** Messages with numbers or names in them, written once as a pattern. `$1` is the first captured part. */

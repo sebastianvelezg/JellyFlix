@@ -30,6 +30,8 @@ export interface PlayerPrefs {
   crossfadeSeconds: number
   /** Music: the next song is made ready ahead of time so there is no pause between songs. */
   gapless: boolean
+  /** Music: the full-screen player shows bars that move with the sound. */
+  visualizer: boolean
   /** The most the video may stream at, in megabits per second; 0 is no limit (the original quality). */
   maxBitrateMbps: number
 }
@@ -73,6 +75,7 @@ const PLAYER_DEFAULTS: PlayerPrefs = {
   cinemaMode: false,
   crossfadeSeconds: 0,
   gapless: true,
+  visualizer: false,
   maxBitrateMbps: 0,
 }
 const BROWSE_DEFAULTS: BrowsePrefs = { sort: 'title', filter: 'all' }
@@ -109,6 +112,7 @@ export function readPlayerPrefs(): PlayerPrefs {
     cinemaMode: p.cinemaMode === true,
     crossfadeSeconds: (CROSSFADE_CHOICES as readonly number[]).includes(p.crossfadeSeconds) ? p.crossfadeSeconds : 0,
     gapless: p.gapless !== false,
+    visualizer: p.visualizer === true,
     maxBitrateMbps: (QUALITY_CHOICES as readonly number[]).includes(p.maxBitrateMbps) ? p.maxBitrateMbps : 0,
   }
 }

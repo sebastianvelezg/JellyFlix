@@ -154,6 +154,12 @@ export const ShuffleIcon = () => (
   </Icon>
 )
 
+export const VisualizerIcon = () => (
+  <Icon width={20} height={20}>
+    <path d="M5 20v-6M9 20V8M13 20V4M17 20v-9M21 20v-4" />
+  </Icon>
+)
+
 export const RadioIcon = () => (
   <Icon width={18} height={18}>
     <circle cx="12" cy="12" r="2" />

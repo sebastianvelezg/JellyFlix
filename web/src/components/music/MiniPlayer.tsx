@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { coverUrl, currentTrack, upcoming, type Session } from '../../core'
-import { CloseIcon, LyricsIcon, QueueIcon } from '../icons'
+import { CloseIcon, LyricsIcon, QueueIcon, VisualizerIcon } from '../icons'
 import { Img } from '../Img'
 import { Seeker, Transport, VolumeControl } from './controls'
 import { useMusic, useMusicState } from './MusicProvider'
@@ -9,6 +9,8 @@ import { Cover } from './parts'
 import { lockPageScroll } from '../../platform/web/scrollLock'
 import { PlayOnButton } from '../remote/PlayOnButton'
 import { LyricsPanel } from './Lyrics'
+import { Visualizer } from './Visualizer'
+import { readPlayerPrefs } from '../../platform/web/prefs'
 import { getLanguage, t } from '../../i18n'
 
 /**
@@ -197,6 +199,12 @@ function NowPlaying({
 }) {
   const music = useMusic()
   const { queue, error } = useMusicState()
+  // Bars that move with the sound, over the cover (remembered on this device).
+  const [visual, setVisual] = useState(() => readPlayerPrefs().visualizer)
+  useEffect(() => {
+    // Opening the full-screen player with the bars on makes sure the sound is being read.
+    if (visual) void music.setVisualizer(true)
+  }, [music, visual])
   if (!queue) return null
   const track = currentTrack(queue)
   if (!track) return null
@@ -261,13 +269,16 @@ function NowPlaying({
             <section
               className={`${panel === 'queue' ? 'hidden lg:flex' : 'flex'} min-h-0 flex-col items-center justify-center gap-6 short:flex-row short:gap-10`}
             >
-              <Cover
-                session={session}
-                item={track}
-                width={600}
-                eager
-                className="w-full max-w-[min(26rem,55vh)] shadow-[0_30px_90px_-20px_var(--glow)] short:w-[min(15rem,62vh)] short:shrink-0"
-              />
+              <div className="relative w-full max-w-[min(26rem,55vh)] short:w-[min(15rem,62vh)] short:shrink-0">
+                <Cover
+                  session={session}
+                  item={track}
+                  width={600}
+                  eager
+                  className={`w-full shadow-[0_30px_90px_-20px_var(--glow)] transition-opacity duration-300 ${visual ? 'opacity-35' : ''}`}
+                />
+                {visual && <Visualizer className="absolute inset-0 h-full w-full p-4" />}
+              </div>
               <div className="flex w-full max-w-md flex-col items-center gap-6 short:gap-3">
                 <div className="w-full text-center">
                   <h2 className="truncate text-2xl font-bold tracking-tight text-white">{track.name}</h2>
@@ -427,7 +438,19 @@ function NowPlaying({
             )}
           </div>
           <footer className="gutter-x relative flex items-center justify-end gap-1 pb-[calc(1rem+var(--safe-bottom))] pt-1">
-            <Tools panel={panel} onPanel={onPanel} backTo={backTo} />
+            <Tools
+              panel={panel}
+              onPanel={onPanel}
+              backTo={backTo}
+              visualizer={{
+                on: visual,
+                toggle: () => {
+                  const on = !visual
+                  setVisual(on)
+                  void music.setVisualizer(on)
+                },
+              }}
+            />
           </footer>
         </>
       )}
@@ -436,11 +459,27 @@ function NowPlaying({
 }
 
 /** Sleep timer, "Play on…", the words and the queue: along the bottom of the full-screen player, like the bar of the other pages. */
-function Tools({ panel, onPanel, backTo }: { panel: Panel; onPanel: (panel: Panel) => void; backTo: Panel }) {
+function Tools({
+  panel,
+  onPanel,
+  backTo,
+  visualizer,
+}: {
+  panel: Panel
+  onPanel: (panel: Panel) => void
+  backTo: Panel
+  /** The bars over the cover (offered where the cover is). */
+  visualizer?: { on: boolean; toggle: () => void }
+}) {
   return (
     <>
       <SleepTimer />
       <PlayOnButton current up className={TOOL} />
+      {visualizer && (
+        <button type="button" className={TOOL} aria-label={t('Visualizer')} title={t('Visualizer')} aria-pressed={visualizer.on} onClick={visualizer.toggle}>
+          <VisualizerIcon />
+        </button>
+      )}
       <button
         type="button"
         className={TOOL}

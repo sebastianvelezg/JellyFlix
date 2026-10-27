@@ -100,6 +100,12 @@ export class MusicPlayer {
   private fade: { outgoing: Outgoing; timer: ReturnType<typeof setInterval> } | null = null
   private prefsRead: { at: number; prefs: PlayerPrefs } | null = null
   private readonly handlerSets = new Map<HTMLAudioElement, Array<[string, () => void]>>()
+  /** The visualizer is on: songs are loaded in a way that lets the browser read their sound (CORS), and the sound is analysed. */
+  private analysis: boolean
+  /** Once a song's sound runs through the analyser it must keep being loaded that way, or it would play silent. */
+  private corsSticky = false
+  private readonly corsLoaded = new WeakSet<HTMLAudioElement>()
+  private graph: { ctx: AudioContext; analyser: AnalyserNode; connected: WeakSet<HTMLAudioElement> } | null = null
 
   constructor(
     private readonly session: Session,
@@ -111,6 +117,7 @@ export class MusicPlayer {
     const prefs = readPlayerPrefs()
     this.volume = prefs.volume
     this.muted = prefs.muted
+    this.analysis = prefs.visualizer
     this.state = { queue: null, status: 'idle', buffering: false, error: null, duration: 0, volume: prefs.volume, muted: prefs.muted, sleep: null }
     this.syncElements()
   }
@@ -176,6 +183,8 @@ export class MusicPlayer {
     this.unbindSession = null
     this.audio.remove()
     this.spare.remove()
+    void this.graph?.ctx.close().catch(() => undefined)
+    this.graph = null
   }
 
   /** The element playing is the one tests and tools look for; the spare one is told apart. */
@@ -333,6 +342,80 @@ export class MusicPlayer {
     if (this.state.queue) this.set({ queue: moveItem(this.state.queue, from, to) })
   }
 
+  // ---- the visualizer (reading the sound that is playing) ---------------------------------------------------------
+
+  /** How many values `readSpectrum` fills. */
+  readonly spectrumSize = 64
+
+  /**
+   * Turns the analysis of the sound on or off. Reading a song's sound needs it loaded with CORS, so the song playing
+   * is loaded again at the same place when the visualizer is switched on (the next songs are loaded that way anyway).
+   */
+  async setVisualizer(on: boolean): Promise<void> {
+    this.analysis = on
+    writePlayerPrefs({ visualizer: on })
+    if (!on) return
+    await this.ensureGraph()
+    if (this.state.status === 'playing' && !this.corsLoaded.has(this.audio)) {
+      this.startAt = this.audio.currentTime
+      void this.load()
+    } else {
+      this.connectToGraph(this.audio)
+      this.connectToGraph(this.spare)
+    }
+  }
+
+  /** Fills `out` (0-255 per frequency band, low to high) with what is playing now. False when the sound cannot be read (the caller then makes up a movement). */
+  readSpectrum(out: Uint8Array<ArrayBuffer>): boolean {
+    const graph = this.graph
+    if (!graph || graph.ctx.state !== 'running' || !graph.connected.has(this.audio)) return false
+    const bins = new Uint8Array(graph.analyser.frequencyBinCount)
+    graph.analyser.getByteFrequencyData(bins)
+    // The upper half of the bands is mostly empty for music: spread the useful lower part over the bars.
+    const useful = Math.floor(bins.length * 0.75)
+    for (let i = 0; i < out.length; i += 1) out[i] = bins[Math.floor((i * useful) / out.length)] ?? 0
+    return true
+  }
+
+  private async ensureGraph(): Promise<void> {
+    if (!this.graph) {
+      const Context = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!Context) return
+      const ctx = new Context()
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = this.spectrumSize * 4
+      analyser.smoothingTimeConstant = 0.78
+      analyser.connect(ctx.destination)
+      this.graph = { ctx, analyser, connected: new WeakSet() }
+    }
+    // A browser lets sound start only after the person has done something on the page: this runs from a click.
+    if (this.graph.ctx.state === 'suspended') await this.graph.ctx.resume().catch(() => undefined)
+  }
+
+  /** The way an element loads its next song: with CORS when the sound is to be read (and from then on). */
+  private useCors(el: HTMLAudioElement): void {
+    if (this.analysis || this.corsSticky) {
+      el.crossOrigin = 'anonymous'
+      this.corsLoaded.add(el)
+    } else {
+      el.removeAttribute('crossorigin')
+      this.corsLoaded.delete(el)
+    }
+  }
+
+  /** Sends an element's sound through the analyser, if it was loaded with CORS (otherwise the browser would silence it). */
+  private connectToGraph(el: HTMLAudioElement): void {
+    const graph = this.graph
+    if (!graph || graph.ctx.state !== 'running' || !this.corsLoaded.has(el) || graph.connected.has(el)) return
+    try {
+      graph.ctx.createMediaElementSource(el).connect(graph.analyser)
+      graph.connected.add(el)
+      this.corsSticky = true
+    } catch {
+      // The element cannot be analysed: it keeps playing as it did.
+    }
+  }
+
   // ---- sleep timer ---------------------------------------------------------------------------------------------
 
   /** Pauses the music after this many minutes. Another call replaces the timer; 0 or less turns it off. */
@@ -412,6 +495,7 @@ export class MusicPlayer {
       if (id !== this.loadId) return
       this.plan = plan
       this.playback = new PlaybackSession(this.session, plan, startSeconds)
+      this.useCors(this.audio)
       this.attached = attachMedia({
         video: this.audio,
         plan,
@@ -422,6 +506,7 @@ export class MusicPlayer {
           if (id === this.loadId) this.fail(message)
         },
       })
+      this.connectToGraph(this.audio)
     } catch (e) {
       if (id === this.loadId) this.fail(e instanceof Error ? e.message : 'Could not start this song.')
     }
@@ -567,6 +652,7 @@ export class MusicPlayer {
         this.preloading = null
         const el = this.spare
         el.preload = 'auto'
+        this.useCors(el)
         const attached = attachMedia({
           video: el,
           plan,
@@ -580,6 +666,7 @@ export class MusicPlayer {
           },
         })
         this.pre = { trackId: track.id, audio: el, plan, attached }
+        this.connectToGraph(el)
       })
       .catch(() => {
         if (token === this.preloadToken) this.preloading = null
