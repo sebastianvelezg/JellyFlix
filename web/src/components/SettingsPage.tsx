@@ -5,6 +5,7 @@ import {
   clearSeriesPrefs,
   countSeriesPrefs,
   COUNTDOWN_CHOICES,
+  CROSSFADE_CHOICES,
   QUALITY_CHOICES,
   readPlayerPrefs,
   readUiPrefs,
@@ -345,6 +346,35 @@ export function SettingsPage({
           </Row>
           <p className="-mt-2 text-xs text-neutral-500">
             {t('The language you pick in the player is switched on automatically next time.')}
+          </p>
+        </Card>
+
+        <Card title={t('Music')} description={t('How songs follow each other.')}>
+          <Toggle
+            label={t('Gapless playback')}
+            hint={t('The next song is made ready before this one ends, so there is no pause between songs.')}
+            checked={player.gapless}
+            onChange={(gapless) => updatePlayer({ gapless })}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label htmlFor="crossfade" className="text-sm font-medium text-neutral-100">
+              {t('Crossfade between songs')}
+            </label>
+            <select
+              id="crossfade"
+              className="select"
+              value={player.crossfadeSeconds}
+              onChange={(e) => updatePlayer({ crossfadeSeconds: Number(e.target.value) })}
+            >
+              {CROSSFADE_CHOICES.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {seconds === 0 ? t('Off') : t('{seconds} seconds', { seconds })}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="-mt-2 text-xs text-neutral-500">
+            {t('The end of a song fades into the start of the next one. Songs shorter than twice the fade just follow each other.')}
           </p>
         </Card>
 

@@ -26,6 +26,10 @@ export interface PlayerPrefs {
   autoplayCountdown: number
   /** Cinema mode: the picture fades in from black, the controls get out of the way sooner and also while paused. */
   cinemaMode: boolean
+  /** Music: seconds the end of a song fades into the start of the next one (0 = no crossfade). */
+  crossfadeSeconds: number
+  /** Music: the next song is made ready ahead of time so there is no pause between songs. */
+  gapless: boolean
   /** The most the video may stream at, in megabits per second; 0 is no limit (the original quality). */
   maxBitrateMbps: number
 }
@@ -43,6 +47,9 @@ export interface BrowsePrefs {
   /** Decade, rating, age rating, tag and quality: kept for each section like the sort and the filter. */
   advanced?: AdvancedFilters
 }
+
+/** How long a song can fade into the next one, in seconds (0 = off). */
+export const CROSSFADE_CHOICES = [0, 2, 4, 6, 8, 10, 12] as const
 
 /** How long the "Up next" countdown can run, in seconds. */
 export const COUNTDOWN_CHOICES = [3, 5, 8, 10, 15] as const
@@ -64,6 +71,8 @@ const PLAYER_DEFAULTS: PlayerPrefs = {
   autoplayNext: true,
   autoplayCountdown: 8,
   cinemaMode: false,
+  crossfadeSeconds: 0,
+  gapless: true,
   maxBitrateMbps: 0,
 }
 const BROWSE_DEFAULTS: BrowsePrefs = { sort: 'title', filter: 'all' }
@@ -98,6 +107,8 @@ export function readPlayerPrefs(): PlayerPrefs {
     autoplayNext: p.autoplayNext !== false,
     autoplayCountdown: (COUNTDOWN_CHOICES as readonly number[]).includes(p.autoplayCountdown) ? p.autoplayCountdown : 8,
     cinemaMode: p.cinemaMode === true,
+    crossfadeSeconds: (CROSSFADE_CHOICES as readonly number[]).includes(p.crossfadeSeconds) ? p.crossfadeSeconds : 0,
+    gapless: p.gapless !== false,
     maxBitrateMbps: (QUALITY_CHOICES as readonly number[]).includes(p.maxBitrateMbps) ? p.maxBitrateMbps : 0,
   }
 }

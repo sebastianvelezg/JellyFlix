@@ -1305,6 +1305,11 @@ export const es: Record<string, string> = {
   '{seconds} seconds': '{seconds} segundos',
   'Cinema mode': 'Modo cine',
   'The picture fades in from black and the controls get out of the way sooner, even while paused. You can also switch it in the player.': 'La imagen aparece desde negro y los controles se ocultan antes, incluso en pausa. También puedes activarlo desde el reproductor.',
+  'How songs follow each other.': 'Cómo se siguen las canciones.',
+  'Gapless playback': 'Reproducción sin pausas',
+  'The next song is made ready before this one ends, so there is no pause between songs.': 'La siguiente canción se prepara antes de que termine esta, así que no hay pausa entre canciones.',
+  'Crossfade between songs': 'Fundido entre canciones',
+  'The end of a song fades into the start of the next one. Songs shorter than twice the fade just follow each other.': 'El final de una canción se funde con el inicio de la siguiente. Las canciones más cortas que el doble del fundido simplemente se siguen.',
 }
 
 /** Messages with numbers or names in them, written once as a pattern. `$1` is the first captured part. */

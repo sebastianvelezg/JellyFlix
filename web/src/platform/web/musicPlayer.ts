@@ -23,7 +23,7 @@ import {
 import { reportStopOnPageHide } from './browser'
 import { detectCapabilities } from './capabilities'
 import { attachMedia, type Attached } from './mediaAttach'
-import { readPlayerPrefs, writePlayerPrefs } from './prefs'
+import { readPlayerPrefs, writePlayerPrefs, type PlayerPrefs } from './prefs'
 
 export interface MusicState {
   queue: PlayQueue | null
@@ -42,6 +42,26 @@ export interface MusicState {
 const PROGRESS_INTERVAL_MS = 10_000
 /** After a song that cannot be played, the next one starts after this long. */
 const SKIP_BROKEN_AFTER_MS = 1800
+/** The next song is made ready this many seconds (plus the crossfade) before the one playing ends. */
+const PRELOAD_BEFORE_END_SECONDS = 25
+/** The fade between two songs is redrawn this often. */
+const FADE_STEP_MS = 50
+/** Settings are read from storage at most this often while a song plays. */
+const PREFS_CACHE_MS = 1000
+
+/** A song loaded ahead of time on the spare audio element, so it can follow the one playing without a gap. */
+interface Preloaded {
+  trackId: string
+  audio: HTMLAudioElement
+  plan: PlaybackPlan
+  attached: Attached
+}
+
+/** The song that is fading out while the next one fades in. */
+interface Outgoing {
+  audio: HTMLAudioElement
+  attached: Attached | null
+}
 
 /**
  * The music player: one `<audio>` element, the play queue, and the reporting of what you listen to. It lives
@@ -49,7 +69,9 @@ const SKIP_BROKEN_AFTER_MS = 1800
  * It is plain TypeScript (no React); components read it through `useMusicState()` and `useMusicPosition()`.
  */
 export class MusicPlayer {
-  private readonly audio: HTMLAudioElement
+  /** The element of the song playing now. A second one (`spare`) gets the next song ready, and they swap at each change. */
+  private audio: HTMLAudioElement
+  private spare: HTMLAudioElement
   private readonly capabilities: () => DeviceCapabilities
   private state: MusicState
   private position = 0
@@ -68,17 +90,29 @@ export class MusicPlayer {
   /** Where the next song to load begins (a song handed over by another device keeps its place). */
   private startAt = 0
   private unbindSession: (() => void) | null = null
+  /** The volume and mute choice. The elements follow it (during a crossfade their own volume is part-way). */
+  private volume: number
+  private muted: boolean
+  private pre: Preloaded | null = null
+  private preloadToken = 0
+  /** The song being asked about for the spare element (so it is not asked twice). */
+  private preloading: string | null = null
+  private fade: { outgoing: Outgoing; timer: ReturnType<typeof setInterval> } | null = null
+  private prefsRead: { at: number; prefs: PlayerPrefs } | null = null
+  private readonly handlerSets = new Map<HTMLAudioElement, Array<[string, () => void]>>()
 
   constructor(
     private readonly session: Session,
     opts: { audio?: HTMLAudioElement; capabilities?: () => DeviceCapabilities } = {},
   ) {
     this.audio = opts.audio ?? new Audio()
+    this.spare = new Audio()
     this.capabilities = opts.capabilities ?? (() => detectCapabilities())
     const prefs = readPlayerPrefs()
+    this.volume = prefs.volume
+    this.muted = prefs.muted
     this.state = { queue: null, status: 'idle', buffering: false, error: null, duration: 0, volume: prefs.volume, muted: prefs.muted, sleep: null }
-    this.audio.volume = prefs.volume
-    this.audio.muted = prefs.muted
+    this.syncElements()
   }
 
   // ---- subscriptions (for React's useSyncExternalStore) ------------------------------------------------------
@@ -115,10 +149,14 @@ export class MusicPlayer {
     if (this.connected) return
     this.connected = true
     // In the page (hidden) rather than loose: browsers treat it as ordinary page media, and tests can find it.
-    this.audio.hidden = true
-    this.audio.dataset.testid = 'music-audio'
-    if (!this.audio.isConnected) document.body.append(this.audio)
-    for (const [name, handler] of this.handlers) this.audio.addEventListener(name, handler)
+    for (const el of [this.audio, this.spare]) {
+      el.hidden = true
+      if (!el.isConnected) document.body.append(el)
+      const handlers = this.handlersFor(el)
+      this.handlerSets.set(el, handlers)
+      for (const [name, handler] of handlers) el.addEventListener(name, handler)
+    }
+    this.labelElements()
     window.addEventListener('pagehide', this.onPageHide)
     this.progressTimer = setInterval(() => this.playback?.tick(this.device()), PROGRESS_INTERVAL_MS)
   }
@@ -127,7 +165,8 @@ export class MusicPlayer {
   disconnect(): void {
     if (!this.connected) return
     this.connected = false
-    for (const [name, handler] of this.handlers) this.audio.removeEventListener(name, handler)
+    for (const [el, handlers] of this.handlerSets) for (const [name, handler] of handlers) el.removeEventListener(name, handler)
+    this.handlerSets.clear()
     window.removeEventListener('pagehide', this.onPageHide)
     if (this.progressTimer) clearInterval(this.progressTimer)
     if (this.skipTimer) clearTimeout(this.skipTimer)
@@ -136,10 +175,24 @@ export class MusicPlayer {
     this.unbindSession?.()
     this.unbindSession = null
     this.audio.remove()
+    this.spare.remove()
+  }
+
+  /** The element playing is the one tests and tools look for; the spare one is told apart. */
+  private labelElements(): void {
+    this.audio.dataset.testid = 'music-audio'
+    this.spare.dataset.testid = 'music-audio-spare'
   }
 
   private device(): DeviceState {
-    return { paused: this.audio.paused, muted: this.audio.muted, volume: this.audio.volume }
+    return { paused: this.audio.paused, muted: this.muted, volume: this.volume }
+  }
+
+  /** The settings that matter while a song plays (crossfade, gapless), without reading storage at every tick. */
+  private prefs(): PlayerPrefs {
+    const now = Date.now()
+    if (!this.prefsRead || now - this.prefsRead.at > PREFS_CACHE_MS) this.prefsRead = { at: now, prefs: readPlayerPrefs() }
+    return this.prefsRead.prefs
   }
 
   private readonly onPageHide = () => {
@@ -163,6 +216,7 @@ export class MusicPlayer {
   }
 
   pause(): void {
+    this.endFade()
     this.audio.pause()
   }
 
@@ -195,6 +249,7 @@ export class MusicPlayer {
   }
 
   seek(seconds: number): void {
+    this.endFade()
     const max = Number.isFinite(this.audio.duration) ? this.audio.duration : seconds
     this.audio.currentTime = Math.min(Math.max(0, seconds), max)
     this.setPosition(this.audio.currentTime)
@@ -202,16 +257,34 @@ export class MusicPlayer {
   }
 
   setVolume(volume: number): void {
-    this.audio.volume = Math.min(1, Math.max(0, volume))
-    this.audio.muted = volume <= 0
+    this.volume = Math.min(1, Math.max(0, volume))
+    this.muted = volume <= 0
+    this.volumeChanged()
   }
 
   setMuted(muted: boolean): void {
-    this.audio.muted = muted
+    this.muted = muted
+    this.volumeChanged()
   }
 
   toggleMute(): void {
-    this.audio.muted = !this.audio.muted
+    this.setMuted(!this.muted)
+  }
+
+  /** Puts the volume and mute choice on the elements, tells the screens and remembers it. */
+  private volumeChanged(): void {
+    this.syncElements()
+    this.set({ volume: this.volume, muted: this.muted })
+    writePlayerPrefs({ volume: this.volume, muted: this.muted })
+  }
+
+  /** Every element follows the choice; one that is part-way through a fade is moved by the fade itself. */
+  private syncElements(): void {
+    for (const el of [this.audio, this.spare, this.fade?.outgoing.audio]) {
+      if (!el) continue
+      el.muted = this.muted
+      if (!this.fade) el.volume = this.volume
+    }
   }
 
   toggleShuffle(): void {
@@ -305,6 +378,8 @@ export class MusicPlayer {
 
   /** Reports the end of what was playing and lets go of the stream. */
   private releaseCurrent(): void {
+    this.endFade()
+    this.dropPreload()
     this.loadId += 1
     if (this.skipTimer) clearTimeout(this.skipTimer)
     this.skipTimer = null
@@ -367,62 +442,71 @@ export class MusicPlayer {
 
   // ---- audio element events --------------------------------------------------------------------------------------
 
-  private readonly handlers: Array<[string, () => void]> = [
-    [
-      'playing',
-      () => {
-        this.set({ status: 'playing', buffering: false, error: null })
-        this.playback?.playing(this.audio.currentTime, this.device())
-      },
-    ],
-    [
-      'pause',
-      () => {
-        if (this.audio.ended || this.state.status === 'loading' || this.state.status === 'idle' || !this.plan) return
-        this.set({ status: 'paused', buffering: false })
-        this.playback?.stateChanged(this.audio.currentTime, this.device())
-      },
-    ],
-    ['waiting', () => this.state.status === 'playing' && this.set({ buffering: true })],
-    ['canplay', () => this.state.buffering && this.set({ buffering: false })],
-    [
-      'timeupdate',
-      () => {
-        this.setPosition(this.audio.currentTime)
-        this.playback?.moved(this.audio.currentTime)
-        this.updateSessionPosition()
-      },
-    ],
-    [
-      'durationchange',
-      () => {
-        if (Number.isFinite(this.audio.duration) && this.audio.duration > 0) this.set({ duration: this.audio.duration })
-      },
-    ],
-    [
-      'volumechange',
-      () => {
-        this.set({ volume: this.audio.volume, muted: this.audio.muted })
-        writePlayerPrefs({ volume: this.audio.volume, muted: this.audio.muted })
-      },
-    ],
-    ['ended', () => void this.onEnded()],
-    ['error', () => this.onMediaError()],
-  ]
+  /** What each audio element reports. Only the element of the song playing is listened to; the spare one is just getting ready. */
+  private handlersFor(el: HTMLAudioElement): Array<[string, () => void]> {
+    const mine = (fn: () => void) => () => {
+      if (el === this.audio) fn()
+    }
+    return [
+      [
+        'playing',
+        mine(() => {
+          this.set({ status: 'playing', buffering: false, error: null })
+          this.playback?.playing(this.audio.currentTime, this.device())
+        }),
+      ],
+      [
+        'pause',
+        mine(() => {
+          if (this.audio.ended || this.state.status === 'loading' || this.state.status === 'idle' || !this.plan) return
+          this.set({ status: 'paused', buffering: false })
+          this.playback?.stateChanged(this.audio.currentTime, this.device())
+        }),
+      ],
+      ['waiting', mine(() => this.state.status === 'playing' && this.set({ buffering: true }))],
+      ['canplay', mine(() => this.state.buffering && this.set({ buffering: false }))],
+      [
+        'timeupdate',
+        mine(() => {
+          this.setPosition(this.audio.currentTime)
+          this.playback?.moved(this.audio.currentTime)
+          this.updateSessionPosition()
+          this.lookAhead()
+        }),
+      ],
+      [
+        'durationchange',
+        mine(() => {
+          if (Number.isFinite(this.audio.duration) && this.audio.duration > 0) this.set({ duration: this.audio.duration })
+        }),
+      ],
+      ['ended', mine(() => void this.onEnded())],
+      ['error', mine(() => this.onMediaError())],
+    ]
+  }
 
   private async onEnded(): Promise<void> {
     const queue = this.state.queue
     if (!queue) return
     const playback = this.playback
     const id = this.loadId
+    const duration = this.audio.duration
+    const device = this.device()
+    const stopHere = this.state.sleep?.kind === 'track'
+    // Gapless: the next song is already loaded, so it starts at once and the server hears about this one meanwhile.
+    const following = stopHere ? null : advance(queue, 'auto')
+    if (following && this.promote(following)) {
+      void playback?.ended(duration, device)
+      return
+    }
     // The song finished: tell the server (it counts the play), then go on to the next one.
-    if (playback) await playback.ended(this.audio.duration, this.device())
+    if (playback) await playback.ended(duration, device)
     if (id !== this.loadId) return
     // "Sleep after this song": the song has played to its end, so stop here (pressing play starts the next one).
-    if (this.state.sleep?.kind === 'track') {
+    if (stopHere) {
       this.set({ sleep: null })
-      const following = advance(queue, 'auto')
-      if (following) this.set({ queue: following.queue })
+      const next = advance(queue, 'auto')
+      if (next) this.set({ queue: next.queue })
       this.audio.pause()
       this.set({ status: 'paused', buffering: false })
       this.plan = null
@@ -435,6 +519,144 @@ export class MusicPlayer {
     }
     this.set({ queue: step.queue })
     void this.load()
+  }
+
+  // ---- the next song, made ready ahead of time (no pause between songs, and crossfade) ---------------------------
+
+  /** The song that follows this one by itself, if the music would go on and this player may prepare it. */
+  private followingSong(): { queue: PlayQueue; track: Track } | null {
+    const queue = this.state.queue
+    // "Repeat one" starts the same song again from the start (its stream is open already); "sleep after this song" stops.
+    if (!queue || queue.repeat === 'one' || this.state.sleep?.kind === 'track') return null
+    const step = advance(queue, 'auto')
+    const track = step && currentTrack(step.queue)
+    return step && track ? { queue: step.queue, track } : null
+  }
+
+  /** Called as the song plays: prepares the next one when the end is near, and starts the crossfade when it is time. */
+  private lookAhead(): void {
+    if (this.state.status !== 'playing' || this.audio.paused) return
+    const prefs = this.prefs()
+    const fadeSeconds = prefs.crossfadeSeconds
+    if (!prefs.gapless && !(fadeSeconds > 0)) return this.dropPreload()
+    const duration = this.audio.duration
+    if (!Number.isFinite(duration) || duration <= 0) return
+    const next = this.followingSong()
+    if (!next) return this.dropPreload()
+    const remaining = duration - this.audio.currentTime
+    if (remaining > PRELOAD_BEFORE_END_SECONDS + fadeSeconds) return
+    this.preload(next.track)
+    // A song shorter than twice the fade would be mostly fade: those just follow each other.
+    if (fadeSeconds > 0 && !this.fade && remaining <= fadeSeconds && duration >= fadeSeconds * 2 && this.pre?.trackId === next.track.id) {
+      const outgoing = this.promote({ queue: next.queue }, { fadeMs: fadeSeconds * 1000 })
+      if (outgoing) void outgoing.playback?.ended(duration, outgoing.device)
+    }
+  }
+
+  /** Loads a song on the spare element (without playing it), unless that is already done or going on. */
+  private preload(track: Track): void {
+    if (this.pre?.trackId === track.id || this.preloading === track.id) return
+    // The spare element may still be fading out the song before this one.
+    if (this.fade) return
+    this.dropPreload()
+    const token = ++this.preloadToken
+    this.preloading = track.id
+    void negotiatePlayback(this.session, track.id, { capabilities: this.capabilities(), mediaType: 'audio' })
+      .then((plan) => {
+        if (token !== this.preloadToken) return
+        this.preloading = null
+        const el = this.spare
+        el.preload = 'auto'
+        const attached = attachMedia({
+          video: el,
+          plan,
+          token: this.session.accessToken,
+          authorization: this.session.api.authorizationHeader,
+          startSeconds: 0,
+          autoplay: false,
+          // A song that cannot be prepared is simply loaded the usual way when its turn comes.
+          onFatal: () => {
+            if (this.pre?.audio === el) this.dropPreload()
+          },
+        })
+        this.pre = { trackId: track.id, audio: el, plan, attached }
+      })
+      .catch(() => {
+        if (token === this.preloadToken) this.preloading = null
+      })
+  }
+
+  private dropPreload(): void {
+    this.preloadToken += 1
+    this.preloading = null
+    const pre = this.pre
+    this.pre = null
+    pre?.attached.destroy()
+  }
+
+  /**
+   * Makes the prepared song the one playing and starts it, instead of loading it the slow way. With `fadeMs` the song
+   * that was playing fades out while the new one fades in. Returns what was playing (so the caller can report it), or
+   * null when nothing was ready for this queue position.
+   */
+  private promote(
+    step: { queue: PlayQueue },
+    opts: { fadeMs?: number } = {},
+  ): { playback: PlaybackSession | null; device: DeviceState } | null {
+    const pre = this.pre
+    const track = currentTrack(step.queue)
+    if (!pre || !track || pre.trackId !== track.id || pre.audio.error) return null
+    const device = this.device()
+    const outgoing: Outgoing = { audio: this.audio, attached: this.attached }
+    const playback = this.playback
+    if (this.skipTimer) clearTimeout(this.skipTimer)
+    this.skipTimer = null
+    this.pre = null
+    this.preloadToken += 1
+    this.loadId += 1
+    this.audio = pre.audio
+    this.spare = outgoing.audio
+    this.labelElements()
+    this.plan = pre.plan
+    this.attached = pre.attached
+    this.triedTranscode = false
+    this.playback = new PlaybackSession(this.session, pre.plan, 0)
+    this.set({ queue: step.queue, status: 'loading', buffering: true, error: null, duration: (track.runtimeTicks ?? 0) / 10_000_000 })
+    this.setPosition(0)
+    this.announce(track)
+    if (opts.fadeMs) {
+      this.audio.volume = 0
+      this.startFade(outgoing, opts.fadeMs)
+    } else {
+      this.audio.volume = this.volume
+      outgoing.attached?.destroy()
+    }
+    void this.audio.play().catch(() => undefined)
+    return { playback, device }
+  }
+
+  /** Raises the new song and lowers the old one together (equal power, so the sum does not dip in the middle). */
+  private startFade(outgoing: Outgoing, ms: number): void {
+    this.endFade()
+    const started = Date.now()
+    const timer = setInterval(() => {
+      const t = Math.min(1, (Date.now() - started) / ms)
+      this.audio.volume = this.volume * Math.sin((t * Math.PI) / 2)
+      outgoing.audio.volume = this.volume * Math.cos((t * Math.PI) / 2)
+      if (t >= 1) this.endFade()
+    }, FADE_STEP_MS)
+    this.fade = { outgoing, timer }
+  }
+
+  /** Finishes a fade at once: the old song is let go and the new one is at full volume. */
+  private endFade(): void {
+    const fade = this.fade
+    if (!fade) return
+    clearInterval(fade.timer)
+    this.fade = null
+    fade.outgoing.audio.pause()
+    fade.outgoing.attached?.destroy()
+    this.syncElements()
   }
 
   private onMediaError(): void {
