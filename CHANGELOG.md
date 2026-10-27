@@ -5,7 +5,9 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
-A better video player, music that flows from one song to the next, mixes made for you, and more varied suggestions.
+## [1.2.0] - 2026-10-27
+
+A better video player, music that flows from one song to the next, mixes made for you, music videos you can browse by folder, play from their card and keep playing in a mini bar, and more varied suggestions. The TV app gets subtitle search, mixes and radio, and play-through.
 
 ### Web app
 - **Subtitles from the internet:** the subtitle menu has a *Search online…* button. It asks the subtitle plugin of your server (Open Subtitles and the like) in a language you choose, lists what it found (matches for your exact file first, machine translations last) and saves the one you pick on the server, next to the video. The video starts again where you were with the new subtitle on. Needs an account that may manage subtitles.
@@ -29,6 +31,10 @@ A better video player, music that flows from one song to the next, mixes made fo
 
 ### TV app
 - The same more varied suggestions on Home: *Because you watched X* for several recent titles and *Because you liked X* for a favourite.
+- **Subtitles from the internet:** the Audio and subtitles menu has *Search online…*: pick a language, then one of what your server's subtitle plugin found (a match of your file is starred); it is saved on the server and switched on, and the video carries on from the same second. Needs an account that may manage subtitles.
+- **Mix of the day and radio:** the music page has a *Mix of the day* (a few of your favourites, the radios of three of them and a few surprises; the same all day while the app is open) and album and artist pages have a *Radio* button, from the server's instant mix.
+- **Play through:** the Play button of a collection goes on to the next film of the saga, and a music video played on its own goes on with the other videos of its folder (with autoplay on), like on the web.
+- Left to the web app on purpose: browsing music videos by folder, repeating a list, the mini player and the play button on cards (the TV player is always full screen and the remote opens a title first), cinema mode, the Up next card with a countdown, crossfade, the visualizer and the cover colours.
 
 ## [1.1.0] - 2026-10-23
 
