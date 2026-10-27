@@ -64,6 +64,8 @@ export interface MockOptions {
   segments?: boolean
   /** Is the signed-in user a server administrator (default)? Plugins and scheduled tasks answer 403 to anyone else. */
   admin?: boolean
+  /** The server has no subtitle plugin: searching for subtitles answers 404. */
+  noSubtitlePlugin?: boolean
   /**
    * The Playback Reporting plugin: absent (default, its routes answer 404), installed with nothing recorded yet ('empty'), or with a
    * few plays on record ('data'). Its queries are for administrators only.
@@ -765,6 +767,8 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
   let flakyHits = 0
   let playSessionCounter = 0
   const savedLyrics = new Set<string>()
+  // Subtitles saved from the internet: how many each video has now (each is one more text track).
+  const savedSubtitles = new Map<string, number>()
   let delayMs = 0
   let apiInFlight = 0
   let peakApi = 0
@@ -1817,7 +1821,21 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         SupportsDirectStream: direct,
         SupportsTranscoding: true,
         DefaultAudioStreamIndex: 1,
-        MediaStreams: isTrack ? [{ Index: 0, Type: 'Audio', Codec: 'mp3', IsDefault: true, DisplayTitle: 'MP3 - Stereo' }] : STREAMS,
+        MediaStreams: isTrack
+          ? [{ Index: 0, Type: 'Audio', Codec: 'mp3', IsDefault: true, DisplayTitle: 'MP3 - Stereo' }]
+          : [
+              ...STREAMS,
+              ...Array.from({ length: savedSubtitles.get(id) ?? 0 }, (_, i) => ({
+                Index: 4 + i,
+                Type: 'Subtitle',
+                Codec: 'srt',
+                Language: 'spa',
+                IsDefault: false,
+                IsExternal: true,
+                IsTextSubtitleStream: true,
+                DisplayTitle: i === 0 ? 'Spanish - SRT - External' : `Spanish ${i + 1} - SRT - External`,
+              })),
+            ],
         // A live channel has no length; the server opens a stream for it and says which.
         ...(isChannel ? { RunTimeTicks: undefined, LiveStreamId: `live-${id}`, IsInfiniteStream: true } : {}),
       }
@@ -1901,6 +1919,29 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       if (req.method === 'POST') {
         savedLyrics.add(id)
         return json(res, 200, { Metadata: { IsSynced: true }, Lyrics: timedLyrics })
+      }
+    }
+    // Subtitles from the internet: a search (three results, the first one matching the file; "zzz" finds nothing) and saving one.
+    const remoteSubtitles = /^\/Items\/([^/]+)\/RemoteSearch\/Subtitles\/([^/]+)$/.exec(path)
+    if (remoteSubtitles) {
+      if (!needAuth()) return
+      if (opts.noSubtitlePlugin) return void res.writeHead(404).end()
+      if (opts.admin === false) return void res.writeHead(403).end()
+      const id = remoteSubtitles[1] as string
+      const arg = remoteSubtitles[2] as string
+      if (req.method === 'GET') {
+        adminLog.push(`subtitle-search ${id} ${arg}${query.isPerfectMatch === 'true' ? ' exact' : ''}`)
+        if (arg === 'zzz') return json(res, 200, [])
+        return json(res, 200, [
+          { Id: 'os-popular', Name: 'Mock.Movie.2020.WEB-DL', ProviderName: 'Open Subtitles', ThreeLetterISOLanguageName: arg, Format: 'srt', Author: 'ana', DownloadCount: 9000, CommunityRating: 8, IsHashMatch: false },
+          { Id: 'os-exact', Name: 'Mock.Movie.2020.1080p.BluRay', ProviderName: 'Open Subtitles', ThreeLetterISOLanguageName: arg, Format: 'srt', Author: 'luis', DownloadCount: 12, IsHashMatch: true, HearingImpaired: true },
+          { Id: 'os-machine', Name: 'Mock Movie (machine)', ProviderName: 'Open Subtitles', ThreeLetterISOLanguageName: arg, Format: 'srt', DownloadCount: 50000, MachineTranslated: true },
+        ])
+      }
+      if (req.method === 'POST') {
+        adminLog.push(`subtitle-download ${id} ${arg}`)
+        savedSubtitles.set(id, (savedSubtitles.get(id) ?? 0) + 1)
+        return void res.writeHead(204).end()
       }
     }
     // Live TV: the channels (with what is on now), one channel, and the guide.

@@ -250,6 +250,7 @@ export {
   type FreshSeries,
 } from './home'
 export * from './lyrics'
+export * from './subtitleSearch'
 export {
   findPlugin,
   getPlugins,

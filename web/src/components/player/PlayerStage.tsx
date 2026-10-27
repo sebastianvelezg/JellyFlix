@@ -4,6 +4,7 @@ import {
   audioChangeRequest,
   episodeCode,
   isEpisode,
+  defaultSearchLanguage,
   PlaybackSession,
   playbackTitle,
   describePlayback,
@@ -25,6 +26,7 @@ import { attachMedia, type Attached } from '../../platform/web/mediaAttach'
 import { bindMediaSession, keepScreenAwake } from '../../platform/web/mediaSession'
 import {
   readPlayerPrefs,
+  readSeriesPrefs,
   readSubtitleOffset,
   writePlayerPrefs,
   writeSubtitleOffset,
@@ -34,9 +36,10 @@ import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
 import { Controls } from './Controls'
 import { SubtitleOverlay, type SubtitleStyle } from './SubtitleOverlay'
+import { SubtitleSearchDialog } from './SubtitleSearchDialog'
 import { useSubtitleTrack } from './useSubtitleTrack'
 import { useTrickplay } from './useTrickplay'
-import { t } from '../../i18n'
+import { getLanguage, t } from '../../i18n'
 import { offsetLabel } from '../offsetLabel'
 
 const HIDE_CONTROLS_MS = 3000
@@ -83,6 +86,7 @@ export function PlayerStage({
   subtitleFileError,
   onSubtitleFile,
   onClearLocalSubtitle,
+  onSubtitleSaved,
   onSpeed,
   onSubtitle,
   onRequest,
@@ -108,6 +112,8 @@ export function PlayerStage({
   onSubtitleFile: (file: File) => void
   /** Drops the loaded file (choosing a server track or turning subtitles off does this). */
   onClearLocalSubtitle: () => void
+  /** A subtitle from the internet was saved on the server: ask for this video again (at this position) so it shows up as a track. */
+  onSubtitleSaved: (startSeconds: number) => void
   onSpeed: (speed: number) => void
   onSubtitle: (index: number | null) => void
   onRequest: (request: StreamRequest) => void
@@ -400,6 +406,24 @@ export function PlayerStage({
       if (next !== null) chooseSubtitle(next)
     }
   }, [localSubtitle, onClearLocalSubtitle, subtitleIndex, chooseSubtitle, plan.subtitleTracks])
+
+  // Subtitles from the internet: the video waits while you choose, and carries on if you change your mind.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const resumeAfterSearch = useRef(false)
+  const openSubtitleSearch = useCallback(() => {
+    const video = videoRef.current
+    resumeAfterSearch.current = !!video && !video.paused
+    video?.pause()
+    setSearchOpen(true)
+  }, [])
+  const closeSubtitleSearch = useCallback(() => {
+    setSearchOpen(false)
+    if (resumeAfterSearch.current) void videoRef.current?.play().catch(() => undefined)
+  }, [])
+  const searchLanguage = defaultSearchLanguage(
+    (isEpisode(movie) ? readSeriesPrefs(movie.seriesId).subtitleLanguage : undefined) ?? readPlayerPrefs().subtitleLanguage,
+    getLanguage(),
+  )
 
   const back = useCallback(async () => {
     // Wait (briefly) for the final position to reach the server so the library shows it.
@@ -744,6 +768,7 @@ export function PlayerStage({
         }}
         onSubtitleOffset={setSubtitleOffset}
         onSubtitleFile={onSubtitleFile}
+        onFindSubtitles={openSubtitleSearch}
         onSpeed={onSpeed}
         onMenuOpenChange={setMenuOpen}
         chapters={extras.chapters}
@@ -755,6 +780,17 @@ export function PlayerStage({
           writePlayerPrefs({ autoplayNext: on })
         } } : undefined}
       />
+
+      {searchOpen && (
+        <SubtitleSearchDialog
+          session={session}
+          itemId={plan.itemId}
+          title={title}
+          initialLanguage={searchLanguage}
+          onSaved={() => onSubtitleSaved(playback.position)}
+          onClose={closeSubtitleSearch}
+        />
+      )}
     </div>
   )
 }

@@ -5,10 +5,12 @@ import {
   isEpisode,
   NO_EXTRAS,
   negotiatePlayback,
+  newSubtitleIndex,
   pickAudio,
   pickSubtitle,
   PlaybackError,
   playbackTitle,
+  retryRequest,
   ticksToSeconds,
   type Movie,
   type PlaybackExtras,
@@ -98,6 +100,8 @@ export function Player({
     },
     [],
   )
+  // The tracks the video had when a subtitle was being saved on the server (so the one that appears afterwards is known).
+  const pendingSubtitles = useRef<number[] | null>(null)
   const subtitlesInitialised = useRef(false)
   const audioInitialised = useRef(false)
   const currentPlan = useRef<PlaybackPlan | null>(null)
@@ -151,6 +155,17 @@ export function Player({
             return
           }
         }
+        // A subtitle was just saved from the internet: it is the new track, so switch it on.
+        if (pendingSubtitles.current) {
+          const added = newSubtitleIndex(pendingSubtitles.current, plan.subtitleTracks.map((track) => track.index))
+          pendingSubtitles.current = null
+          if (added !== null) {
+            setSubtitleIndex(added)
+            const language = plan.subtitleTracks.find((track) => track.index === added)?.language ?? null
+            writePlayerPrefs({ subtitleLanguage: language })
+            if (seriesId) writeSeriesPrefs(seriesId, { subtitleLanguage: language })
+          }
+        }
         currentPlan.current = plan
         setState({ status: 'ready', plan, startSeconds, fallback: request.fallback ?? false })
       } catch (e) {
@@ -188,6 +203,16 @@ export function Player({
     [seriesId],
   )
 
+  const subtitleSaved = useCallback(
+    (startSeconds: number) => {
+      const plan = currentPlan.current
+      if (!plan) return
+      pendingSubtitles.current = plan.subtitleTracks.map((track) => track.index)
+      requestStream(retryRequest(plan, { fallback: state.status === 'ready' ? state.fallback : false, startSeconds }))
+    },
+    [requestStream, state],
+  )
+
   if (state.status === 'ready') {
     return (
       <PlayerStage
@@ -206,6 +231,7 @@ export function Player({
         subtitleFileError={subtitleFileError}
         onSubtitleFile={chooseSubtitleFile}
         onClearLocalSubtitle={clearLocalSubtitle}
+        onSubtitleSaved={subtitleSaved}
         onSpeed={setSpeed}
         onSubtitle={(index) => {
           setSubtitleIndex(index)

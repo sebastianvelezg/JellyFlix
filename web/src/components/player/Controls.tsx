@@ -109,6 +109,8 @@ export interface ControlsProps {
   onSubtitleStyle: (patch: Partial<SubtitleStyle>) => void
   onSubtitleOffset: (seconds: number) => void
   onSubtitleFile: (file: File) => void
+  /** Present when subtitles can be searched for on the internet (a video, not a live channel): adds a button to the menu. */
+  onFindSubtitles?: () => void
   onSpeed: (speed: number) => void
   /** The settings menu opened or closed; the controls must stay visible while it is open. */
   onMenuOpenChange: (open: boolean) => void
@@ -388,6 +390,18 @@ function SettingsMenu(p: ControlsProps) {
             >
               {t('Load a subtitle file (.srt, .vtt)…')}
             </button>
+            {p.onFindSubtitles && (
+              <button
+                type="button"
+                className="w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-[var(--color-accent)] transition hover:bg-white/10"
+                onClick={() => {
+                  setOpen(false)
+                  p.onFindSubtitles?.()
+                }}
+              >
+                {t('Search online…')}
+              </button>
+            )}
             {p.subtitleStatus !== 'idle' && (
               <p role="status" className="px-2 pt-1 text-xs text-neutral-400">
                 {p.subtitleStatus === 'loading' ? t('Loading subtitles…') : t('Could not load these subtitles.')}
