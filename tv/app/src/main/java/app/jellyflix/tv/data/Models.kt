@@ -47,6 +47,8 @@ data class MediaItem(
     val format: String? = null,
     /** How long it runs, in milliseconds (an audiobook is played as a long song). */
     val runtimeMs: Long? = null,
+    /** A music video: the folder it is in, whose other videos follow it when it is played on its own. */
+    val parentId: UUID? = null,
 ) {
     val isPlayable get() = kind == BaseItemKind.MOVIE || kind == BaseItemKind.EPISODE || kind == BaseItemKind.MUSIC_VIDEO || kind == BaseItemKind.TV_CHANNEL
 

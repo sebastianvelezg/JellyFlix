@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import app.jellyflix.tv.R
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.artistApi
@@ -11,6 +12,7 @@ import org.jellyfin.sdk.api.client.extensions.authenticationApi
 import org.jellyfin.sdk.api.client.extensions.displayPreferenceApi
 import org.jellyfin.sdk.api.client.extensions.filterApi
 import org.jellyfin.sdk.api.client.extensions.imageApi
+import org.jellyfin.sdk.api.client.extensions.instantMixApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.client.extensions.lyricApi
@@ -21,6 +23,7 @@ import org.jellyfin.sdk.api.client.extensions.pluginApi
 import org.jellyfin.sdk.api.client.extensions.scheduledTaskApi
 import org.jellyfin.sdk.api.client.extensions.userApi
 import org.jellyfin.sdk.api.client.extensions.sessionApi
+import org.jellyfin.sdk.api.client.extensions.subtitleApi
 import org.jellyfin.sdk.api.client.extensions.showApi
 import org.jellyfin.sdk.api.client.extensions.trickPlayApi
 import kotlinx.coroutines.sync.withLock
@@ -675,6 +678,44 @@ class JellyfinRepository(context: Context) {
             ?: Lyrics.parse(best.lyrics.lyrics.map { it.start to it.text }, best.lyrics.metadata.offset ?: 0)
     }
 
+    /** The music videos directly in a folder, in name order: what follows a video that is played on its own. */
+    suspend fun folderVideos(session: Session, folderId: UUID): List<MediaItem> {
+        val api = api(session)
+        return api.libraryApi.getItems(
+            userId = userId(session),
+            parentId = folderId,
+            includeItemTypes = listOf(BaseItemKind.MUSIC_VIDEO),
+            sortBy = listOf(ItemSortBy.SORT_NAME),
+            sortOrder = listOf(SortOrder.ASCENDING),
+            limit = 500,
+            enableTotalRecordCount = false,
+        ).content.items.map { toItem(api, it) }
+    }
+
+    /** Subtitles of one video in one language, from the server's subtitle plugin, best first. Empty when nothing was found. */
+    suspend fun searchSubtitles(session: Session, itemId: UUID, language: String): List<RemoteSubtitle> =
+        sortRemoteSubtitles(
+            api(session).subtitleApi.searchRemoteSubtitles(itemId = itemId, language = language).content.mapNotNull { s ->
+                val id = s.id ?: return@mapNotNull null
+                RemoteSubtitle(
+                    id = id,
+                    name = s.name.orEmpty(),
+                    provider = s.providerName.orEmpty(),
+                    language = s.threeLetterIsoLanguageName ?: language,
+                    format = s.format.orEmpty().lowercase(),
+                    downloads = s.downloadCount,
+                    rating = s.communityRating,
+                    exactMatch = s.isHashMatch == true,
+                    machineTranslated = s.machineTranslated == true || s.aiTranslated == true,
+                )
+            },
+        )
+
+    /** Saves one of the found subtitles on the server; the video then has one more subtitle track. */
+    suspend fun saveSubtitle(session: Session, itemId: UUID, subtitleId: String) {
+        api(session).subtitleApi.downloadRemoteSubtitles(itemId = itemId, subtitleId = subtitleId)
+    }
+
     /** What is in a collection, oldest first so a saga reads in order. */
     suspend fun collectionItems(session: Session, id: UUID): List<MediaItem> {
         val api = api(session)
@@ -1182,6 +1223,38 @@ class JellyfinRepository(context: Context) {
         ).content.items.map { toSong(api, it) }
     }
 
+    /** The server's instant mix of songs that go with [itemId] (a song, an album or an artist), best fit first: its "radio". */
+    suspend fun radio(session: Session, itemId: UUID, limit: Int = 50): List<Song> {
+        val api = api(session)
+        return api.instantMixApi.getInstantMixFromItem(itemId = itemId, userId = userId(session), limit = limit).content.items.map { toSong(api, it) }
+    }
+
+    /** Songs marked as favourites: in a random order, or by name ([stable]) so the same ones come back every time. */
+    suspend fun favoriteSongs(session: Session, libs: List<Lib>, limit: Int = 40, stable: Boolean = false): List<Song> {
+        val api = api(session)
+        return api.libraryApi.getItems(
+            userId = userId(session),
+            parentId = musicParent(libs),
+            includeItemTypes = listOf(BaseItemKind.AUDIO),
+            recursive = true,
+            isFavorite = true,
+            sortBy = listOf(if (stable) ItemSortBy.SORT_NAME else ItemSortBy.RANDOM),
+            limit = limit,
+            enableTotalRecordCount = false,
+        ).content.items.map { toSong(api, it) }
+    }
+
+    /**
+     * Today's mix: a few of your favourites, the radios of three of them and a handful of random songs, taken in turn. Which favourites
+     * are the starting points follows [seed] (the day), so it is the same mix all day long.
+     */
+    suspend fun dayMix(session: Session, libs: List<Lib>, seed: Long): List<Song> = coroutineScope {
+        val favourites = favoriteSongs(session, libs, 200, stable = true).shuffled(kotlin.random.Random(seed))
+        val radios = favourites.take(3).map { async { runCatching { radio(session, it.id, 25) }.getOrDefault(emptyList()) } }.awaitAll()
+        val surprise = runCatching { randomSongs(session, libs, 15) }.getOrDefault(emptyList())
+        blendSongs(listOf(favourites.take(15)) + radios + listOf(surprise), DAY_MIX_SIZE)
+    }
+
     /** A mix of songs for "Shuffle everything". */
     suspend fun randomSongs(session: Session, libs: List<Lib>, limit: Int = 50): List<Song> {
         val api = api(session)
@@ -1655,6 +1728,7 @@ class JellyfinRepository(context: Context) {
             artist = artist,
             format = format,
             runtimeMs = dto.runTimeTicks?.div(10_000),
+            parentId = if (dto.type == BaseItemKind.MUSIC_VIDEO) dto.parentId else null,
             cast = dto.people.orEmpty().filter { it.type == PersonKind.ACTOR || it.type == PersonKind.GUEST_STAR }.take(24).map {
                 CastMember(
                     id = it.id,

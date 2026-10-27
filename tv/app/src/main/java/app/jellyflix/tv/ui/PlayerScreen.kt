@@ -119,6 +119,8 @@ class PlayerActions(
     val onExit: () -> Unit,
     /** A live channel: change to the one before (-1) or after (+1) this one. */
     val onChannelStep: (Int) -> Unit = {},
+    /** "Search online…" in the subtitle menu: look for subtitles on the server's plugin, from this position. */
+    val onSearchSubtitles: (positionMs: Long) -> Unit = {},
 )
 
 /**
@@ -495,6 +497,11 @@ fun PlayerScreen(
                     controlsVisible = false
                     actions.onChangeTracks(audio, subtitle, now())
                 },
+                onSearch = {
+                    panel = Panel.None
+                    controlsVisible = false
+                    actions.onSearchSubtitles(now())
+                },
                 onClose = { panel = Panel.None },
             )
             Panel.Chapters -> ChaptersPanel(
@@ -621,7 +628,7 @@ private fun Controls(
 
 /** Audio and subtitle choices. Picking one asks the server for a stream with it and carries on from the same moment. */
 @Composable
-private fun TracksPanel(plan: PlaybackPlan, onChoose: (audio: Int?, subtitle: Int?) -> Unit, onClose: () -> Unit) {
+private fun TracksPanel(plan: PlaybackPlan, onChoose: (audio: Int?, subtitle: Int?) -> Unit, onSearch: () -> Unit, onClose: () -> Unit) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { first.requestFocusSoon() }
     Box(Modifier.fillMaxSize().background(Color(0x99000000))) {
@@ -649,6 +656,7 @@ private fun TracksPanel(plan: PlaybackPlan, onChoose: (audio: Int?, subtitle: In
             plan.subtitleTracks.forEach { track ->
                 TrackPill(track.label, selected = track.index == plan.subtitleIndex, onClick = { onChoose(null, track.index) })
             }
+            if (!plan.item.isChannel) Pill(stringResource(R.string.player_subtitles_search), onClick = onSearch)
             Pill(stringResource(R.string.player_close), onClick = onClose, modifier = Modifier.padding(top = 16.dp))
         }
     }

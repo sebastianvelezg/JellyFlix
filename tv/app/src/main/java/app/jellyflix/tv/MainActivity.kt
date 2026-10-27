@@ -162,6 +162,7 @@ class MainActivity : ComponentActivity() {
                         onNextEpisode = { vm.playNext(page.plan) },
                         onExit = { vm.back() },
                         onChannelStep = { vm.stepChannel(page.plan, it) },
+                        onSearchSubtitles = { vm.searchSubtitles(page.plan, it) },
                     ),
                 )
             }

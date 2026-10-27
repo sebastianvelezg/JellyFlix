@@ -77,6 +77,7 @@ fun MusicScreen(vm: AppViewModel) {
                 )
             }
             Spacer(Modifier.weight(1f))
+            Pill(stringResource(R.string.music_mix_day), onClick = vm::playDayMix)
             Pill(stringResource(R.string.music_shuffle_all), onClick = vm::shuffleEverything, accent = true)
         }
         when (vm.musicView) {

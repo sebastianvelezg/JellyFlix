@@ -286,7 +286,8 @@ fun CollectionScreen(vm: AppViewModel, state: DetailState) {
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Pill(
                             stringResource(R.string.collection_play),
-                            onClick = { target?.let { vm.play(it) } },
+                            // It goes on to the next title of the collection when one ends, like a playlist.
+                            onClick = { target?.let { vm.playThrough(members.orEmpty(), it) } },
                             accent = true,
                             modifier = Modifier.focusRequester(playButton),
                         )
