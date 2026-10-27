@@ -718,7 +718,10 @@ function Shell({
             startOver={route.startOver}
             startAt={route.startAt}
             queue={queueOf(route)}
-            onNextEpisode={(following) => go({ page: 'play', id: following.id, startOver: false, ...queueOf(route) }, { replace: true })}
+            // A music video that follows another one plays from its start (not from where it was left: a list of videos flows).
+            onNextEpisode={(following) =>
+              go({ page: 'play', id: following.id, startOver: !!following.musicVideo, ...queueOf(route) }, { replace: true })
+            }
             onExit={(item) =>
               back(item && isEpisode(item) ? { page: 'show', id: item.seriesId } : { page: 'movie', id: route.id })
             }

@@ -8,6 +8,7 @@ import {
   PlaybackSession,
   playbackTitle,
   upNextPhase,
+  FLOW_COUNTDOWN_SECONDS,
   describePlayback,
   retryRequest,
   stepOffset,
@@ -165,10 +166,14 @@ export function PlayerStage({
   const title = playbackTitle(movie)
   // Up next: set when an episode finishes; counts down, then starts the next episode.
   const [ended, setEnded] = useState(false)
+  // Set once a flow has moved on to the next video, so that it happens once.
+  const advanced = useRef(false)
   const [upNextDismissed, setUpNextDismissed] = useState(false)
   // After a title ends the next one starts by itself once this many seconds have counted down (chosen in Settings).
-  // (One music video after another is meant to flow, so its countdown is short.)
-  const [countdownSeconds] = useState(movie.musicVideo ? Math.min(initialPrefs.autoplayCountdown, 3) : initialPrefs.autoplayCountdown)
+  // One music video after another is meant to flow: the countdown runs over the last seconds of the video, and the next one starts
+  // the moment it ends.
+  const flow = !!movie.musicVideo
+  const [countdownSeconds] = useState(flow ? FLOW_COUNTDOWN_SECONDS : initialPrefs.autoplayCountdown)
   const [secondsLeft, setSecondsLeft] = useState(countdownSeconds)
   const [autoplay, setAutoplay] = useState(initialPrefs.autoplayNext)
   // Cinema mode: the picture fades in from black, and the controls leave when you are not using them, even while paused.
@@ -280,6 +285,7 @@ export function PlayerStage({
       },
       playing: () => {
         setEnded(false)
+        advanced.current = false
         setSecondsLeft(countdownSeconds)
         setCurtainUp(true)
         setBuffering(false)
@@ -508,17 +514,28 @@ export function PlayerStage({
     dismissed: upNextDismissed,
     autoplay,
     error: !!error,
+    flow,
   })
   const upNextVisible = phase !== 'hidden'
   const counting = phase === 'counting'
+  // A flow counts with the video itself (its last seconds); anything else counts on a clock once the title has ended.
+  const timed = counting && !flow
   useEffect(() => {
-    if (!counting) return
+    if (!timed) return
     const timer = setInterval(() => setSecondsLeft((n) => n - 1), 1000)
     return () => clearInterval(timer)
-  }, [counting])
+  }, [timed])
   useEffect(() => {
-    if (counting && secondsLeft <= 0) void goNext()
-  }, [counting, secondsLeft, goNext])
+    if (timed && secondsLeft <= 0) void goNext()
+  }, [timed, secondsLeft, goNext])
+  // The video ended and the next one follows: straight away (the end was already reported to the server when the video ended).
+  useEffect(() => {
+    if (!flow || !counting || !ended || advanced.current || !onNext) return
+    advanced.current = true
+    onNext()
+  }, [flow, counting, ended, onNext])
+  const flowSeconds = Math.min(FLOW_COUNTDOWN_SECONDS, Math.max(0, duration - currentTime))
+  const shownSeconds = flow ? Math.max(1, Math.ceil(flowSeconds)) : Math.max(0, secondsLeft)
 
   const changeAudio = useCallback(
     (index: number) => {
@@ -756,7 +773,7 @@ export function PlayerStage({
           <p className="truncate text-sm text-neutral-400">
             {(isEpisode(next) ? [next.seriesName, episodeCode(next)] : [next.year ? String(next.year) : '']).filter(Boolean).join(' · ')}
           </p>
-          {counting && <p className="mt-2 text-sm text-neutral-300">{t('Starting in {seconds}s', { seconds: Math.max(0, secondsLeft) })}</p>}
+          {counting && <p className="mt-2 text-sm text-neutral-300">{t('Starting in {seconds}s', { seconds: shownSeconds })}</p>}
           <div className="mt-3 flex gap-2">
             <button type="button" className="btn-primary flex-1 py-2" onClick={() => void goNext()}>
               {t('Play now')}
@@ -771,8 +788,12 @@ export function PlayerStage({
             <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
               <div
                 data-testid="countdown-bar"
-                className="h-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)] transition-[width] duration-1000 ease-linear motion-reduce:transition-none"
-                style={{ width: `${Math.max(0, Math.min(1, (secondsLeft - 1) / Math.max(1, countdownSeconds - 1))) * 100}%` }}
+                className={`h-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)] transition-[width] ease-linear motion-reduce:transition-none ${flow ? 'duration-300' : 'duration-1000'}`}
+                style={{
+                  width: `${
+                    (flow ? flowSeconds / FLOW_COUNTDOWN_SECONDS : Math.max(0, Math.min(1, (secondsLeft - 1) / Math.max(1, countdownSeconds - 1)))) * 100
+                  }%`,
+                }}
               />
             </div>
           )}

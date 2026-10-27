@@ -16,10 +16,16 @@ const tabs = (page: Page) => page.getByRole('navigation', { name: 'Sections' })
 const views = (page: Page) => page.getByRole('navigation', { name: 'Music video views' })
 const options = { movieCount: 3, musicVideos: 7, musicVideoFolders: 2 }
 
-/** Plays the video to its end (the test videos last 30 seconds). */
+/** Plays the video to its end (the test videos last 30 seconds): it ends, or, when another one follows, that one takes over. */
 async function finish(page: Page) {
+  const before = page.url()
   await clickSeekAt(page, 0.97)
-  await expect(video(page)).toHaveJSProperty('ended', true, { timeout: 15_000 })
+  await expect.poll(async () => page.url() !== before || (await video(page).evaluate((v: HTMLVideoElement) => v.ended)), { timeout: 15_000 }).toBe(true)
+}
+
+/** Jumps to a few seconds before the end, where the countdown to the next video begins. */
+async function nearEnd(page: Page) {
+  await clickSeekAt(page, 0.85)
 }
 
 const playing = (page: Page, title: string) => page.getByRole('region', { name: `Playing ${title}` })
@@ -63,12 +69,14 @@ test('play folder: the videos follow each other, with a short countdown, and the
   await expect(page).toHaveURL(/#\/play\/mv0001\?folder=mvf0001$/)
   await waitPlaying(page)
 
-  await finish(page)
+  await nearEnd(page)
   const upNext = page.getByRole('status', { name: 'Up next' })
   await expect(upNext).toContainText('Test Music Video 002')
-  await expect(upNext).toContainText(/Starting in [123]s/) // music videos are meant to flow: never more than 3 seconds
+  // The countdown runs over the last 3 seconds of the video, which is still playing, and the next one follows at once.
+  await expect(upNext).toContainText(/Starting in [123]s/)
+  expect(await video(page).evaluate((v: HTMLVideoElement) => v.ended)).toBe(false)
   await expect(playing(page, 'Test Music Video 002')).toBeVisible({ timeout: 15_000 })
-  await expect(page).toHaveURL(/#\/play\/mv0002\?folder=mvf0001$/) // still inside the folder
+  await expect(page).toHaveURL(/#\/play\/mv0002\?start=0&folder=mvf0001$/) // still inside the folder, from its start
   await waitPlaying(page)
 
   // The last video of the folder has nothing after it...
@@ -85,7 +93,7 @@ test('play folder: the videos follow each other, with a short countdown, and the
   await settings.getByLabel('Repeat the list').check()
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.player') ?? '{}').repeatQueue)).toBe(true)
   await page.keyboard.press('Escape')
-  await finish(page)
+  await nearEnd(page)
   await expect(page.getByRole('status', { name: 'Up next' })).toContainText('Test Music Video 001')
   await expect(playing(page, 'Test Music Video 001')).toBeVisible({ timeout: 15_000 })
 })
@@ -97,7 +105,7 @@ test('play folder: everything below it plays, folders first (the nested one befo
   await page.getByRole('button', { name: 'Play folder', exact: true }).click()
   await expect(page).toHaveURL(/#\/play\/mv0007\?folder=mvf0002$/)
   await waitPlaying(page)
-  await finish(page)
+  await nearEnd(page)
   await expect(page.getByRole('status', { name: 'Up next' })).toContainText('Test Music Video 005')
 })
 
@@ -134,7 +142,7 @@ test('a video played on its own goes on with the others of its folder', async ({
   await page.getByRole('button', { name: /^(Play|Resume from .*)$/ }).click()
   await expect(player(page)).toBeVisible()
   await waitPlaying(page)
-  await finish(page)
+  await nearEnd(page)
   await expect(page.getByRole('status', { name: 'Up next' })).toContainText('Test Music Video 006')
   await expect(playing(page, 'Test Music Video 006')).toBeVisible({ timeout: 15_000 })
   await waitPlaying(page)

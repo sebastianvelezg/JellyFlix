@@ -23,6 +23,22 @@ describe('upNextPhase', () => {
     expect(upNextPhase({ ...base, ended: true, error: true })).toBe('hidden')
   })
 
+  it('in a flow (music videos) counts down over the last seconds, before the video ends', () => {
+    const flow = { ...base, flow: true, durationSeconds: 200 }
+    expect(upNextPhase({ ...flow, durationSeconds: 60, remainingSeconds: 3.01 })).toBe('hidden') // a short video has no preview before that
+    expect(upNextPhase({ ...flow, remainingSeconds: 3.01 })).toBe('preview')
+    expect(upNextPhase({ ...flow, remainingSeconds: 3 })).toBe('counting')
+    expect(upNextPhase({ ...flow, remainingSeconds: 0.4 })).toBe('counting')
+    expect(upNextPhase({ ...flow, ended: true, remainingSeconds: 0 })).toBe('counting')
+    // Cancelled, off, last of its list or unknown length: no countdown.
+    expect(upNextPhase({ ...flow, remainingSeconds: 2, dismissed: true })).toBe('hidden')
+    expect(upNextPhase({ ...flow, remainingSeconds: 2, hasNext: false })).toBe('hidden')
+    expect(upNextPhase({ ...flow, remainingSeconds: 2, autoplay: false })).toBe('preview')
+    expect(upNextPhase({ ...flow, durationSeconds: 0, remainingSeconds: 0 })).toBe('hidden')
+    // Anything that is not a flow only counts once it has ended.
+    expect(upNextPhase({ ...base, remainingSeconds: 2 })).toBe('preview')
+  })
+
   it('does not sit on a short clip, or on a title whose length is not known yet', () => {
     expect(upNextPhase({ ...base, durationSeconds: 30, remainingSeconds: 10 })).toBe('hidden')
     expect(upNextPhase({ ...base, durationSeconds: 0, remainingSeconds: 0 })).toBe('hidden')

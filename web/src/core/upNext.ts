@@ -9,8 +9,14 @@ export const UP_NEXT_PREVIEW_SECONDS = 20
 export const UP_NEXT_MIN_RUNTIME_SECONDS = 90
 
 /**
- * hidden: no card. preview: near the end, with "Play now" only. counting: ended and autoplay is on, the countdown runs.
- * waiting: ended and autoplay is off, so the card just waits for you.
+ * Music videos flow into one another: the countdown runs over their last seconds (not after they end), and the next one starts the
+ * moment the video ends.
+ */
+export const FLOW_COUNTDOWN_SECONDS = 3
+
+/**
+ * hidden: no card. preview: near the end, with "Play now" only. counting: autoplay is on and the countdown runs (after the title
+ * ended, or, in a flow, over its last seconds). waiting: ended and autoplay is off, so the card just waits for you.
  */
 export type UpNextPhase = 'hidden' | 'preview' | 'counting' | 'waiting'
 
@@ -24,9 +30,12 @@ export function upNextPhase(state: {
   dismissed: boolean
   autoplay: boolean
   error: boolean
+  /** The next title follows without a pause (music videos): see {@link FLOW_COUNTDOWN_SECONDS}. */
+  flow?: boolean
 }): UpNextPhase {
   if (!state.hasNext || state.dismissed || state.error) return 'hidden'
   if (state.ended) return state.autoplay ? 'counting' : 'waiting'
+  if (state.flow && state.autoplay && state.durationSeconds > 0 && state.remainingSeconds <= FLOW_COUNTDOWN_SECONDS) return 'counting'
   const known = state.durationSeconds >= UP_NEXT_MIN_RUNTIME_SECONDS
   return known && state.remainingSeconds <= UP_NEXT_PREVIEW_SECONDS ? 'preview' : 'hidden'
 }
