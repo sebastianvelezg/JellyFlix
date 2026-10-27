@@ -5,7 +5,9 @@ import { startMockJellyfin, type MockServer } from '../../test/mock/mockJellyfin
 import { connect } from './auth'
 import {
   buildHomeLineup,
+  distinctSeeds,
   getBecauseYouWatched,
+  getRecommendations,
   getContinueAll,
   getFreshSeries,
   getHomePool,
@@ -18,7 +20,7 @@ import type { Session } from './jellyfin'
 import type { Movie } from './library'
 import { negotiatePlayback } from './playback'
 import { PlaybackSession } from './playbackSession'
-import { setWatched } from './details'
+import { setFavorite, setWatched } from './details'
 import { isEpisode } from './shows'
 
 let mock: MockServer
@@ -181,5 +183,60 @@ describe('because you watched', () => {
     const row = await getBecauseYouWatched(session)
     // The suggestions are m0004..m0006 for m0003 (still the last one played): m0005 is seen, which leaves too few for a row.
     expect(row).toBeNull()
+  })
+})
+
+describe('recommendations', () => {
+  it('keeps each seed once, with an episode standing for its series', () => {
+    const seeds = distinctSeeds([{ id: 's1', name: 'Show' }, { id: 'm1', name: 'Film' }, { id: 's1', name: 'Show' }])
+    expect(seeds.map((m) => m.id)).toEqual(['s1', 'm1'])
+  })
+
+  it('makes several rows from different titles, with one for a favourite, and no title twice', async () => {
+    const own = await startMockJellyfin({ movieCount: 30, seriesCount: 0 })
+    try {
+      const s = await connect(own.url, 'tester', 'secret')
+      for (const id of ['m0003', 'm0010', 'm0020']) {
+        const plan = await negotiatePlayback(s, id, { capabilities })
+        const playback = new PlaybackSession(s, plan, 10)
+        playback.playing(10, device)
+        await playback.stop(device)
+        await setWatched(s, id, true)
+      }
+      await setFavorite(s, 'm0025', true)
+      const rows = await getRecommendations(s)
+      // The last one watched, then the favourite, then the one watched before: alternating, so the rows do not look alike.
+      expect(rows.map((r) => [r.kind, r.seed.id])).toEqual([
+        ['watched', 'm0020'],
+        ['liked', 'm0025'],
+        ['watched', 'm0010'],
+      ])
+      expect(rows[0]?.items.map((m) => m.id)).toEqual(['m0021', 'm0022', 'm0023'])
+      expect(rows[1]?.items.map((m) => m.id)).toEqual(['m0026', 'm0027', 'm0028'])
+      const all = rows.flatMap((r) => r.items.map((m) => m.id))
+      expect(new Set(all).size).toBe(all.length)
+
+      // Without a favourite the rows are all about what was watched.
+      await setFavorite(s, 'm0025', false)
+      const plain = await getRecommendations(s)
+      expect(plain.map((r) => [r.kind, r.seed.id])).toEqual([
+        ['watched', 'm0020'],
+        ['watched', 'm0010'],
+        ['watched', 'm0003'],
+      ])
+      expect(await getRecommendations(s, { rows: 1 })).toHaveLength(1)
+    } finally {
+      await own.close()
+    }
+  })
+
+  it('has nothing to say before anything has been watched', async () => {
+    const fresh = await startMockJellyfin({ movieCount: 10, seriesCount: 0 })
+    try {
+      const s = await connect(fresh.url, 'tester', 'secret')
+      expect(await getRecommendations(s)).toEqual([])
+    } finally {
+      await fresh.close()
+    }
   })
 })

@@ -238,8 +238,11 @@ export {
 } from './collections'
 export {
   buildHomeLineup,
+  distinctSeeds,
   getAddedSince,
   getBecauseYouWatched,
+  getRecommendations,
+  RECOMMENDATION_ROWS,
   getContinueAll,
   getFreshSeries,
   getHomePool,
@@ -249,6 +252,8 @@ export {
   newestFirst,
   type BecauseYouWatched,
   type FreshSeries,
+  type Recommendation,
+  type RecommendationKind,
 } from './home'
 export * from './lyrics'
 export * from './subtitleSearch'

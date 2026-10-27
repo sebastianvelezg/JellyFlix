@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react'
 import {
   buildHomeLineup,
-  getBecauseYouWatched,
+  getRecommendations,
   getContinueAll,
   getHomePool,
   getLatestTitles,
@@ -363,7 +363,7 @@ function NextUpRow({
   )
 }
 
-/** "Because you watched X": what the server finds similar to the last thing you finished. */
+/** Rows of suggestions: "Because you watched X" for a few of the last things you finished, and "Because you liked X" for a favourite. */
 function BecauseRow({
   session,
   playbackVersion,
@@ -377,16 +377,19 @@ function BecauseRow({
   onOpenMovie: (movie: Movie) => void
   onOpenShow: (show: Movie) => void
 }) {
-  const load = useCallback(() => getBecauseYouWatched(session).then((row) => ({ row, playbackVersion })), [session, playbackVersion])
+  const load = useCallback(() => getRecommendations(session).then((rows) => ({ rows, playbackVersion })), [session, playbackVersion])
   const { state } = useSwr(swrKey(swrScope(session), 'home', 'because'), load, { fresh: 5 * 60_000 })
-  if (state.status !== 'ready' || !state.data.row) return null
-  const { seed, items } = state.data.row
+  if (state.status !== 'ready' || state.data.rows.length === 0) return null
   return (
-    <Row title={t('Because you watched {title}', { title: seed.name })}>
-      {items.map((m) => (
-        <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={m.isSeries ? onOpenShow : onOpenMovie} />
+    <>
+      {state.data.rows.map(({ kind, seed, items }) => (
+        <Row key={`${kind}-${seed.id}`} title={kind === 'liked' ? t('Because you liked {title}', { title: seed.name }) : t('Because you watched {title}', { title: seed.name })}>
+          {items.map((m) => (
+            <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={m.isSeries ? onOpenShow : onOpenMovie} />
+          ))}
+        </Row>
       ))}
-    </Row>
+    </>
   )
 }
 

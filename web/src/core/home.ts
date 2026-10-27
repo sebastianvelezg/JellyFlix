@@ -214,3 +214,110 @@ export async function getBecauseYouWatched(session: Session, limit = 16): Promis
   const items = similar.filter((m) => !m.played && m.id !== seed.id).slice(0, limit)
   return items.length >= 3 ? { seed, items } : null
 }
+
+// ---- several rows of suggestions ----------------------------------------------------------------------------------
+
+/** Why a row of suggestions is shown: you watched its seed, or you marked it as a favourite. */
+export type RecommendationKind = 'watched' | 'liked'
+
+export interface Recommendation {
+  kind: RecommendationKind
+  /** The movie or series the suggestions are based on. */
+  seed: Movie
+  items: Movie[]
+}
+
+/** How many rows of suggestions the main page shows at most. */
+export const RECOMMENDATION_ROWS = 3
+/** Fewer suggestions than this are not worth a row. */
+const MIN_SUGGESTIONS = 3
+
+/** What you watched, newest first, as movies and series (an episode stands for its series), each once. Pure. */
+export function distinctSeeds(played: ReadonlyArray<Pick<Movie, 'id' | 'name'> & Partial<Movie>>): Movie[] {
+  const seen = new Set<string>()
+  const seeds: Movie[] = []
+  for (const item of played) {
+    if (seen.has(item.id)) continue
+    seen.add(item.id)
+    seeds.push({ resumeTicks: 0, played: true, favorite: false, ...item })
+  }
+  return seeds
+}
+
+/**
+ * Rows of suggestions made from different starting points: a few of the titles you finished most recently and one of your
+ * favourites, each with what the server finds similar, without what you have seen and without a title that already shows in
+ * an earlier row. The order alternates (watched, liked, watched) so the rows do not all look alike. Empty when there is nothing
+ * to go on (nothing watched yet).
+ */
+export async function getRecommendations(
+  session: Session,
+  opts: { rows?: number; limit?: number; random?: () => number } = {},
+): Promise<Recommendation[]> {
+  const { rows = RECOMMENDATION_ROWS, limit = 16, random = Math.random } = opts
+  const api = getLibraryApi(session.api)
+  const [playedResult, favoriteResult] = await Promise.allSettled([
+    api.getItems({
+      userId: session.userId,
+      includeItemTypes: [BaseItemKind.Movie, BaseItemKind.Episode],
+      recursive: true,
+      filters: [ItemFilter.IsPlayed],
+      sortBy: [ItemSortBy.DatePlayed],
+      sortOrder: [SortOrder.Descending],
+      limit: 40,
+      enableImages: true,
+      enableImageTypes: [ImageType.Primary, ImageType.Backdrop],
+      enableUserData: true,
+    }),
+    api.getItems({
+      userId: session.userId,
+      includeItemTypes: [BaseItemKind.Movie, BaseItemKind.Series],
+      recursive: true,
+      filters: [ItemFilter.IsFavorite],
+      sortBy: [ItemSortBy.Random],
+      limit: 6,
+      enableImages: true,
+      enableUserData: true,
+    }),
+  ])
+  const playedItems = playedResult.status === 'fulfilled' ? (playedResult.value.data.Items ?? []) : []
+  const watchedSeeds = distinctSeeds(
+    playedItems.flatMap((dto): Array<Pick<Movie, 'id' | 'name'> & Partial<Movie>> => {
+      const episode = toEpisode(dto)
+      if (episode) return [{ id: episode.seriesId, name: episode.seriesName, isSeries: true }]
+      const movie = toMovie(dto)
+      return movie ? [movie] : []
+    }),
+  )
+  if (watchedSeeds.length === 0) return []
+  const used = new Set(watchedSeeds.map((s) => s.id))
+  const favoriteDtos = favoriteResult.status === 'fulfilled' ? (favoriteResult.value.data.Items ?? []) : []
+  const likedSeeds = shuffle(favoriteDtos.map(toMovie).filter((m): m is Movie => m !== null), random)
+    .filter((m) => !watchedSeeds.slice(0, rows + 2).some((w) => w.id === m.id))
+    .slice(0, 3)
+
+  const similarTo = (seed: Movie) =>
+    (seed.isSeries ? getSimilarShows(session, seed.id, limit + 8) : getSimilarMovies(session, seed.id, limit + 8)).catch(() => [] as Movie[])
+  const [watchedLists, likedLists] = await Promise.all([
+    Promise.all(watchedSeeds.slice(0, rows + 2).map(similarTo)),
+    Promise.all(likedSeeds.map(similarTo)),
+  ])
+  const take = (seed: Movie, similar: Movie[], kind: RecommendationKind): Recommendation | null => {
+    const items = similar.filter((m) => !m.played && m.id !== seed.id && !used.has(m.id)).slice(0, limit)
+    if (items.length < MIN_SUGGESTIONS) return null
+    for (const m of items) used.add(m.id)
+    return { kind, seed, items }
+  }
+
+  const liked = likedSeeds.map((seed, i) => ({ seed, similar: likedLists[i] ?? [] }))
+  // One row is for a favourite when there is one to use; the rest are for what you watched.
+  const likedRow = liked.map((l) => take(l.seed, l.similar, 'liked')).find((r): r is Recommendation => r !== null)
+  const watchedRows: Recommendation[] = []
+  for (const [i, seed] of watchedSeeds.slice(0, rows + 2).entries()) {
+    if (watchedRows.length >= rows - (likedRow ? 1 : 0)) break
+    const row = take(seed, watchedLists[i] ?? [], 'watched')
+    if (row) watchedRows.push(row)
+  }
+  const [first, ...rest] = watchedRows
+  return [first, likedRow, ...rest].filter((r): r is Recommendation => !!r)
+}
