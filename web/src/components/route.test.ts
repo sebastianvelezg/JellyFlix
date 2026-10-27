@@ -31,6 +31,8 @@ describe('routes', () => {
     { page: 'play', id: 'abc123', startOver: false },
     { page: 'play', id: 'abc123', startOver: true },
     { page: 'play', id: 'abc123', startOver: false, startAt: 754 },
+    { page: 'play', id: 'abc123', startOver: false, listId: 'vp0001' },
+    { page: 'play', id: 'abc123', startOver: false, collectionId: 'bx0001' },
   ]
   it.each(cases)('round-trips %j', (route) => {
     expect(parseRoute(formatRoute(route))).toEqual(route)

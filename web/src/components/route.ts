@@ -19,7 +19,7 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/book/<id>         book page (read it, listen to it, download it); #/read/<id> the reader
  *   #/person/<id>?name= a person's filmography
  *   #/play/<id>         player (add ?start=0 to start over instead of resuming, or ?start=<seconds> to begin there;
- *                       ?list=<playlist id> goes on to the next title of that playlist when this one ends)
+ *                       ?list=<playlist id> or ?collection=<collection id> goes on to the next title of it when this one ends)
  */
 export const MUSIC_TABS = ['home', 'albums', 'artists', 'songs', 'playlists'] as const
 export type MusicTab = (typeof MUSIC_TABS)[number]
@@ -46,7 +46,7 @@ export type Route =
   | { page: 'read'; id: string }
   | { page: 'live'; id: string }
   | { page: 'person'; id: string; name: string }
-  | { page: 'play'; id: string; startOver: boolean; startAt?: number; listId?: string }
+  | { page: 'play'; id: string; startOver: boolean; startAt?: number; listId?: string; collectionId?: string }
 
 export function formatRoute(route: Route): string {
   switch (route.page) {
@@ -94,6 +94,7 @@ export function formatRoute(route: Route): string {
       if (route.startAt) params.set('start', String(Math.round(route.startAt)))
       else if (route.startOver) params.set('start', '0')
       if (route.listId) params.set('list', route.listId)
+      if (route.collectionId) params.set('collection', route.collectionId)
       const query = params.toString()
       return `#/play/${encodeURIComponent(route.id)}${query ? `?${query}` : ''}`
     }
@@ -131,6 +132,7 @@ export function parseRoute(hash: string): Route {
       const params = new URLSearchParams(query)
       const start = params.get('start')
       const listId = params.get('list')
+      const collectionId = params.get('collection')
       const seconds = start === null ? NaN : Number(start)
       return {
         page: 'play',
@@ -138,6 +140,7 @@ export function parseRoute(hash: string): Route {
         startOver: start === '0',
         ...(Number.isFinite(seconds) && seconds > 0 ? { startAt: seconds } : {}),
         ...(listId ? { listId } : {}),
+        ...(collectionId ? { collectionId } : {}),
       }
     }
   } catch {

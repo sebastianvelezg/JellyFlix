@@ -25,9 +25,11 @@ import {
   audiobookStart,
   audiobookTrack,
   getLibrarySections,
+  getCollectionItems,
   getNextEpisode,
   getPlayable,
   getPlaylistEntries,
+  nextInCollection,
   getSeriesPlayTarget,
   isEpisode,
   logout,
@@ -530,7 +532,7 @@ function Shell({
               session={session}
               id={route.id}
               overrides={overrides}
-              onPlay={play}
+              onPlay={(item) => go({ page: 'play', id: item.id, startOver: false, collectionId: route.id })}
               onOpen={openMovie}
               onBack={() => back({ page: 'collections' })}
             />
@@ -677,13 +679,14 @@ function Shell({
       {route.page === 'play' && (
         <Suspense fallback={<PlayerLoading />}>
           <PlayerRoute
-            key={`${route.id}:${route.startOver}:${route.startAt ?? ''}:${route.listId ?? ''}`}
+            key={`${route.id}:${route.startOver}:${route.startAt ?? ''}:${route.listId ?? ''}:${route.collectionId ?? ''}`}
             session={session}
             id={route.id}
             startOver={route.startOver}
             startAt={route.startAt}
             listId={route.listId}
-            onNextEpisode={(following) => go({ page: 'play', id: following.id, startOver: false, listId: route.listId }, { replace: true })}
+            collectionId={route.collectionId}
+            onNextEpisode={(following) => go({ page: 'play', id: following.id, startOver: false, listId: route.listId, collectionId: route.collectionId }, { replace: true })}
             onExit={(item) =>
               back(item && isEpisode(item) ? { page: 'show', id: item.seriesId } : { page: 'movie', id: route.id })
             }
@@ -709,6 +712,7 @@ function PlayerRoute({
   startOver,
   startAt,
   listId,
+  collectionId,
   onNextEpisode,
   onExit,
 }: {
@@ -717,6 +721,8 @@ function PlayerRoute({
   startOver: boolean
   /** Playing a playlist: what follows is its next title, not the next episode of a series. */
   listId?: string
+  /** Playing a collection (a saga): what follows is its next title. */
+  collectionId?: string
   /** Seconds to begin at, when another device handed its playback over. */
   startAt?: number
   onNextEpisode: (next: Movie) => void
@@ -741,6 +747,12 @@ function PlayerRoute({
               if (!cancelled && at >= 0) setNext(entries[at + 1]?.item ?? null)
             })
             .catch(() => undefined)
+        } else if (collectionId) {
+          getCollectionItems(session, collectionId)
+            .then((items) => {
+              if (!cancelled) setNext(nextInCollection(items, found.id))
+            })
+            .catch(() => undefined)
         } else if (isEpisode(found)) {
           getNextEpisode(session, found)
             .then((following) => {
@@ -755,7 +767,7 @@ function PlayerRoute({
     return () => {
       cancelled = true
     }
-  }, [session, id, listId])
+  }, [session, id, listId, collectionId])
 
   if (failed) {
     return (

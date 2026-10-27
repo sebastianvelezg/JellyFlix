@@ -22,6 +22,10 @@ export interface PlayerPrefs {
   subtitleLanguage: string | null
   /** Start the next episode on its own when one ends. */
   autoplayNext: boolean
+  /** How many seconds the "Up next" countdown runs before the next title starts by itself. */
+  autoplayCountdown: number
+  /** Cinema mode: the picture fades in from black, the controls get out of the way sooner and also while paused. */
+  cinemaMode: boolean
   /** The most the video may stream at, in megabits per second; 0 is no limit (the original quality). */
   maxBitrateMbps: number
 }
@@ -40,6 +44,9 @@ export interface BrowsePrefs {
   advanced?: AdvancedFilters
 }
 
+/** How long the "Up next" countdown can run, in seconds. */
+export const COUNTDOWN_CHOICES = [3, 5, 8, 10, 15] as const
+
 /** The limits the player offers, in megabits per second (0 = original quality). */
 export const QUALITY_CHOICES = [0, 40, 20, 10, 8, 4, 2] as const
 
@@ -55,6 +62,8 @@ const PLAYER_DEFAULTS: PlayerPrefs = {
   subtitlePosition: 'low',
   subtitleLanguage: null,
   autoplayNext: true,
+  autoplayCountdown: 8,
+  cinemaMode: false,
   maxBitrateMbps: 0,
 }
 const BROWSE_DEFAULTS: BrowsePrefs = { sort: 'title', filter: 'all' }
@@ -87,6 +96,8 @@ export function readPlayerPrefs(): PlayerPrefs {
     subtitlePosition: SUBTITLE_POSITIONS.includes(p.subtitlePosition) ? p.subtitlePosition : 'low',
     subtitleLanguage: typeof p.subtitleLanguage === 'string' ? p.subtitleLanguage : null,
     autoplayNext: p.autoplayNext !== false,
+    autoplayCountdown: (COUNTDOWN_CHOICES as readonly number[]).includes(p.autoplayCountdown) ? p.autoplayCountdown : 8,
+    cinemaMode: p.cinemaMode === true,
     maxBitrateMbps: (QUALITY_CHOICES as readonly number[]).includes(p.maxBitrateMbps) ? p.maxBitrateMbps : 0,
   }
 }

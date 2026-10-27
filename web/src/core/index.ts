@@ -224,6 +224,7 @@ export {
 export {
   collectionBackdropUrl,
   collectionPlayTarget,
+  nextInCollection,
   COLLECTION_SORT_LABELS,
   collectionPosterUrl,
   getCollection,
@@ -251,6 +252,7 @@ export {
 } from './home'
 export * from './lyrics'
 export * from './subtitleSearch'
+export * from './upNext'
 export {
   findPlugin,
   getPlugins,

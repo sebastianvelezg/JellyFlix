@@ -1300,6 +1300,11 @@ export const es: Record<string, string> = {
   'Japanese': 'Japonés',
   'Korean': 'Coreano',
   'Chinese': 'Chino',
+  'When an episode, or a title of a playlist or collection, ends, the next one starts after a short countdown.': 'Cuando termina un episodio, o un título de una lista o colección, el siguiente empieza tras una breve cuenta regresiva.',
+  'Countdown before the next title': 'Cuenta regresiva antes del siguiente título',
+  '{seconds} seconds': '{seconds} segundos',
+  'Cinema mode': 'Modo cine',
+  'The picture fades in from black and the controls get out of the way sooner, even while paused. You can also switch it in the player.': 'La imagen aparece desde negro y los controles se ocultan antes, incluso en pausa. También puedes activarlo desde el reproductor.',
 }
 
 /** Messages with numbers or names in them, written once as a pattern. `$1` is the first captured part. */

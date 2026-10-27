@@ -122,6 +122,8 @@ export interface ControlsProps {
   trickplay?: TrickplayPreview | null
   /** Present when the browser can float the video in its own window. */
   pictureInPicture?: { active: boolean; onToggle: () => void }
+  /** The cinema mode switch of the settings menu. */
+  cinemaMode?: { enabled: boolean; onChange: (enabled: boolean) => void }
   /** Present when there is a next episode: adds the autoplay switch to the settings menu. */
   autoplayNext?: { enabled: boolean; onChange: (enabled: boolean) => void }
 }
@@ -492,6 +494,17 @@ function SettingsMenu(p: ControlsProps) {
                 </button>
               ))}
             </fieldset>
+          )}
+          {p.cinemaMode && (
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-neutral-200 transition hover:bg-white/10">
+              <input
+                type="checkbox"
+                checked={p.cinemaMode.enabled}
+                onChange={(e) => p.cinemaMode?.onChange(e.target.checked)}
+                className="shrink-0 accent-[var(--color-accent)]"
+              />
+              {t('Cinema mode')}
+            </label>
           )}
           {p.autoplayNext && (
             <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-neutral-200 transition hover:bg-white/10">

@@ -7,6 +7,7 @@ import {
   defaultSearchLanguage,
   PlaybackSession,
   playbackTitle,
+  upNextPhase,
   describePlayback,
   retryRequest,
   stepOffset,
@@ -43,11 +44,15 @@ import { getLanguage, t } from '../../i18n'
 import { offsetLabel } from '../offsetLabel'
 
 const HIDE_CONTROLS_MS = 3000
+/** In cinema mode the controls get out of the way sooner. */
+const HIDE_CONTROLS_CINEMA_MS = 1800
 const PROGRESS_INTERVAL_MS = 10_000
 const STOP_TIMEOUT_MS = 2000
 const SKIP_SECONDS = 10
-/** After an episode ends, the next one starts by itself after this many seconds. */
-const UP_NEXT_SECONDS = 8
+/** How long the picture takes to fade in from black (and out at the very end) in cinema mode. */
+const CURTAIN_MS = 1400
+/** The fade out starts this long before the end. */
+const CURTAIN_OUT_SECONDS = 1.5
 
 function mediaErrorMessage(error: MediaError): string {
   switch (error.code) {
@@ -122,6 +127,8 @@ export function PlayerStage({
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // The latest `poke` (shows the controls for a moment), for the video's own event handlers.
+  const pokeRef = useRef<() => void>(() => undefined)
   const attachedRef = useRef<Attached | null>(null)
   const lastSubtitle = useRef<number | null>(null)
 
@@ -156,8 +163,13 @@ export function PlayerStage({
   // Up next: set when an episode finishes; counts down, then starts the next episode.
   const [ended, setEnded] = useState(false)
   const [upNextDismissed, setUpNextDismissed] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState(UP_NEXT_SECONDS)
+  // After a title ends the next one starts by itself once this many seconds have counted down (chosen in Settings).
+  const [countdownSeconds] = useState(initialPrefs.autoplayCountdown)
+  const [secondsLeft, setSecondsLeft] = useState(countdownSeconds)
   const [autoplay, setAutoplay] = useState(initialPrefs.autoplayNext)
+  // Cinema mode: the picture fades in from black, and the controls leave when you are not using them, even while paused.
+  const [cinema, setCinema] = useState(initialPrefs.cinemaMode)
+  const [curtainUp, setCurtainUp] = useState(false)
   const [pip, setPip] = useState(false)
   const canPip = typeof document !== 'undefined' && document.pictureInPictureEnabled === true
 
@@ -259,10 +271,13 @@ export function PlayerStage({
       pause: () => {
         setPaused(true)
         playback.stateChanged(video.currentTime, device())
+        // Cinema mode: the controls show for a moment after pausing, then leave (see `poke`, which is set further down).
+        pokeRef.current()
       },
       playing: () => {
         setEnded(false)
-        setSecondsLeft(UP_NEXT_SECONDS)
+        setSecondsLeft(countdownSeconds)
+        setCurtainUp(true)
         setBuffering(false)
         playback.playing(video.currentTime, device())
       },
@@ -329,7 +344,7 @@ export function PlayerStage({
       // Covers unmounting for any reason (audio switch, sign-out). A no-op if already stopped.
       void playback.stop(device())
     }
-  }, [playback, device, plan, fallback, onRequest])
+  }, [playback, device, plan, fallback, onRequest, countdownSeconds])
 
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement === containerRef.current)
@@ -345,8 +360,11 @@ export function PlayerStage({
   const poke = useCallback(() => {
     setAwake(true)
     if (hideTimer.current) clearTimeout(hideTimer.current)
-    hideTimer.current = setTimeout(() => setAwake(false), HIDE_CONTROLS_MS)
-  }, [])
+    hideTimer.current = setTimeout(() => setAwake(false), cinema ? HIDE_CONTROLS_CINEMA_MS : HIDE_CONTROLS_MS)
+  }, [cinema])
+  useEffect(() => {
+    pokeRef.current = poke
+  }, [poke])
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current
@@ -477,8 +495,18 @@ export function PlayerStage({
     else seek(segment.endSeconds)
   }, [segment, next, goNext, seek])
 
-  const upNextVisible = ended && !!next && !upNextDismissed && !error
-  const counting = upNextVisible && autoplay
+  // Near the end the card shows what follows; once the title ends it counts down (when autoplay is on) and moves on.
+  const phase = upNextPhase({
+    hasNext: !!next,
+    ended,
+    remainingSeconds: duration - currentTime,
+    durationSeconds: duration,
+    dismissed: upNextDismissed,
+    autoplay,
+    error: !!error,
+  })
+  const upNextVisible = phase !== 'hidden'
+  const counting = phase === 'counting'
   useEffect(() => {
     if (!counting) return
     const timer = setInterval(() => setSecondsLeft((n) => n - 1), 1000)
@@ -601,7 +629,11 @@ export function PlayerStage({
     }
   }
 
-  const controlsVisible = paused || awake || menuOpen || !!error
+  // Cinema mode lets go of the "paused means controls" rule: they come back with the mouse, a key or a tap.
+  const controlsVisible = (!cinema && paused) || awake || menuOpen || !!error
+  // The black curtain: closed until playback starts, and closing again in the last moments of the title.
+  const curtainDown =
+    cinema && (!curtainUp || ended || (!paused && duration > 0 && duration - currentTime < CURTAIN_OUT_SECONDS))
   const showSpinner = buffering && !error
 
   return (
@@ -628,6 +660,16 @@ export function PlayerStage({
       </video>
 
       <SubtitleOverlay videoRef={videoRef} trackUrl={subtitleUrl} lifted={controlsVisible} style={subtitleStyle} offset={subtitleOffset} />
+
+      {cinema && (
+        <div
+          aria-hidden="true"
+          data-testid="curtain"
+          data-down={curtainDown}
+          className="pointer-events-none absolute inset-0 bg-black transition-opacity ease-in-out motion-reduce:transition-none"
+          style={{ opacity: curtainDown ? 1 : 0, transitionDuration: `${CURTAIN_MS}ms` }}
+        />
+      )}
 
       {syncNote && (
         <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
@@ -703,7 +745,7 @@ export function PlayerStage({
         <div
           role="status"
           aria-label={t('Up next')}
-          className="absolute bottom-28 right-4 z-20 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-white/10 bg-black/80 p-4 shadow-[0_24px_70px_-10px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:right-6"
+          className="absolute bottom-28 right-4 z-20 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/10 bg-black/80 p-4 shadow-[0_24px_70px_-10px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:right-6"
         >
           <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)]">{t('Up next')}</p>
           <p className="mt-1 truncate font-medium text-white">{next.name}</p>
@@ -715,12 +757,21 @@ export function PlayerStage({
             <button type="button" className="btn-primary flex-1 py-2" onClick={() => void goNext()}>
               {t('Play now')}
             </button>
-            {counting && (
+            {(counting || phase === 'preview') && (
               <button type="button" className="btn py-2" onClick={() => setUpNextDismissed(true)}>
-                {t('Cancel')}
+                {counting ? t('Cancel') : t('Close')}
               </button>
             )}
           </div>
+          {counting && (
+            <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
+              <div
+                data-testid="countdown-bar"
+                className="h-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)] transition-[width] duration-1000 ease-linear motion-reduce:transition-none"
+                style={{ width: `${Math.max(0, Math.min(1, (secondsLeft - 1) / Math.max(1, countdownSeconds - 1))) * 100}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -775,6 +826,13 @@ export function PlayerStage({
         trickplay={trickplay}
         pictureInPicture={canPip ? { active: pip, onToggle: togglePip } : undefined}
         nextEpisode={next ? { label: `${isEpisode(next) ? episodeCode(next) : ''} ${next.name}`.trim(), onPlay: () => void goNext() } : undefined}
+        cinemaMode={{
+          enabled: cinema,
+          onChange: (on) => {
+            setCinema(on)
+            writePlayerPrefs({ cinemaMode: on })
+          },
+        }}
         autoplayNext={next ? { enabled: autoplay, onChange: (on) => {
           setAutoplay(on)
           writePlayerPrefs({ autoplayNext: on })

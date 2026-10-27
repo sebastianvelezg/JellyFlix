@@ -4,6 +4,7 @@ import {
   clearBrowsePrefs,
   clearSeriesPrefs,
   countSeriesPrefs,
+  COUNTDOWN_CHOICES,
   QUALITY_CHOICES,
   readPlayerPrefs,
   readUiPrefs,
@@ -271,9 +272,33 @@ export function SettingsPage({
         <Card title={t('Playback')} description={t('Applies to everything you watch on this device.')}>
           <Toggle
             label={t('Play the next episode automatically')}
-            hint={t('When an episode ends, the next one starts after a few seconds.')}
+            hint={t('When an episode, or a title of a playlist or collection, ends, the next one starts after a short countdown.')}
             checked={player.autoplayNext}
             onChange={(autoplayNext) => updatePlayer({ autoplayNext })}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label htmlFor="autoplay-countdown" className="text-sm font-medium text-neutral-100">
+              {t('Countdown before the next title')}
+            </label>
+            <select
+              id="autoplay-countdown"
+              className="select"
+              value={player.autoplayCountdown}
+              disabled={!player.autoplayNext}
+              onChange={(e) => updatePlayer({ autoplayCountdown: Number(e.target.value) })}
+            >
+              {COUNTDOWN_CHOICES.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {t('{seconds} seconds', { seconds })}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Toggle
+            label={t('Cinema mode')}
+            hint={t('The picture fades in from black and the controls get out of the way sooner, even while paused. You can also switch it in the player.')}
+            checked={player.cinemaMode}
+            onChange={(cinemaMode) => updatePlayer({ cinemaMode })}
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <label htmlFor="subtitle-size" className="text-sm font-medium text-neutral-100">

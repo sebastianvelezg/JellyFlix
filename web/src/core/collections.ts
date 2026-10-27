@@ -115,6 +115,13 @@ export function collectionPlayTarget<T extends Pick<Movie, 'played' | 'resumeTic
   return playable.find((m) => m.resumeTicks > 0) ?? playable.find((m) => !m.played) ?? playable[0]
 }
 
+/** The title that follows `currentId` in a collection (a series is not played through, so it is skipped); null after the last one. Pure. */
+export function nextInCollection<T extends Pick<Movie, 'id' | 'isSeries'>>(items: readonly T[], currentId: string): T | null {
+  const at = items.findIndex((m) => m.id === currentId)
+  if (at < 0) return null
+  return items.slice(at + 1).find((m) => !m.isSeries) ?? null
+}
+
 /** Collections whose name matches the text (for search). */
 export async function searchCollections(session: Session, term: string, limit = 12): Promise<Collection[]> {
   if (!term.trim()) return []
