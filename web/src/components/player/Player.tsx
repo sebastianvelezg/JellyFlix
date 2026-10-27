@@ -22,6 +22,8 @@ import { loadSubtitleFile } from '../../platform/web/browser'
 import { lockPageScroll } from '../../platform/web/scrollLock'
 import { detectCapabilities } from '../../platform/web/capabilities'
 import { readPlayerPrefs, readSeriesPrefs, writePlayerPrefs, writeSeriesPrefs } from '../../platform/web/prefs'
+import { CloseIcon } from '../icons'
+import { DockNotice, DOCK_BUTTON } from './dock'
 import { PlayerStage } from './PlayerStage'
 import { t } from '../../i18n'
 
@@ -50,6 +52,10 @@ export function Player({
   onNext,
   repeat,
   onExit,
+  mini = false,
+  onClose,
+  onExpand,
+  onPlaying,
 }: {
   session: Session
   /** A fresh copy of the title (its resume position is used to start). An episode gets series features. */
@@ -64,6 +70,14 @@ export function Player({
   /** Present when this is part of a queue: the choice to play it again from the start after the last title. */
   repeat?: { enabled: boolean; onChange: (enabled: boolean) => void }
   onExit: () => void
+  /** A bar at the bottom of the page instead of the whole screen (a music video that was left with Back, still playing). */
+  mini?: boolean
+  /** Stop and take the mini bar away. */
+  onClose?: () => void
+  /** Bring the video back full screen. */
+  onExpand?: () => void
+  /** The video started playing. */
+  onPlaying?: () => void
 }) {
   const [request, setRequest] = useState<Request>({ nonce: 0 })
   const [state, setState] = useState<State>({ status: 'loading' })
@@ -122,8 +136,8 @@ export function Player({
     }
   }, [session, movie.id])
 
-  // The page behind the player stops scrolling for as long as it is open.
-  useEffect(() => lockPageScroll(), [])
+  // The page behind the player stops scrolling for as long as it is open (not while it is a bar at the bottom of the page).
+  useEffect(() => (mini ? undefined : lockPageScroll()), [mini])
 
   useEffect(() => {
     let cancelled = false
@@ -246,7 +260,30 @@ export function Player({
         }}
         onRequest={requestStream}
         onExit={onExit}
+        mini={mini}
+        onClose={onClose}
+        onExpand={onExpand}
+        onPlaying={onPlaying}
       />
+    )
+  }
+
+  // The bar has no room for a spinner screen or a message page: it says the same in a line, and does not cover the page.
+  if (mini) {
+    return (
+      <DockNotice
+        title={playbackTitle(movie)}
+        text={state.status === 'loading' ? t('Preparing “{title}”…', { title: playbackTitle(movie) }) : state.message}
+      >
+        {state.status === 'error' && (
+          <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={retry}>
+            {t('Try again')}
+          </button>
+        )}
+        <button type="button" aria-label={t('Close the video player')} title={t('Close')} onClick={onClose} className={DOCK_BUTTON}>
+          <CloseIcon />
+        </button>
+      </DockNotice>
     )
   }
 
@@ -271,7 +308,15 @@ export function Player({
             <button type="button" className="btn-primary" onClick={retry}>
               {t('Try again')}
             </button>
-            <button type="button" className="btn" onClick={onExit}>
+            {/* A video that could not be played is not kept in the bar: leaving here closes it (onClose comes after onExit, so it wins). */}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                onExit()
+                onClose?.()
+              }}
+            >
               {t('Back')}
             </button>
           </div>

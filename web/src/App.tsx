@@ -18,7 +18,9 @@ import { RemoteProvider } from './components/remote/RemoteProvider'
 import { MusicProvider, useMusic, useMusicState } from './components/music/MusicProvider'
 import { OfflineBanner } from './components/OfflineBanner'
 import { PersonPage } from './components/PersonPage'
-import { formatRoute, useRoute, type MusicTab, type Navigate, type PlayQueueRef, type Route } from './components/route'
+import { formatRoute, useRoute, type MusicTab, type Navigate, type PlayQueueRef, type PlayRoute, type Route } from './components/route'
+import { CloseIcon } from './components/icons'
+import { DockNotice, DOCK_BUTTON } from './components/player/dock'
 import { readPlayerPrefs, writePlayerPrefs } from './platform/web/prefs'
 import { SearchPage } from './components/SearchPage'
 import { useLanguage } from './components/useLanguage'
@@ -347,11 +349,23 @@ function Shell({
 
   // Music: the music player keeps going between pages, and gives way to the video player.
   const music = useMusic()
-  const queued = useMusicState().queue !== null
+  const musicState = useMusicState()
+  const queued = musicState.queue !== null
   const playingVideo = route.page === 'play'
   useEffect(() => {
     if (playingVideo) music.pause()
   }, [playingVideo, music])
+
+  // A music video left with Back goes on playing in a bar at the bottom of the page (like the music) while you look for another one.
+  // The bar is the same player, not a new one: it is told to be small, so the video never stops.
+  const [docked, setDocked] = useState<PlayRoute | null>(null)
+  // Opening another video full screen takes the place of the one in the bar.
+  if (route.page === 'play' && docked && playKey(docked) !== playKey(route)) setDocked(null)
+  const video: PlayRoute | null = route.page === 'play' ? route : docked
+  const mini = route.page !== 'play'
+  const barShown = mini && !!video
+  // A song starting while a video waits in the bar takes its place (the music's own bar comes back).
+  if (barShown && musicState.status === 'playing') setDocked(null)
 
   // The music home is kept (hidden) once visited, like the other homes, remembering its tab; its "recently played"
   // lists are read again each time it is opened.
@@ -455,7 +469,7 @@ function Shell({
         onSignOut={onSignOut}
       />
       <OfflineBanner />
-      <main ref={mainRef} id="main" tabIndex={-1} className={`gutter-x pt-[var(--header-h)] outline-none ${queued ? 'pb-[calc(10rem+var(--nav-h))]' : 'pb-[calc(5rem+var(--nav-h))]'}`}>
+      <main ref={mainRef} id="main" tabIndex={-1} className={`gutter-x pt-[var(--header-h)] outline-none ${queued || barShown ? 'pb-[calc(10rem+var(--nav-h))]' : 'pb-[calc(5rem+var(--nav-h))]'}`}>
         {homeSeen && hasHome && sections.status === 'ready' && (
           <div hidden={!onHome}>
             <HomePage
@@ -692,7 +706,7 @@ function Shell({
           go(tab === 'home' ? { page: 'home' } : tab === 'music' ? { page: 'music', tab: musicTab } : sectionRoute(tab))
         }
       />
-      <MiniPlayer session={session} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
+      <MiniPlayer session={session} onOpenAlbum={openAlbum} onOpenArtist={openArtist} hidden={barShown} />
       {route.page === 'live' && (
         <Suspense fallback={<PlayerLoading />}>
           <LivePlayer
@@ -709,22 +723,32 @@ function Shell({
           <BookReader key={route.id} session={session} id={route.id} onExit={() => back({ page: 'book', id: route.id })} />
         </Suspense>
       )}
-      {route.page === 'play' && (
-        <Suspense fallback={<PlayerLoading />}>
+      {video && (
+        <Suspense fallback={mini ? null : <PlayerLoading />}>
           <PlayerRoute
-            key={`${route.id}:${route.startOver}:${route.startAt ?? ''}:${JSON.stringify(queueOf(route))}`}
+            // The same key full screen and in the bar: going from one to the other keeps the same player (and its <video>).
+            key={playKey(video)}
             session={session}
-            id={route.id}
-            startOver={route.startOver}
-            startAt={route.startAt}
-            queue={queueOf(route)}
+            id={video.id}
+            startOver={video.startOver}
+            startAt={video.startAt}
+            queue={queueOf(video)}
+            mini={mini}
             // A music video that follows another one plays from its start (not from where it was left: a list of videos flows).
-            onNextEpisode={(following) =>
-              go({ page: 'play', id: following.id, startOver: !!following.musicVideo, ...queueOf(route) }, { replace: true })
-            }
-            onExit={(item) =>
-              back(item && isEpisode(item) ? { page: 'show', id: item.seriesId } : { page: 'movie', id: route.id })
-            }
+            // In the bar the next one takes its place there, without taking the page along.
+            onNextEpisode={(following) => {
+              const nextRoute: PlayRoute = { page: 'play', id: following.id, startOver: !!following.musicVideo, ...queueOf(video) }
+              if (mini) setDocked(nextRoute)
+              else go(nextRoute, { replace: true })
+            }}
+            onExit={(item) => {
+              // A music video keeps playing in the bar while you look for the next one; anything else ends with Back.
+              if (item?.musicVideo) setDocked(video)
+              back(item && isEpisode(item) ? { page: 'show', id: item.seriesId } : { page: 'movie', id: video.id })
+            }}
+            onClose={() => setDocked(null)}
+            onExpand={() => go(video)}
+            onPlaying={() => music.pause()}
           />
         </Suspense>
       )}
@@ -741,13 +765,16 @@ function PlayerLoading() {
 }
 
 /** The queue a /play route belongs to, as the route's own words. */
-const queueOf = (route: Extract<Route, { page: 'play' }>): PlayQueueRef => ({
+const queueOf = (route: PlayRoute): PlayQueueRef => ({
   listId: route.listId,
   collectionId: route.collectionId,
   folderId: route.folderId,
   libraryId: route.libraryId,
   shuffle: route.shuffle,
 })
+
+/** Two play routes with the same key are the same viewing: the player is kept between them, not started again. */
+const playKey = (route: PlayRoute): string => `${route.id}:${route.startOver}:${route.startAt ?? ''}:${JSON.stringify(queueOf(route))}`
 
 /** Looks up what a /play route points at (it may be a deep link or a refresh) and renders the player. */
 function PlayerRoute({
@@ -756,8 +783,12 @@ function PlayerRoute({
   startOver,
   startAt,
   queue,
+  mini,
   onNextEpisode,
   onExit,
+  onClose,
+  onExpand,
+  onPlaying,
 }: {
   session: Session
   id: string
@@ -766,9 +797,16 @@ function PlayerRoute({
   queue: PlayQueueRef
   /** Seconds to begin at, when another device handed its playback over. */
   startAt?: number
+  /** Drawn as a bar at the bottom of the page (a music video that was left with Back), not over the whole screen. */
+  mini: boolean
   onNextEpisode: (next: Movie) => void
   /** Leave the player; `item` is what was playing (null if it could not be loaded). */
   onExit: (item: Movie | null) => void
+  /** Stop for good and take the bar away. */
+  onClose: () => void
+  /** Bring the bar back as the full-screen player. */
+  onExpand: () => void
+  onPlaying: () => void
 }) {
   const [item, setItem] = useState<Movie | null>(null)
   // The titles that follow each other (in play order) when this is part of a queue, and the next episode when it is just an episode.
@@ -815,6 +853,16 @@ function PlayerRoute({
 
   const next = titles ? nextInQueue(titles, id, loop) : episodeNext
 
+  // The bar at the bottom of the page does not cover the page while it waits for the video or when it could not be loaded.
+  if (mini && (failed || !item)) {
+    return (
+      <DockNotice title={failed ? t('That title could not be loaded.') : t('Preparing playback…')} text="">
+        <button type="button" aria-label={t('Close the video player')} title={t('Close')} onClick={onClose} className={DOCK_BUTTON}>
+          <CloseIcon />
+        </button>
+      </DockNotice>
+    )
+  }
   if (failed) {
     return (
       <div
@@ -845,6 +893,10 @@ function PlayerRoute({
       onNext={() => next && onNextEpisode(next)}
       repeat={titles ? { enabled: loop, onChange: (on) => { setLoop(on); writePlayerPrefs({ repeatQueue: on }) } } : undefined}
       onExit={() => onExit(item)}
+      mini={mini}
+      onClose={onClose}
+      onExpand={onExpand}
+      onPlaying={onPlaying}
     />
   )
 }

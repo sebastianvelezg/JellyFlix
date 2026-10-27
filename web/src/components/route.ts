@@ -64,6 +64,9 @@ export type Route =
   | { page: 'person'; id: string; name: string }
   | ({ page: 'play'; id: string; startOver: boolean; startAt?: number } & PlayQueueRef)
 
+/** What the player is opened with: a title, where to begin, and the queue it is part of. */
+export type PlayRoute = Extract<Route, { page: 'play' }>
+
 export function formatRoute(route: Route): string {
   switch (route.page) {
     case 'home':

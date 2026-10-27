@@ -16,7 +16,7 @@ import { t } from '../../i18n'
 
 const round = 'inline-flex items-center justify-center rounded-full transition duration-150 active:scale-90'
 
-function Button({
+export function Button({
   label,
   onClick,
   pressed,
@@ -86,7 +86,7 @@ export function Transport({ size = 'compact' }: { size?: 'compact' | 'large' }) 
 }
 
 /** A thin range input whose filled part follows the value (see `.music-range` in the stylesheet). */
-function Range({
+export function Range({
   label,
   value,
   max,

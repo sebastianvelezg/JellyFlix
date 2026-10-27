@@ -3,6 +3,7 @@ import {
   activeSegment,
   audioChangeRequest,
   episodeCode,
+  formatTime,
   isEpisode,
   defaultSearchLanguage,
   PlaybackSession,
@@ -33,10 +34,12 @@ import {
   writePlayerPrefs,
   writeSubtitleOffset,
 } from '../../platform/web/prefs'
-import { SkipIcon } from '../icons'
+import { CloseIcon, FullscreenIcon, PauseIcon, PlayIcon, SkipIcon, SkipNextIcon } from '../icons'
+import { Range } from '../music/controls'
 import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
 import { Controls } from './Controls'
+import { DOCK_BAR_CLASS, DOCK_BUTTON, DOCK_THUMB_CLASS } from './dock'
 import { SubtitleOverlay, type SubtitleStyle } from './SubtitleOverlay'
 import { SubtitleSearchDialog } from './SubtitleSearchDialog'
 import { useSubtitleTrack } from './useSubtitleTrack'
@@ -98,6 +101,10 @@ export function PlayerStage({
   onSubtitle,
   onRequest,
   onExit,
+  mini = false,
+  onClose,
+  onExpand,
+  onPlaying,
 }: {
   session: Session
   movie: Movie
@@ -127,8 +134,20 @@ export function PlayerStage({
   onSubtitle: (index: number | null) => void
   onRequest: (request: StreamRequest) => void
   onExit: () => void
+  /** Shown as a bar at the bottom of the page, over the page being browsed, instead of full screen. The same <video> goes on playing. */
+  mini?: boolean
+  /** Stop and take the bar away (only the mini bar offers it). */
+  onClose?: () => void
+  /** Bring the video back full screen (from the mini bar). */
+  onExpand?: () => void
+  /** The video started playing: whatever else is playing (the music) makes way for it. */
+  onPlaying?: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const onPlayingRef = useRef(onPlaying)
+  useEffect(() => {
+    onPlayingRef.current = onPlaying
+  })
   const containerRef = useRef<HTMLDivElement>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // The latest `poke` (shows the controls for a moment), for the video's own event handlers.
@@ -256,27 +275,45 @@ export function PlayerStage({
     }
   }, [plan, session, startSeconds])
 
-  // OS media keys / now-playing, screen wake lock and the tab title while this stage is open.
+  // OS media keys / now-playing while this stage is open (also in the mini bar, so the keys of the keyboard still work).
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    const unbind = bindMediaSession(video, title)
+    return bindMediaSession(video, title)
+  }, [title])
+
+  // The screen wake lock and the tab title are for the full-screen player; the bar leaves the page its own.
+  useEffect(() => {
+    if (mini) return
     const release = keepScreenAwake()
     const previousTitle = document.title
     document.title = `▶ ${title}`
     return () => {
-      unbind()
       release()
       document.title = previousTitle
     }
-  }, [title])
+  }, [title, mini])
+
+  // The mini bar is not a full-screen element, and it does not take the keyboard: it gives both back, and takes them again when opened.
+  useEffect(() => {
+    if (mini) {
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
+      const active = document.activeElement
+      if (active instanceof HTMLElement && containerRef.current?.contains(active)) active.blur()
+    } else {
+      containerRef.current?.focus()
+    }
+  }, [mini])
 
   // Mirror <video> state into React and drive progress reporting from the same events.
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
     const on = {
-      play: () => setPaused(false),
+      play: () => {
+        setPaused(false)
+        onPlayingRef.current?.()
+      },
       pause: () => {
         setPaused(true)
         playback.stateChanged(video.currentTime, device())
@@ -357,13 +394,13 @@ export function PlayerStage({
   }, [playback, device, plan, fallback, onRequest, countdownSeconds])
 
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === containerRef.current)
+    const container = containerRef.current
+    const onChange = () => setFullscreen(document.fullscreenElement === container)
     document.addEventListener('fullscreenchange', onChange)
-    containerRef.current?.focus()
     return () => {
       document.removeEventListener('fullscreenchange', onChange)
       if (hideTimer.current) clearTimeout(hideTimer.current)
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
+      if (document.fullscreenElement && document.fullscreenElement === container) void document.exitFullscreen().catch(() => undefined)
     }
   }, [])
 
@@ -459,6 +496,12 @@ export function PlayerStage({
     onExit()
   }, [playback, device, onExit])
 
+  /** Closing the mini bar: the same wait for the final position, then the video goes away. */
+  const closeBar = useCallback(async () => {
+    await Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))])
+    onClose?.()
+  }, [playback, device, onClose])
+
   /** Report where this episode stopped (so it counts as watched), then move on to the next one. */
   const goNext = useCallback(async () => {
     if (!onNext) return
@@ -472,7 +515,7 @@ export function PlayerStage({
       pause: () => videoRef.current?.pause(),
       resume: () => void videoRef.current?.play().catch(() => undefined),
       toggle: togglePlay,
-      stop: () => back(),
+      stop: () => (mini ? closeBar() : back()),
       seek,
       skip,
       next: () => {
@@ -486,7 +529,7 @@ export function PlayerStage({
       },
       snapshot: () => ({ itemIds: [plan.itemId], startIndex: 0, positionSeconds: videoRef.current?.currentTime ?? 0 }),
     }),
-    [togglePlay, back, seek, skip, onNext, goNext, changeVolume, plan.itemId],
+    [togglePlay, back, closeBar, mini, seek, skip, onNext, goNext, changeVolume, plan.itemId],
   )
   useRegisterPlayback('video', remoteController)
 
@@ -571,6 +614,8 @@ export function PlayerStage({
   const transcodeInstead = transcodeFallbackRequest(plan, { fallback, startSeconds: playback.position })
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    // The mini bar has its own buttons and leaves the keys (Esc included) to the page behind it.
+    if (mini) return
     poke()
     if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
     const target = event.target as HTMLElement
@@ -660,19 +705,20 @@ export function PlayerStage({
   return (
     <div
       ref={containerRef}
-      tabIndex={-1}
-      className={`fixed inset-0 z-50 bg-black outline-none ${controlsVisible ? '' : 'cursor-none'}`}
-      onMouseMove={poke}
+      tabIndex={mini ? undefined : -1}
+      className={mini ? DOCK_BAR_CLASS : `fixed inset-0 z-50 bg-black outline-none ${controlsVisible ? '' : 'cursor-none'}`}
+      onMouseMove={mini ? undefined : poke}
       onKeyDown={onKeyDown}
       role="region"
-      aria-label={t('Playing {title}', { title })}
+      aria-label={mini ? t('Video mini player: {title}', { title }) : t('Playing {title}', { title })}
     >
+      {/* The same <video> in both: only its size and what it does when clicked change, so playback is never interrupted. */}
       <video
         ref={videoRef}
-        className="h-full w-full"
+        className={mini ? DOCK_THUMB_CLASS : 'h-full w-full'}
         playsInline
-        onClick={togglePlay}
-        onDoubleClick={toggleFullscreen}
+        onClick={mini ? onExpand : togglePlay}
+        onDoubleClick={mini ? undefined : toggleFullscreen}
         data-testid="video"
         data-play-method={plan.playMethod}
         data-protocol={plan.protocol}
@@ -680,6 +726,72 @@ export function PlayerStage({
         {subtitleUrl && <track key={subtitleUrl} kind="subtitles" src={subtitleUrl} label={t('Subtitles')} />}
       </video>
 
+      {mini && (
+        <>
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label={t('Open the video full screen: {title}', { title: movie.artist ? `${title} — ${movie.artist}` : title })}
+            className="min-w-0 flex-1 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] sm:w-1/4 sm:flex-none"
+          >
+            <span className="block truncate text-sm font-medium text-white">{title}</span>
+            <span className={`block truncate text-xs ${error ? 'text-red-300' : 'text-neutral-400'}`}>
+              {error
+                ? t(error)
+                : buffering
+                  ? t('Loading…')
+                  : upNextVisible && next
+                    ? t('Up next: {title}', { title: next.name })
+                    : movie.artist ?? ''}
+            </span>
+          </button>
+
+          <div className="flex shrink-0 flex-col items-center gap-0.5 sm:flex-1">
+            <div className="flex items-center gap-1 sm:gap-2">
+              {error ? (
+                <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={retry}>
+                  {t('Try again')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-label={paused ? t('Play') : t('Pause')}
+                  title={paused ? t('Play') : t('Pause')}
+                  onClick={togglePlay}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition duration-150 hover:scale-105 active:scale-90"
+                >
+                  {paused ? <PlayIcon /> : <PauseIcon />}
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label={t('Next title')}
+                title={t('Next title')}
+                disabled={!next}
+                onClick={() => void goNext()}
+                className={DOCK_BUTTON}
+              >
+                <SkipNextIcon />
+              </button>
+            </div>
+            <MiniSeek currentTime={currentTime} duration={duration} onSeek={seek} className="hidden w-full max-w-xl sm:flex" />
+          </div>
+
+          <div className="flex shrink-0 items-center justify-end gap-1 sm:w-1/4">
+            <button type="button" aria-label={t('Full screen')} title={t('Full screen')} onClick={onExpand} className={DOCK_BUTTON}>
+              <FullscreenIcon />
+            </button>
+            <button type="button" aria-label={t('Close the video player')} title={t('Close')} onClick={() => void closeBar()} className={DOCK_BUTTON}>
+              <CloseIcon />
+            </button>
+          </div>
+          {/* On a phone the timeline is a thin line along the top of the bar. */}
+          <MiniSeek currentTime={currentTime} duration={duration} onSeek={seek} showTimes={false} className="absolute inset-x-0 -top-2.5 h-5 sm:hidden" />
+        </>
+      )}
+
+      {!mini && (
+      <>
       <SubtitleOverlay videoRef={videoRef} trackUrl={subtitleUrl} lifted={controlsVisible} style={subtitleStyle} offset={subtitleOffset} />
 
       {cinema && (
@@ -875,6 +987,47 @@ export function PlayerStage({
           onClose={closeSubtitleSearch}
         />
       )}
+      </>
+      )}
+    </div>
+  )
+}
+
+/** The video's timeline in the mini bar: a thin bar that follows the video, and seeks when let go. */
+function MiniSeek({
+  currentTime,
+  duration,
+  onSeek,
+  showTimes = true,
+  className = '',
+}: {
+  currentTime: number
+  duration: number
+  onSeek: (seconds: number) => void
+  showTimes?: boolean
+  className?: string
+}) {
+  const [scrub, setScrub] = useState<number | null>(null)
+  const value = scrub ?? currentTime
+  const commit = () => {
+    if (scrub !== null) {
+      onSeek(scrub)
+      setScrub(null)
+    }
+  }
+  return (
+    <div className={`items-center gap-3 ${showTimes ? '' : 'flex'} ${className}`}>
+      {showTimes && <span className="w-10 text-right text-xs tabular-nums text-neutral-400">{formatTime(value)}</span>}
+      <Range
+        label={t('Seek')}
+        value={value}
+        max={duration}
+        onChange={setScrub}
+        onCommit={commit}
+        valueText={t('{time} of {total}', { time: formatTime(value), total: formatTime(duration) })}
+        className="flex-1"
+      />
+      {showTimes && <span className="w-10 text-xs tabular-nums text-neutral-400">{formatTime(duration)}</span>}
     </div>
   )
 }

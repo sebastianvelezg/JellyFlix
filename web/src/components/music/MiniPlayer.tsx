@@ -25,10 +25,13 @@ export function MiniPlayer({
   session,
   onOpenAlbum,
   onOpenArtist,
+  hidden = false,
 }: {
   session: Session
   onOpenAlbum: (albumId: string) => void
   onOpenArtist: (artistId: string) => void
+  /** A video is playing in the bar at the bottom of the page: it has that place, and the music (paused) waits behind it. */
+  hidden?: boolean
 }) {
   const music = useMusic()
   const { queue, error, status } = useMusicState()
@@ -57,7 +60,7 @@ export function MiniPlayer({
     }
   }, [fullScreen])
 
-  if (!queue || !track) return null
+  if (!queue || !track || hidden) return null
 
   const openArtist = (id: string) => {
     setOpen(false)
