@@ -152,3 +152,36 @@ test('video and music take turns: the video pauses the music and holds the bar, 
   await expect(video(page)).toHaveCount(0)
   await expect(musicBar(page)).toContainText('Song 1.2')
 })
+
+test('the browser\'s own Back (a back gesture, a mouse button) also keeps the video in the bar', async ({ page }) => {
+  mock = await startMock(options)
+  await signIn(page, mock)
+  await page.goto('/#/folder/mvf0001')
+  await page.getByRole('button', { name: 'Play folder', exact: true }).click()
+  await waitPlaying(page)
+  await page.evaluate(() => {
+    ;(window as unknown as { __video?: Element }).__video = document.querySelector('[data-testid=video]') ?? undefined
+  })
+  await page.goBack()
+  await expect(bar(page, 'Test Music Video 001')).toBeVisible()
+  await expect(page).toHaveURL(/#\/folder\/mvf0001$/)
+  expect(await sameVideo(page)).toBe(true)
+  await expect(video(page)).toHaveJSProperty('paused', false)
+})
+
+test('closing the bar leaves nothing behind, and a new viewing is kept again when it is left', async ({ page }) => {
+  mock = await startMock(options)
+  await signIn(page, mock)
+  await page.goto('/#/folder/mvf0001')
+  await page.getByRole('button', { name: 'Play folder', exact: true }).click()
+  await waitPlaying(page)
+  // Closing from the bar leaves nothing behind (the video is stopped, not waiting to be docked again).
+  await page.goBack()
+  await bar(page, 'Test Music Video 001').getByRole('button', { name: 'Close the video player' }).click()
+  await expect(anyBar(page)).toHaveCount(0)
+  await page.goForward()
+  await expect(player(page)).toBeVisible() // the full-screen player starts it afresh
+  await waitPlaying(page)
+  await page.goBack()
+  await expect(bar(page, 'Test Music Video 001')).toBeVisible() // and leaving it keeps it again
+})

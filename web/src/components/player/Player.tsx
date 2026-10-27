@@ -308,7 +308,7 @@ export function Player({
             <button type="button" className="btn-primary" onClick={retry}>
               {t('Try again')}
             </button>
-            {/* A video that could not be played is not kept in the bar: leaving here closes it (onClose comes after onExit, so it wins). */}
+            {/* A video that could not be played is not kept in the bar: leaving here closes it. */}
             <button
               type="button"
               className="btn"

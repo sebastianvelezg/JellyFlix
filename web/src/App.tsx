@@ -363,6 +363,22 @@ function Shell({
   const [docked, setDocked] = useState<PlayRoute | null>(null)
   // Opening another video full screen takes the place of the one in the bar.
   if (route.page === 'play' && docked && playKey(docked) !== playKey(route)) setDocked(null)
+  // A music video is docked whenever the player is left, however that happens: the Back button, Esc, or the browser's own Back (a
+  // back gesture, a mouse button). Which video is a music video is only known once it has loaded; one that was closed on purpose
+  // (a failed one, the bar's close button) is not kept.
+  const [lastPlay, setLastPlay] = useState<PlayRoute | null>(null)
+  const [loadedMusicVideo, setLoadedMusicVideo] = useState<string | null>(null)
+  const [notKept, setNotKept] = useState<string | null>(null)
+  const rememberLoaded = useCallback((item: Movie) => setLoadedMusicVideo(item.musicVideo ? item.id : null), [])
+  if (route.page === 'play') {
+    if (!lastPlay || playKey(lastPlay) !== playKey(route)) {
+      setLastPlay(route)
+      setNotKept(null)
+    }
+  } else if (lastPlay) {
+    setLastPlay(null)
+    if (loadedMusicVideo === lastPlay.id && notKept !== playKey(lastPlay)) setDocked(lastPlay)
+  }
   const video: PlayRoute | null = route.page === 'play' ? route : docked
   const mini = route.page !== 'play'
   const barShown = mini && !!video
@@ -431,11 +447,17 @@ function Shell({
   /** Plays a video as part of a folder, a library or a shuffled queue: the next one of it follows. */
   const playQueue = (first: Movie, queue: PlayQueueRef) => go({ page: 'play', id: first.id, startOver: false, ...queue })
   /** The play button of a music video's card: what follows is the folder it is in, or the row or grid it was played from. */
-  const playVideo: PlayVideo = (video, from) => {
+  const playVideoNow: PlayVideo = (video, from) => {
     if (from?.queue) playQueue(video, from.queue)
     else if (from?.list && from.list.length > 1) playQueue(video, { queueId: rememberPlayList(from.list) })
     else play(video)
   }
+  // The cards get a function that never changes (the page re-renders often, and every card would re-render with it).
+  const latestPlayVideo = useRef(playVideoNow)
+  useEffect(() => {
+    latestPlayVideo.current = playVideoNow
+  })
+  const playVideo = useCallback<PlayVideo>((video, from) => latestPlayVideo.current(video, from), [])
   /** The Play button of a series: its next (or first) episode. */
   const playShow = (show: Movie) => {
     getSeriesPlayTarget(session, show.id)
@@ -757,12 +779,13 @@ function Shell({
               if (mini) setDocked(nextRoute)
               else go(nextRoute, { replace: true })
             }}
-            onExit={(item) => {
-              // A music video keeps playing in the bar while you look for the next one; anything else ends with Back.
-              if (item?.musicVideo) setDocked(video)
-              back(item && isEpisode(item) ? { page: 'show', id: item.seriesId } : { page: 'movie', id: video.id })
+            // (A music video keeps playing in the bar when the player is left: see `docked`.)
+            onExit={(item) => back(item && isEpisode(item) ? { page: 'show', id: item.seriesId } : { page: 'movie', id: video.id })}
+            onLoaded={rememberLoaded}
+            onClose={() => {
+              setDocked(null)
+              setNotKept(playKey(video))
             }}
-            onClose={() => setDocked(null)}
             onExpand={() => go(video)}
             onPlaying={() => music.pause()}
           />
@@ -807,6 +830,7 @@ function PlayerRoute({
   onClose,
   onExpand,
   onPlaying,
+  onLoaded,
 }: {
   session: Session
   id: string
@@ -825,8 +849,13 @@ function PlayerRoute({
   /** Bring the bar back as the full-screen player. */
   onExpand: () => void
   onPlaying: () => void
+  /** The title is known (so the app knows whether it is a music video). */
+  onLoaded: (item: Movie) => void
 }) {
   const [item, setItem] = useState<Movie | null>(null)
+  useEffect(() => {
+    if (item) onLoaded(item)
+  }, [item, onLoaded])
   // The titles that follow each other (in play order) when this is part of a queue, and the next episode when it is just an episode.
   const [titles, setTitles] = useState<Movie[] | null>(null)
   const [episodeNext, setEpisodeNext] = useState<Movie | null>(null)

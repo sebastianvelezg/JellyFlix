@@ -3,7 +3,6 @@ import {
   activeSegment,
   audioChangeRequest,
   episodeCode,
-  formatTime,
   isEpisode,
   defaultSearchLanguage,
   PlaybackSession,
@@ -35,7 +34,7 @@ import {
   writeSubtitleOffset,
 } from '../../platform/web/prefs'
 import { CloseIcon, FullscreenIcon, PauseIcon, PlayIcon, SkipIcon, SkipNextIcon } from '../icons'
-import { Range } from '../music/controls'
+import { SeekBar } from '../music/controls'
 import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
 import { Controls } from './Controls'
@@ -775,7 +774,7 @@ export function PlayerStage({
                 <SkipNextIcon />
               </button>
             </div>
-            <MiniSeek currentTime={currentTime} duration={duration} onSeek={seek} className="hidden w-full max-w-xl sm:flex" />
+            <SeekBar value={currentTime} max={duration} onSeek={seek} className="hidden w-full max-w-xl sm:flex" />
           </div>
 
           <div className="flex shrink-0 items-center justify-end gap-1 sm:w-1/4">
@@ -787,7 +786,7 @@ export function PlayerStage({
             </button>
           </div>
           {/* On a phone the timeline is a thin line along the top of the bar. */}
-          <MiniSeek currentTime={currentTime} duration={duration} onSeek={seek} showTimes={false} className="absolute inset-x-0 -top-2.5 h-5 sm:hidden" />
+          <SeekBar value={currentTime} max={duration} onSeek={seek} showTimes={false} className="absolute inset-x-0 -top-2.5 h-5 sm:hidden" />
         </>
       )}
 
@@ -990,45 +989,6 @@ export function PlayerStage({
       )}
       </>
       )}
-    </div>
-  )
-}
-
-/** The video's timeline in the mini bar: a thin bar that follows the video, and seeks when let go. */
-function MiniSeek({
-  currentTime,
-  duration,
-  onSeek,
-  showTimes = true,
-  className = '',
-}: {
-  currentTime: number
-  duration: number
-  onSeek: (seconds: number) => void
-  showTimes?: boolean
-  className?: string
-}) {
-  const [scrub, setScrub] = useState<number | null>(null)
-  const value = scrub ?? currentTime
-  const commit = () => {
-    if (scrub !== null) {
-      onSeek(scrub)
-      setScrub(null)
-    }
-  }
-  return (
-    <div className={`items-center gap-3 ${showTimes ? '' : 'flex'} ${className}`}>
-      {showTimes && <span className="w-10 text-right text-xs tabular-nums text-neutral-400">{formatTime(value)}</span>}
-      <Range
-        label={t('Seek')}
-        value={value}
-        max={duration}
-        onChange={setScrub}
-        onCommit={commit}
-        valueText={t('{time} of {total}', { time: formatTime(value), total: formatTime(duration) })}
-        className="flex-1"
-      />
-      {showTimes && <span className="w-10 text-xs tabular-nums text-neutral-400">{formatTime(duration)}</span>}
     </div>
   )
 }
