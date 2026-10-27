@@ -863,7 +863,8 @@ describe('main page and collections', () => {
     expect(inside.getAllByRole('button', { name: /^Open Test Movie/ })).toHaveLength(3)
 
     await ui.click(within(page).getByRole('button', { name: /^Play$/ }))
-    await waitFor(() => expect(location.hash).toMatch(/^#\/play\/m000[456]$/))
+    // It plays on through the collection, so the route remembers which one.
+    await waitFor(() => expect(location.hash).toMatch(/^#\/play\/m000[456]\?collection=bx0002$/))
   })
 
   it('marks a collection as a favorite on the server', async () => {
