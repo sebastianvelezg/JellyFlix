@@ -1310,6 +1310,14 @@ export const es: Record<string, string> = {
   'The next song is made ready before this one ends, so there is no pause between songs.': 'La siguiente canción se prepara antes de que termine esta, así que no hay pausa entre canciones.',
   'Crossfade between songs': 'Fundido entre canciones',
   'The end of a song fades into the start of the next one. Songs shorter than twice the fade just follow each other.': 'El final de una canción se funde con el inicio de la siguiente. Las canciones más cortas que el doble del fundido simplemente se siguen.',
+  'Made for you': 'Hecho para ti',
+  'Make another mix': 'Hacer otro mix',
+  'Mix of the day': 'Mix del día',
+  '{artist} radio': 'Radio de {artist}',
+  'Songs that go with {artist}': 'Canciones que van con {artist}',
+  'Radio': 'Radio',
+  'Play {name}': 'Reproducir {name}',
+  'Start a radio from {name}': 'Iniciar una radio a partir de {name}',
 }
 
 /** Messages with numbers or names in them, written once as a pattern. `$1` is the first captured part. */

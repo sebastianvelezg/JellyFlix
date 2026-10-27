@@ -1921,6 +1921,24 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         return json(res, 200, { Metadata: { IsSynced: true }, Lyrics: timedLyrics })
       }
     }
+    // Instant mixes ("radio"): the songs of the seed's artist first, then the others, nearest artist first.
+    const instantMix = /^\/(Artists|Albums|Songs)\/([^/]+)\/InstantMix$/.exec(path)
+    if (instantMix && req.method === 'GET') {
+      if (!needAuth()) return
+      if (opts.musicArtists === 0) return void res.writeHead(404).end()
+      const seed = instantMix[2] as string
+      const seedNumber = Number(/(\d{4})/.exec(seed)?.[1] ?? 1)
+      const tracks = musicRows(opts.musicArtists).filter((r) => r.type === 'Audio')
+      const distance = (id: string) => {
+        const n = Number(/^tr(\d{4})/.exec(id)?.[1] ?? 0)
+        return (n - seedNumber + opts.musicArtists) % opts.musicArtists
+      }
+      const ordered = [...tracks].filter((r) => r.id !== seed).sort((a, b) => distance(a.id) - distance(b.id) || a.id.localeCompare(b.id))
+      const limit = Number(query.limit ?? 50)
+      adminLog.push(`mix ${instantMix[1]} ${seed}`)
+      const items = ordered.slice(0, limit).map((r) => dtoFor(r.id, user, opts))
+      return json(res, 200, { Items: items, TotalRecordCount: items.length, StartIndex: 0 })
+    }
     // Subtitles from the internet: a search (three results, the first one matching the file; "zzz" finds nothing) and saving one.
     const remoteSubtitles = /^\/Items\/([^/]+)\/RemoteSearch\/Subtitles\/([^/]+)$/.exec(path)
     if (remoteSubtitles) {

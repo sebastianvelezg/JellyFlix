@@ -3,8 +3,10 @@ import { useCallback, useState, type ReactNode } from 'react'
 import {
   getAlbum,
   getAlbumPage,
+  getAlbumRadio,
   getAlbumTracks,
   getArtist,
+  getArtistRadio,
   getPlaylist,
   getPlaylistTracks,
   getPopularTracks,
@@ -15,7 +17,7 @@ import {
   type Track,
 } from '../../core'
 import { PlayOnButton } from '../remote/PlayOnButton'
-import { BackIcon, HeartIcon, PlayIcon, PlusIcon, ShuffleIcon } from '../icons'
+import { BackIcon, HeartIcon, PlayIcon, PlusIcon, RadioIcon, ShuffleIcon } from '../icons'
 import { Row } from '../Row'
 import { EditButton } from '../admin/EditButton'
 import { useReloadOnEdit } from '../admin/editorEvents'
@@ -69,16 +71,20 @@ function PlayButtons({
   tracks,
   playOnId,
   favorite,
+  radio,
   edit,
 }: {
   tracks: Track[]
   playOnId?: string
+  /** Songs that go with this artist or album (the server's instant mix): starts a radio from them. */
+  radio?: () => Promise<Track[]>
   favorite?: { on: boolean; failed: boolean; toggle: () => void; label: string }
   /** The administrator's pencil, at the end of the same row (nothing for anyone else). */
   edit?: ReactNode
 }) {
   const music = useMusic()
   const none = tracks.length === 0
+  const [radioBusy, setRadioBusy] = useState(false)
   return (
     <div className="relative z-20 mt-6 flex flex-wrap items-center gap-2.5">
       <button type="button" className="btn-primary px-6 py-3 text-base" disabled={none} onClick={() => music.play(tracks, 0)}>
@@ -90,6 +96,22 @@ function PlayButtons({
       <button type="button" className="btn py-3" disabled={none} onClick={() => music.enqueue(tracks)}>
         <PlusIcon /> {t('Add to queue')}
       </button>
+      {radio && (
+        <button
+          type="button"
+          className="btn py-3"
+          disabled={radioBusy}
+          onClick={() => {
+            setRadioBusy(true)
+            radio()
+              .then((songs) => songs.length > 0 && music.play(songs, 0))
+              .catch(() => undefined)
+              .finally(() => setRadioBusy(false))
+          }}
+        >
+          <RadioIcon /> {t('Radio')}
+        </button>
+      )}
       {playOnId && <PlayOnButton itemId={playOnId} />}
       {favorite && (
         <button
@@ -179,6 +201,7 @@ function AlbumContent({
           <PlayButtons
             tracks={songs}
             playOnId={album.id}
+            radio={() => getAlbumRadio(session, album.id)}
             favorite={{ on: favorite.favorite, failed: favorite.failed, toggle: favorite.toggle, label: 'album' }}
             edit={<EditButton session={session} compact className={PENCIL} target={{ id: album.id, name: album.name, type: 'MusicAlbum' }} />}
           />
@@ -288,6 +311,7 @@ function ArtistContent({
           )}
           <PlayButtons
             tracks={songs}
+            radio={() => getArtistRadio(session, artist.id)}
             favorite={{ on: favorite.favorite, failed: favorite.failed, toggle: favorite.toggle, label: 'artist' }}
             edit={<EditButton session={session} compact className={PENCIL} target={{ id: artist.id, name: artist.name, type: 'MusicArtist' }} />}
           />

@@ -253,6 +253,7 @@ export {
 export * from './lyrics'
 export * from './subtitleSearch'
 export * from './upNext'
+export * from './mixes'
 export {
   findPlugin,
   getPlugins,

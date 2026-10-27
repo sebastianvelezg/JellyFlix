@@ -154,6 +154,13 @@ export const ShuffleIcon = () => (
   </Icon>
 )
 
+export const RadioIcon = () => (
+  <Icon width={18} height={18}>
+    <circle cx="12" cy="12" r="2" />
+    <path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19a10 10 0 0 1 0-14" />
+  </Icon>
+)
+
 /** The app mark: the Jellyflix jellyfish, with its own glow. */
 export const LogoMark = ({ size = 28 }: { size?: number }) => (
   <img src={logo} width={size} height={size} alt="" aria-hidden="true" draggable={false} />

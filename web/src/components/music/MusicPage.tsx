@@ -26,6 +26,7 @@ import {
 import { ShuffleIcon } from '../icons'
 import { PagedView } from '../PagedView'
 import { Row } from '../Row'
+import { MadeForYou } from './MadeForYou'
 import { useAsync } from '../useAsync'
 import { swrKey, swrScope, useSwr } from '../useSwr'
 import type { MusicTab } from '../route'
@@ -173,6 +174,12 @@ function Home({
 
   return (
     <div className="space-y-9">
+      <MadeForYou
+        session={session}
+        libraryId={libraryId}
+        favorites={favorites.status === 'ready' ? favorites.data.t : []}
+        recent={recentlyPlayed.status === 'ready' ? recentlyPlayed.data.t : []}
+      />
       {jumpBack.length > 0 && (
         <Row title={t('Jump back in')}>
           {jumpBack.map((album) => (
