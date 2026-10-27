@@ -4,7 +4,8 @@ import { FolderPage } from './components/MusicVideoFolders'
 import { MusicVideosPage } from './components/MusicVideosPage'
 import { ConnectForm } from './components/ConnectForm'
 import { DetailsPage } from './components/DetailsPage'
-import { CardActionsProvider } from './components/cardActions'
+import { CardActionsProvider, PlayVideoProvider, type PlayVideo } from './components/cardActions'
+import { recallPlayList, rememberPlayList } from './components/playQueues'
 import { AddToPlaylistDialog } from './components/AddToPlaylistDialog'
 import { AdminTools } from './components/admin/AdminTools'
 import { clearActivity } from './platform/web/adminActivity'
@@ -421,6 +422,12 @@ function Shell({
   const play = (item: Movie, startOver = false) => go({ page: 'play', id: item.id, startOver })
   /** Plays a video as part of a folder, a library or a shuffled queue: the next one of it follows. */
   const playQueue = (first: Movie, queue: PlayQueueRef) => go({ page: 'play', id: first.id, startOver: false, ...queue })
+  /** The play button of a music video's card: what follows is the folder it is in, or the row or grid it was played from. */
+  const playVideo: PlayVideo = (video, from) => {
+    if (from?.queue) playQueue(video, from.queue)
+    else if (from?.list && from.list.length > 1) playQueue(video, { queueId: rememberPlayList(from.list) })
+    else play(video)
+  }
   /** The Play button of a series: its next (or first) episode. */
   const playShow = (show: Movie) => {
     getSeriesPlayTarget(session, show.id)
@@ -444,6 +451,7 @@ function Shell({
 
   return (
     <CardActionsProvider value={remember}>
+    <PlayVideoProvider value={playVideo}>
       <button
         type="button"
         className="btn-primary fixed left-3 top-3 z-[60] -translate-y-20 focus:translate-y-0"
@@ -752,6 +760,7 @@ function Shell({
           />
         </Suspense>
       )}
+    </PlayVideoProvider>
     </CardActionsProvider>
   )
 }
@@ -770,6 +779,7 @@ const queueOf = (route: PlayRoute): PlayQueueRef => ({
   collectionId: route.collectionId,
   folderId: route.folderId,
   libraryId: route.libraryId,
+  queueId: route.queueId,
   shuffle: route.shuffle,
 })
 
@@ -815,7 +825,7 @@ function PlayerRoute({
   // After the last title of a queue the first one plays again. Chosen in the player and remembered.
   const [loop, setLoop] = useState(() => readPlayerPrefs().repeatQueue)
   const [failed, setFailed] = useState(false)
-  const { listId, collectionId, folderId, libraryId, shuffle } = queue
+  const { listId, collectionId, folderId, libraryId, queueId, shuffle } = queue
 
   useEffect(() => {
     let cancelled = false
@@ -830,7 +840,10 @@ function PlayerRoute({
         if (cancelled) return
         setItem(found)
         // What follows is only needed at the end, so it is looked up in the background.
-        if (listId) void readQueue(getPlaylistEntries(session, listId).then((entries) => entries.map((e) => e.item)))
+        // (A row or grid it was played from is already known; after a reload it is not, and the folder's other videos follow instead.)
+        const fromRow = queueId ? recallPlayList(queueId) : undefined
+        if (fromRow) setTitles(orderQueue(fromRow, shuffle))
+        else if (listId) void readQueue(getPlaylistEntries(session, listId).then((entries) => entries.map((e) => e.item)))
         else if (collectionId) void readQueue(getCollectionItems(session, collectionId))
         else if (folderId || libraryId) void readQueue(getVideosUnder(session, (folderId ?? libraryId) as string))
         // A music video played on its own goes on with the others of its folder.
@@ -849,7 +862,7 @@ function PlayerRoute({
     return () => {
       cancelled = true
     }
-  }, [session, id, listId, collectionId, folderId, libraryId, shuffle])
+  }, [session, id, listId, collectionId, folderId, libraryId, queueId, shuffle])
 
   const next = titles ? nextInQueue(titles, id, loop) : episodeNext
 

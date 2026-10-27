@@ -167,7 +167,8 @@ export function FolderView({
         ))}
         {videos.map((video) => (
           <li key={video.id}>
-            <MovieCard session={session} movie={overrides[video.id] ?? video} onOpen={onOpenVideo} />
+            {/* From a folder, a video goes on through what is under that folder (its folders first, as "Play folder" does). */}
+            <MovieCard session={session} movie={overrides[video.id] ?? video} onOpen={onOpenVideo} queue={{ folderId: parentId }} />
           </li>
         ))}
       </ul>

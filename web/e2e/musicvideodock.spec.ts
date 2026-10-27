@@ -91,7 +91,7 @@ test('playing another video takes the place of the one in the bar', async ({ pag
   await signIn(page, mock)
   await dock(page)
 
-  await page.getByRole('button', { name: /^Open Test Music Video 002/ }).click()
+  await page.getByRole('button', { name: /^Open Test Music Video 002/ }).click({ position: { x: 12, y: 12 } })
   await page.getByRole('button', { name: /^(Play|Resume from .*)$/ }).click()
   await expect(page.getByRole('region', { name: 'Playing Test Music Video 002' })).toBeVisible()
   await expect(anyBar(page)).toHaveCount(0)

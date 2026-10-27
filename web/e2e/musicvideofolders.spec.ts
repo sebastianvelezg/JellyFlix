@@ -138,7 +138,7 @@ test('a video played on its own goes on with the others of its folder', async ({
   mock = await startMock(options)
   await signIn(page, mock)
   await page.goto('/#/folder/mvf0002')
-  await page.getByRole('button', { name: /^Open Test Music Video 005/ }).click()
+  await page.getByRole('button', { name: /^Open Test Music Video 005/ }).click({ position: { x: 12, y: 12 } })
   await page.getByRole('button', { name: /^(Play|Resume from .*)$/ }).click()
   await expect(player(page)).toBeVisible()
   await waitPlaying(page)

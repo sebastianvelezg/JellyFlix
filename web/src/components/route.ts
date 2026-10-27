@@ -20,7 +20,8 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/person/<id>?name= a person's filmography
  *   #/play/<id>         player (add ?start=0 to start over instead of resuming, or ?start=<seconds> to begin there;
  *                       ?list=<playlist id>, ?collection=<collection id>, ?folder=<folder id> or ?library=<library id> goes on to the
- *                       next title of it when this one ends; &shuffle=<seed> plays that queue in a random order)
+ *                       next title of it when this one ends; ?queue=<word> goes on through the row or grid it was played from (kept in
+ *                       memory, so only until a reload); &shuffle=<seed> plays that queue in a random order)
  *   #/folder/<id>       a folder of music videos
  */
 export const MUSIC_TABS = ['home', 'albums', 'artists', 'songs'] as const
@@ -36,6 +37,8 @@ export interface PlayQueueRef {
   collectionId?: string
   folderId?: string
   libraryId?: string
+  /** A list of videos played "from here" (a row, a grid): kept in memory under this word (see `playQueues`), so it is gone after a reload. */
+  queueId?: string
   shuffle?: string
 }
 
@@ -118,6 +121,7 @@ export function formatRoute(route: Route): string {
       if (route.collectionId) params.set('collection', route.collectionId)
       if (route.folderId) params.set('folder', route.folderId)
       if (route.libraryId) params.set('library', route.libraryId)
+      if (route.queueId) params.set('queue', route.queueId)
       if (route.shuffle) params.set('shuffle', route.shuffle)
       const query = params.toString()
       return `#/play/${encodeURIComponent(route.id)}${query ? `?${query}` : ''}`
@@ -160,6 +164,7 @@ export function parseRoute(hash: string): Route {
       const collectionId = params.get('collection')
       const folderId = params.get('folder')
       const libraryId = params.get('library')
+      const queueId = params.get('queue')
       const shuffle = params.get('shuffle')
       const seconds = start === null ? NaN : Number(start)
       return {
@@ -171,6 +176,7 @@ export function parseRoute(hash: string): Route {
         ...(collectionId ? { collectionId } : {}),
         ...(folderId ? { folderId } : {}),
         ...(libraryId ? { libraryId } : {}),
+        ...(queueId ? { queueId } : {}),
         ...(shuffle ? { shuffle } : {}),
       }
     }

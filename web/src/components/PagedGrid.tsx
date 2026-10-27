@@ -50,7 +50,8 @@ export function PagedGrid({
       emptyMessage={emptyMessage}
       onTotal={onTotal}
       summary={summary}
-      renderItem={(movie) => <MovieCard session={session} movie={overrides[movie.id] ?? movie} onOpen={onOpen} />}
+      // A music video played from the grid goes on with the next ones of it (the ones loaded so far, in the order shown).
+      renderItem={(movie, _index, items) => <MovieCard session={session} movie={overrides[movie.id] ?? movie} onOpen={onOpen} list={wide ? items : undefined} />}
     />
   )
 }

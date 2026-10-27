@@ -33,6 +33,7 @@ import { CollectionsRow } from './CollectionCard'
 import { HeroCarousel, HeroSkeleton } from './Hero'
 import { FiltersButton, FiltersPanel } from './LibraryFilters'
 import { ShuffleIcon } from './icons'
+import { usePlayVideo } from './cardActions'
 import { ContinueCard, RowCard } from './MovieCard'
 import { PagedGrid } from './PagedGrid'
 import { Row } from './Row'
@@ -279,7 +280,7 @@ function LibraryView({
             {recent.status === 'ready' && recent.data.length > 0 && (
               <Row title={t('Recently added')}>
                 {recent.data.map((m) => (
-                  <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} />
+                  <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} list={recent.data} />
                 ))}
               </Row>
             )}
@@ -539,7 +540,7 @@ function GenreRow({
       }
     >
       {state.data.map((m) => (
-        <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} />
+        <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} list={state.data} />
       ))}
     </Row>
   )
@@ -583,13 +584,15 @@ function ContinueRow({
     [session, kind, playbackVersion],
   )
   const { state } = useSwr(swrKey(swrScope(session), `continue-${kind}s`), load, { fresh: 0 })
+  const playVideo = usePlayVideo()
   if (state.status !== 'ready') return null
   const movies = state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0)
   if (movies.length === 0) return null
   return (
     <Row title={t('Continue watching')}>
       {movies.map((m) => (
-        <ContinueCard key={m.id} session={session} movie={m} onPlay={onPlay} onOpen={onOpen} />
+        // A music video goes on with the next ones of the row.
+        <ContinueCard key={m.id} session={session} movie={m} onPlay={(v) => (v.musicVideo && playVideo ? playVideo(v, { list: movies }) : onPlay(v))} onOpen={onOpen} />
       ))}
     </Row>
   )
@@ -665,7 +668,7 @@ function FavoritesRow({
   return (
     <Row title={t('Your favorites')}>
       {movies.map((m) => (
-        <RowCard key={m.id} session={session} movie={m} onOpen={onOpen} />
+        <RowCard key={m.id} session={session} movie={m} onOpen={onOpen} list={movies} />
       ))}
     </Row>
   )

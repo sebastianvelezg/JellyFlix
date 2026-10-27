@@ -34,6 +34,7 @@ describe('routes', () => {
     { page: 'play', id: 'abc123', startOver: false, collectionId: 'bx0001' },
     { page: 'play', id: 'mv1', startOver: false, folderId: 'f1' },
     { page: 'play', id: 'mv1', startOver: false, libraryId: 'lib-musicvideos', shuffle: 'seed-1' },
+    { page: 'play', id: 'mv1', startOver: true, queueId: 'k3x9aq' },
     { page: 'folder', id: 'f1' },
   ]
   it.each(cases)('round-trips %j', (route) => {
