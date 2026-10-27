@@ -4,6 +4,8 @@ import {
   clearBrowsePrefs,
   clearSeriesPrefs,
   countSeriesPrefs,
+  COUNTDOWN_CHOICES,
+  CROSSFADE_CHOICES,
   QUALITY_CHOICES,
   readPlayerPrefs,
   readUiPrefs,
@@ -271,9 +273,33 @@ export function SettingsPage({
         <Card title={t('Playback')} description={t('Applies to everything you watch on this device.')}>
           <Toggle
             label={t('Play the next episode automatically')}
-            hint={t('When an episode ends, the next one starts after a few seconds.')}
+            hint={t('When an episode, or a title of a playlist or collection, ends, the next one starts after a short countdown.')}
             checked={player.autoplayNext}
             onChange={(autoplayNext) => updatePlayer({ autoplayNext })}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label htmlFor="autoplay-countdown" className="text-sm font-medium text-neutral-100">
+              {t('Countdown before the next title')}
+            </label>
+            <select
+              id="autoplay-countdown"
+              className="select"
+              value={player.autoplayCountdown}
+              disabled={!player.autoplayNext}
+              onChange={(e) => updatePlayer({ autoplayCountdown: Number(e.target.value) })}
+            >
+              {COUNTDOWN_CHOICES.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {t('{seconds} seconds', { seconds })}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Toggle
+            label={t('Cinema mode')}
+            hint={t('The picture fades in from black and the controls get out of the way sooner, even while paused. You can also switch it in the player.')}
+            checked={player.cinemaMode}
+            onChange={(cinemaMode) => updatePlayer({ cinemaMode })}
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <label htmlFor="subtitle-size" className="text-sm font-medium text-neutral-100">
@@ -320,6 +346,35 @@ export function SettingsPage({
           </Row>
           <p className="-mt-2 text-xs text-neutral-500">
             {t('The language you pick in the player is switched on automatically next time.')}
+          </p>
+        </Card>
+
+        <Card title={t('Music')} description={t('How songs follow each other.')}>
+          <Toggle
+            label={t('Gapless playback')}
+            hint={t('The next song is made ready before this one ends, so there is no pause between songs.')}
+            checked={player.gapless}
+            onChange={(gapless) => updatePlayer({ gapless })}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label htmlFor="crossfade" className="text-sm font-medium text-neutral-100">
+              {t('Crossfade between songs')}
+            </label>
+            <select
+              id="crossfade"
+              className="select"
+              value={player.crossfadeSeconds}
+              onChange={(e) => updatePlayer({ crossfadeSeconds: Number(e.target.value) })}
+            >
+              {CROSSFADE_CHOICES.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {seconds === 0 ? t('Off') : t('{seconds} seconds', { seconds })}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="-mt-2 text-xs text-neutral-500">
+            {t('The end of a song fades into the start of the next one. Songs shorter than twice the fade just follow each other.')}
           </p>
         </Card>
 

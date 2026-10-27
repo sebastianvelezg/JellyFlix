@@ -59,6 +59,8 @@ export interface Movie {
   musicVideo?: boolean
   /** Music videos: who performs it ("Artist" or "Artist & Artist"). */
   artist?: string
+  /** Music videos: the folder (or library) the video is in, so the next video of that folder can follow it. */
+  parentId?: string
   /** A book to read, or an audiobook to listen to. */
   book?: 'book' | 'audiobook'
   /** Books: the file's format in lower case ("epub", "pdf", "cbz"), when the server says. */
@@ -127,7 +129,7 @@ export function toMovie(dto: BaseItemDto): Movie | null {
     isSeries: dto.Type === BaseItemKind.Series ? true : undefined,
     unwatchedCount: dto.Type === BaseItemKind.Series ? (dto.UserData?.UnplayedItemCount ?? undefined) : undefined,
     lastPlayedAt: toTime(dto.UserData?.LastPlayedDate),
-    ...(dto.Type === BaseItemKind.MusicVideo ? { musicVideo: true, artist: artistsOf(dto) } : {}),
+    ...(dto.Type === BaseItemKind.MusicVideo ? { musicVideo: true, artist: artistsOf(dto), parentId: dto.ParentId ?? undefined } : {}),
     ...(dto.Type === BaseItemKind.Book || dto.Type === BaseItemKind.AudioBook
       ? { book: dto.Type === BaseItemKind.Book ? ('book' as const) : ('audiobook' as const), format: formatOf(dto), author: artistsOf(dto) ?? dto.AlbumArtist ?? undefined }
       : {}),

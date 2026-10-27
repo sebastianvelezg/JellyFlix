@@ -66,7 +66,7 @@ Movies, series, anime, music videos, books, collections and music, each with a b
 
 **A real player**
 
-Direct play or the server's HLS conversion, audio tracks, subtitles you can style and time-shift, skip intro and credits, chapters, seek-bar pictures, next episode, a quality limit, and progress synced to Jellyfin.
+Direct play or the server's HLS conversion, audio tracks, subtitles you can style and time-shift, skip intro and credits, chapters, seek-bar pictures, next episode with an Up next card, cinema mode, subtitles searched on your server's plugin, a quality limit, and progress synced to Jellyfin.
 
 </td>
 </tr>
@@ -176,6 +176,12 @@ The buttons at the top can show icons and names, only icons or only names, in th
 | A menu on every title (watched, favorite, Watch later, playlists) | ✅ "⋯" | ✅ hold OK |
 | Playlists, Watch later, New since your last visit, Coming up | ✅ | ✅ |
 | Music, lyrics, queue, sleep timer | ✅ | ✅ |
+| Music mixes: mix of the day, radio of an artist, album or song | ✅ | ✅ |
+| Music videos played one after the other | ✅ | ✅ (the other videos of the folder) |
+| Music videos: folders, repeat the list, play button on the card, mini player | ✅ | — |
+| Subtitle search on your server's plugin, collections that play through | ✅ | ✅ |
+| Gapless music | ✅ (+ crossfade, colours from the cover) | ✅ (no crossfade) |
+| Cinema mode, Up next card with a countdown, visualizer | ✅ | — |
 | Seek-bar pictures, skip intro / credits, chapters, audio and subtitle tracks | ✅ | ✅ |
 | Appearance: backgrounds, accents, poster size, home rows, top menu (icons or names, order, hide) | ✅ (+ any colour) | ✅ |
 | Back up your look on the server | ✅ | ✅ |
@@ -417,7 +423,7 @@ No, only Jellyfin.
 
 Jellyflix 1.1 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
 
-- **Playback:** subtitle search through your server's plugin (opt-in), SyncPlay (watch together), recording and timers for live TV, a version picker on the web.
+- **Playback:** SyncPlay (watch together), recording and timers for live TV, a version picker on the web.
 - **Books:** a reader for the TV app, Mobi and RAR comics.
 - **Sign in:** find servers on the network, several servers and users.
 - **Reach:** Fire TV, more languages, a public demo of the web app.

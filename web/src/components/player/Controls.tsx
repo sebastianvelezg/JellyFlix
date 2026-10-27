@@ -109,6 +109,8 @@ export interface ControlsProps {
   onSubtitleStyle: (patch: Partial<SubtitleStyle>) => void
   onSubtitleOffset: (seconds: number) => void
   onSubtitleFile: (file: File) => void
+  /** Present when subtitles can be searched for on the internet (a video, not a live channel): adds a button to the menu. */
+  onFindSubtitles?: () => void
   onSpeed: (speed: number) => void
   /** The settings menu opened or closed; the controls must stay visible while it is open. */
   onMenuOpenChange: (open: boolean) => void
@@ -120,6 +122,10 @@ export interface ControlsProps {
   trickplay?: TrickplayPreview | null
   /** Present when the browser can float the video in its own window. */
   pictureInPicture?: { active: boolean; onToggle: () => void }
+  /** The switch of the settings menu that plays a queue again from its first title after the last one. */
+  repeatQueue?: { enabled: boolean; onChange: (enabled: boolean) => void }
+  /** The cinema mode switch of the settings menu. */
+  cinemaMode?: { enabled: boolean; onChange: (enabled: boolean) => void }
   /** Present when there is a next episode: adds the autoplay switch to the settings menu. */
   autoplayNext?: { enabled: boolean; onChange: (enabled: boolean) => void }
 }
@@ -388,6 +394,18 @@ function SettingsMenu(p: ControlsProps) {
             >
               {t('Load a subtitle file (.srt, .vtt)…')}
             </button>
+            {p.onFindSubtitles && (
+              <button
+                type="button"
+                className="w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-[var(--color-accent)] transition hover:bg-white/10"
+                onClick={() => {
+                  setOpen(false)
+                  p.onFindSubtitles?.()
+                }}
+              >
+                {t('Search online…')}
+              </button>
+            )}
             {p.subtitleStatus !== 'idle' && (
               <p role="status" className="px-2 pt-1 text-xs text-neutral-400">
                 {p.subtitleStatus === 'loading' ? t('Loading subtitles…') : t('Could not load these subtitles.')}
@@ -478,6 +496,28 @@ function SettingsMenu(p: ControlsProps) {
                 </button>
               ))}
             </fieldset>
+          )}
+          {p.repeatQueue && (
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-neutral-200 transition hover:bg-white/10">
+              <input
+                type="checkbox"
+                checked={p.repeatQueue.enabled}
+                onChange={(e) => p.repeatQueue?.onChange(e.target.checked)}
+                className="shrink-0 accent-[var(--color-accent)]"
+              />
+              {t('Repeat the list')}
+            </label>
+          )}
+          {p.cinemaMode && (
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-neutral-200 transition hover:bg-white/10">
+              <input
+                type="checkbox"
+                checked={p.cinemaMode.enabled}
+                onChange={(e) => p.cinemaMode?.onChange(e.target.checked)}
+                className="shrink-0 accent-[var(--color-accent)]"
+              />
+              {t('Cinema mode')}
+            </label>
           )}
           {p.autoplayNext && (
             <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-neutral-200 transition hover:bg-white/10">

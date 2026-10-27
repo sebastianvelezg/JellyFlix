@@ -8,6 +8,7 @@ import {
   getCollection,
   getCollectionItems,
   getCollectionPage,
+  nextInCollection,
   searchCollections,
   sortByYear,
 } from './collections'
@@ -115,5 +116,19 @@ describe('collectionPlayTarget', () => {
   it('skips series and handles an empty collection', () => {
     expect(collectionPlayTarget([m('s', { isSeries: true }), m('2')])?.id).toBe('2')
     expect(collectionPlayTarget([])).toBeUndefined()
+  })
+})
+
+describe('nextInCollection', () => {
+  const m = (id: string, isSeries = false) => ({ id, isSeries })
+  const saga = [m('1'), m('2'), m('show', true), m('3')]
+  it('goes on to the next title, skipping a series', () => {
+    expect(nextInCollection(saga, '1')?.id).toBe('2')
+    expect(nextInCollection(saga, '2')?.id).toBe('3')
+  })
+  it('has nothing after the last title, or for a title that is not in it', () => {
+    expect(nextInCollection(saga, '3')).toBeNull()
+    expect(nextInCollection(saga, 'nope')).toBeNull()
+    expect(nextInCollection([m('1'), m('show', true)], '1')).toBeNull()
   })
 })

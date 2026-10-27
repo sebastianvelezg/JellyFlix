@@ -6,6 +6,7 @@ import { SortOrder } from '@jellyfin/sdk/lib/generated-client/models/sort-order'
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api'
 import { itemImageUrl } from './images'
 import type { Session } from './jellyfin'
+import { nextInQueue } from './musicVideos'
 import { toMovie, type Movie } from './library'
 import type { Page } from './music'
 
@@ -113,6 +114,11 @@ export function sortByYear<T extends Pick<Movie, 'year'>>(titles: T[]): T[] {
 export function collectionPlayTarget<T extends Pick<Movie, 'played' | 'resumeTicks' | 'isSeries'>>(items: T[]): T | undefined {
   const playable = items.filter((m) => !m.isSeries)
   return playable.find((m) => m.resumeTicks > 0) ?? playable.find((m) => !m.played) ?? playable[0]
+}
+
+/** The title that follows `currentId` in a collection (a series is not played through, so it is skipped); null after the last one. Pure. */
+export function nextInCollection<T extends Pick<Movie, 'id' | 'isSeries'>>(items: readonly T[], currentId: string): T | null {
+  return nextInQueue(items, currentId, false)
 }
 
 /** Collections whose name matches the text (for search). */

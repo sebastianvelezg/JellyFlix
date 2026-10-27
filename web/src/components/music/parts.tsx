@@ -5,6 +5,7 @@ import {
   formatRuntime,
   formatTime,
   getAlbumTracks,
+  getSongRadio,
   setFavorite,
   ticksToSeconds,
   type Album,
@@ -13,7 +14,7 @@ import {
   type Session,
   type Track,
 } from '../../core'
-import { HeartIcon, MusicIcon, PlayIcon, PlusIcon } from '../icons'
+import { HeartIcon, MusicIcon, PlayIcon, PlusIcon, RadioIcon } from '../icons'
 import { Img } from '../Img'
 import { Subtext } from '../Subtext'
 import { useMusic, useMusicState } from './MusicProvider'
@@ -95,7 +96,7 @@ export function PlayingBars({ playing }: { playing: boolean }) {
   )
 }
 
-const cardFrame =
+export const cardFrame =
   'relative transition duration-300 ease-out group-hover:scale-[1.03] group-hover:shadow-[0_14px_44px_-10px_var(--glow)] group-hover:ring-[var(--color-accent)]/70 group-focus-within:ring-[var(--color-accent)]/70'
 
 /** An album: click opens it, the round button plays it. */
@@ -229,6 +230,12 @@ export function TrackItem({
       onPlay={onPlay}
       onPlayNext={() => music.playNext([track])}
       onEnqueue={() => music.enqueue([track])}
+      onRadio={() => {
+        // This song first, then songs that go with it.
+        getSongRadio(session, track.id)
+          .then((more) => music.play([track, ...more.filter((m) => m.id !== track.id)], 0))
+          .catch(() => undefined)
+      }}
       onOpenAlbum={onOpenAlbum}
     />
   )
@@ -282,6 +289,7 @@ function TrackRow({
   onPlay,
   onPlayNext,
   onEnqueue,
+  onRadio,
   onOpenAlbum,
 }: {
   session: Session
@@ -294,6 +302,7 @@ function TrackRow({
   onPlay: () => void
   onPlayNext: () => void
   onEnqueue: () => void
+  onRadio: () => void
   onOpenAlbum?: (albumId: string) => void
 }) {
   const { favorite, failed, toggle: toggleFavorite } = useFavorite(session, track.id, track.favorite)
@@ -346,6 +355,9 @@ function TrackRow({
         </IconAction>
         <IconAction label={t('Add {name} to the queue', { name: track.name })} onClick={onEnqueue}>
           <PlusIcon />
+        </IconAction>
+        <IconAction label={t('Start a radio from {name}', { name: track.name })} onClick={onRadio}>
+          <RadioIcon />
         </IconAction>
       </span>
       <button

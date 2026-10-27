@@ -1,8 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CatalogPage } from './components/CatalogPage'
+import { FolderPage } from './components/MusicVideoFolders'
+import { MusicVideosPage } from './components/MusicVideosPage'
 import { ConnectForm } from './components/ConnectForm'
 import { DetailsPage } from './components/DetailsPage'
-import { CardActionsProvider } from './components/cardActions'
+import { CardActionsProvider, PlayVideoProvider, type PlayVideo } from './components/cardActions'
+import { recallPlayList, rememberPlayList } from './components/playQueues'
+import { leaveFullscreen, pageInFullscreen } from './components/player/fullscreen'
 import { AddToPlaylistDialog } from './components/AddToPlaylistDialog'
 import { AdminTools } from './components/admin/AdminTools'
 import { clearActivity } from './platform/web/adminActivity'
@@ -16,7 +20,10 @@ import { RemoteProvider } from './components/remote/RemoteProvider'
 import { MusicProvider, useMusic, useMusicState } from './components/music/MusicProvider'
 import { OfflineBanner } from './components/OfflineBanner'
 import { PersonPage } from './components/PersonPage'
-import { formatRoute, useRoute, type MusicTab, type Navigate, type Route } from './components/route'
+import { formatRoute, useRoute, type MusicTab, type Navigate, type PlayQueueRef, type PlayRoute, type Route } from './components/route'
+import { CloseIcon } from './components/icons'
+import { DockNotice, DOCK_BUTTON } from './components/player/dock'
+import { readPlayerPrefs, writePlayerPrefs } from './platform/web/prefs'
 import { SearchPage } from './components/SearchPage'
 import { useLanguage } from './components/useLanguage'
 import { clearSwr, swrKey, swrScope, useSwr } from './components/useSwr'
@@ -25,9 +32,14 @@ import {
   audiobookStart,
   audiobookTrack,
   getLibrarySections,
+  getCollectionItems,
+  getFolderContents,
+  getVideosUnder,
   getNextEpisode,
   getPlayable,
   getPlaylistEntries,
+  nextInQueue,
+  orderQueue,
   getSeriesPlayTarget,
   isEpisode,
   logout,
@@ -287,7 +299,9 @@ function Shell({
               ? 'books'
               : route.page === 'live'
                 ? 'livetv'
-                : null
+                : route.page === 'folder'
+                  ? 'musicvideos'
+                  : null
 
   // With two or more tabs the phone layout needs a second header row for them.
   const hasTabs = tabs.length >= 2
@@ -337,11 +351,46 @@ function Shell({
 
   // Music: the music player keeps going between pages, and gives way to the video player.
   const music = useMusic()
-  const queued = useMusicState().queue !== null
+  const musicState = useMusicState()
+  const queued = musicState.queue !== null
   const playingVideo = route.page === 'play'
   useEffect(() => {
     if (playingVideo) music.pause()
   }, [playingVideo, music])
+
+  // A music video left with Back goes on playing in a bar at the bottom of the page (like the music) while you look for another one.
+  // The bar is the same player, not a new one: it is told to be small, so the video never stops.
+  const [docked, setDocked] = useState<PlayRoute | null>(null)
+  // Opening another video full screen takes the place of the one in the bar.
+  if (route.page === 'play' && docked && playKey(docked) !== playKey(route)) setDocked(null)
+  // A music video is docked whenever the player is left, however that happens: the Back button, Esc, or the browser's own Back (a
+  // back gesture, a mouse button). Which video is a music video is only known once it has loaded; one that was closed on purpose
+  // (a failed one, the bar's close button) is not kept.
+  const [lastPlay, setLastPlay] = useState<PlayRoute | null>(null)
+  const [loadedMusicVideo, setLoadedMusicVideo] = useState<string | null>(null)
+  const [notKept, setNotKept] = useState<string | null>(null)
+  const rememberLoaded = useCallback((item: Movie) => setLoadedMusicVideo(item.musicVideo ? item.id : null), [])
+  if (route.page === 'play') {
+    if (!lastPlay || playKey(lastPlay) !== playKey(route)) {
+      setLastPlay(route)
+      setNotKept(null)
+    }
+  } else if (lastPlay) {
+    setLastPlay(null)
+    if (loadedMusicVideo === lastPlay.id && notKept !== playKey(lastPlay)) setDocked(lastPlay)
+  }
+  const video: PlayRoute | null = route.page === 'play' ? route : docked
+  const mini = route.page !== 'play'
+  const barShown = mini && !!video
+  // Full screen belongs to the player: it goes on from one video to the next, and ends when the player does (or becomes the bar).
+  const hadVideo = useRef(false)
+  useEffect(() => {
+    if (hadVideo.current && !video && pageInFullscreen()) leaveFullscreen()
+    hadVideo.current = !!video
+  }, [video])
+  useEffect(() => () => (pageInFullscreen() ? leaveFullscreen() : undefined), [])
+  // A song starting while a video waits in the bar takes its place (the music's own bar comes back).
+  if (barShown && musicState.status === 'playing') setDocked(null)
 
   // The music home is kept (hidden) once visited, like the other homes, remembering its tab; its "recently played"
   // lists are read again each time it is opened.
@@ -395,6 +444,20 @@ function Shell({
   const listen = (book: Movie, startSeconds: number) => music.play([audiobookTrack(book)], 0, { startSeconds })
   const playOrOpenBook = (book: Movie) => (book.book === 'audiobook' ? listen(book, audiobookStart(book)) : openBook(book))
   const play = (item: Movie, startOver = false) => go({ page: 'play', id: item.id, startOver })
+  /** Plays a video as part of a folder, a library or a shuffled queue: the next one of it follows. */
+  const playQueue = (first: Movie, queue: PlayQueueRef) => go({ page: 'play', id: first.id, startOver: false, ...queue })
+  /** The play button of a music video's card: what follows is the folder it is in, or the row or grid it was played from. */
+  const playVideoNow: PlayVideo = (video, from) => {
+    if (from?.queue) playQueue(video, from.queue)
+    else if (from?.list && from.list.length > 1) playQueue(video, { queueId: rememberPlayList(from.list) })
+    else play(video)
+  }
+  // The cards get a function that never changes (the page re-renders often, and every card would re-render with it).
+  const latestPlayVideo = useRef(playVideoNow)
+  useEffect(() => {
+    latestPlayVideo.current = playVideoNow
+  })
+  const playVideo = useCallback<PlayVideo>((video, from) => latestPlayVideo.current(video, from), [])
   /** The Play button of a series: its next (or first) episode. */
   const playShow = (show: Movie) => {
     getSeriesPlayTarget(session, show.id)
@@ -418,6 +481,7 @@ function Shell({
 
   return (
     <CardActionsProvider value={remember}>
+    <PlayVideoProvider value={playVideo}>
       <button
         type="button"
         className="btn-primary fixed left-3 top-3 z-[60] -translate-y-20 focus:translate-y-0"
@@ -443,7 +507,7 @@ function Shell({
         onSignOut={onSignOut}
       />
       <OfflineBanner />
-      <main ref={mainRef} id="main" tabIndex={-1} className={`gutter-x pt-[var(--header-h)] outline-none ${queued ? 'pb-[calc(10rem+var(--nav-h))]' : 'pb-[calc(5rem+var(--nav-h))]'}`}>
+      <main ref={mainRef} id="main" tabIndex={-1} className={`gutter-x pt-[var(--header-h)] outline-none ${queued || barShown ? 'pb-[calc(10rem+var(--nav-h))]' : 'pb-[calc(5rem+var(--nav-h))]'}`}>
         {homeSeen && hasHome && sections.status === 'ready' && (
           <div hidden={!onHome}>
             <HomePage
@@ -476,14 +540,36 @@ function Shell({
           .filter((x) => seen.includes(x))
           .map((x) => (
             <div key={x} hidden={!(route.page === 'section' && route.section === x)}>
-              <CatalogPage
-                section={x}
-                onOpen={x === 'musicvideos' ? openMovie : x === 'books' ? openBook : openShow}
-                {...catalog}
-                {...(x === 'books' ? { onPlay: playOrOpenBook } : {})}
-              />
+              {x === 'musicvideos' ? (
+                <MusicVideosPage
+                  onOpen={openMovie}
+                  onOpenFolder={(id) => go({ page: 'folder', id })}
+                  onPlayQueue={playQueue}
+                  {...catalog}
+                />
+              ) : (
+                <CatalogPage
+                  section={x}
+                  onOpen={x === 'books' ? openBook : openShow}
+                  {...catalog}
+                  {...(x === 'books' ? { onPlay: playOrOpenBook } : {})}
+                />
+              )}
             </div>
           ))}
+        {route.page === 'folder' && (
+          <FolderPage
+            key={route.id}
+            session={session}
+            id={route.id}
+            overrides={overrides}
+            onOpenFolder={(id) => go({ page: 'folder', id })}
+            onOpenLibrary={() => go(sectionRoute('musicvideos'))}
+            onOpenVideo={openMovie}
+            onPlayQueue={playQueue}
+            onBack={() => back(sectionRoute('musicvideos'))}
+          />
+        )}
         {musicSeen && musicLibraries.length > 0 && (
           <div hidden={!onMusic}>
             <Suspense fallback={<PageLoading />}>
@@ -530,7 +616,7 @@ function Shell({
               session={session}
               id={route.id}
               overrides={overrides}
-              onPlay={play}
+              onPlay={(item) => go({ page: 'play', id: item.id, startOver: false, collectionId: route.id })}
               onOpen={openMovie}
               onBack={() => back({ page: 'collections' })}
             />
@@ -559,6 +645,7 @@ function Shell({
               id={route.id}
               overrides={overrides}
               onPlay={(item) => go({ page: 'play', id: item.id, startOver: false, listId: route.id })}
+              onShuffle={(item, seed) => go({ page: 'play', id: item.id, startOver: false, listId: route.id, shuffle: seed })}
               onOpenMovie={openMovie}
               onOpenSeries={openSeries}
               onBack={() => back({ page: 'lists' })}
@@ -657,7 +744,7 @@ function Shell({
           go(tab === 'home' ? { page: 'home' } : tab === 'music' ? { page: 'music', tab: musicTab } : sectionRoute(tab))
         }
       />
-      <MiniPlayer session={session} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
+      <MiniPlayer session={session} onOpenAlbum={openAlbum} onOpenArtist={openArtist} hidden={barShown} />
       {route.page === 'live' && (
         <Suspense fallback={<PlayerLoading />}>
           <LivePlayer
@@ -674,22 +761,37 @@ function Shell({
           <BookReader key={route.id} session={session} id={route.id} onExit={() => back({ page: 'book', id: route.id })} />
         </Suspense>
       )}
-      {route.page === 'play' && (
-        <Suspense fallback={<PlayerLoading />}>
+      {video && (
+        <Suspense fallback={mini ? null : <PlayerLoading />}>
           <PlayerRoute
-            key={`${route.id}:${route.startOver}:${route.startAt ?? ''}:${route.listId ?? ''}`}
+            // The same key full screen and in the bar: going from one to the other keeps the same player (and its <video>).
+            key={playKey(video)}
             session={session}
-            id={route.id}
-            startOver={route.startOver}
-            startAt={route.startAt}
-            listId={route.listId}
-            onNextEpisode={(following) => go({ page: 'play', id: following.id, startOver: false, listId: route.listId }, { replace: true })}
-            onExit={(item) =>
-              back(item && isEpisode(item) ? { page: 'show', id: item.seriesId } : { page: 'movie', id: route.id })
-            }
+            id={video.id}
+            startOver={video.startOver}
+            startAt={video.startAt}
+            queue={queueOf(video)}
+            mini={mini}
+            // A music video that follows another one plays from its start (not from where it was left: a list of videos flows).
+            // In the bar the next one takes its place there, without taking the page along.
+            onNextEpisode={(following) => {
+              const nextRoute: PlayRoute = { page: 'play', id: following.id, startOver: !!following.musicVideo, ...queueOf(video) }
+              if (mini) setDocked(nextRoute)
+              else go(nextRoute, { replace: true })
+            }}
+            // (A music video keeps playing in the bar when the player is left: see `docked`.)
+            onExit={(item) => back(item && isEpisode(item) ? { page: 'show', id: item.seriesId } : { page: 'movie', id: video.id })}
+            onLoaded={rememberLoaded}
+            onClose={() => {
+              setDocked(null)
+              setNotKept(playKey(video))
+            }}
+            onExpand={() => go(video)}
+            onPlaying={() => music.pause()}
           />
         </Suspense>
       )}
+    </PlayVideoProvider>
     </CardActionsProvider>
   )
 }
@@ -702,49 +804,91 @@ function PlayerLoading() {
   )
 }
 
+/** The queue a /play route belongs to, as the route's own words. */
+const queueOf = (route: PlayRoute): PlayQueueRef => ({
+  listId: route.listId,
+  collectionId: route.collectionId,
+  folderId: route.folderId,
+  libraryId: route.libraryId,
+  queueId: route.queueId,
+  shuffle: route.shuffle,
+})
+
+/** Two play routes with the same key are the same viewing: the player is kept between them, not started again. */
+const playKey = (route: PlayRoute): string => `${route.id}:${route.startOver}:${route.startAt ?? ''}:${JSON.stringify(queueOf(route))}`
+
 /** Looks up what a /play route points at (it may be a deep link or a refresh) and renders the player. */
 function PlayerRoute({
   session,
   id,
   startOver,
   startAt,
-  listId,
+  queue,
+  mini,
   onNextEpisode,
   onExit,
+  onClose,
+  onExpand,
+  onPlaying,
+  onLoaded,
 }: {
   session: Session
   id: string
   startOver: boolean
-  /** Playing a playlist: what follows is its next title, not the next episode of a series. */
-  listId?: string
+  /** What this is played as part of (a playlist, a collection, a folder...): what follows is the next title of it. */
+  queue: PlayQueueRef
   /** Seconds to begin at, when another device handed its playback over. */
   startAt?: number
+  /** Drawn as a bar at the bottom of the page (a music video that was left with Back), not over the whole screen. */
+  mini: boolean
   onNextEpisode: (next: Movie) => void
   /** Leave the player; `item` is what was playing (null if it could not be loaded). */
   onExit: (item: Movie | null) => void
+  /** Stop for good and take the bar away. */
+  onClose: () => void
+  /** Bring the bar back as the full-screen player. */
+  onExpand: () => void
+  onPlaying: () => void
+  /** The title is known (so the app knows whether it is a music video). */
+  onLoaded: (item: Movie) => void
 }) {
   const [item, setItem] = useState<Movie | null>(null)
-  const [next, setNext] = useState<Movie | null>(null)
+  useEffect(() => {
+    if (item) onLoaded(item)
+  }, [item, onLoaded])
+  // The titles that follow each other (in play order) when this is part of a queue, and the next episode when it is just an episode.
+  const [titles, setTitles] = useState<Movie[] | null>(null)
+  const [episodeNext, setEpisodeNext] = useState<Movie | null>(null)
+  // After the last title of a queue the first one plays again. Chosen in the player and remembered.
+  const [loop, setLoop] = useState(() => readPlayerPrefs().repeatQueue)
   const [failed, setFailed] = useState(false)
+  const { listId, collectionId, folderId, libraryId, queueId, shuffle } = queue
 
   useEffect(() => {
     let cancelled = false
+    const readQueue = (read: Promise<Movie[]>) =>
+      read
+        .then((all) => {
+          if (!cancelled) setTitles(orderQueue(all, shuffle))
+        })
+        .catch(() => undefined)
     getPlayable(session, id)
       .then((found) => {
         if (cancelled) return
         setItem(found)
         // What follows is only needed at the end, so it is looked up in the background.
-        if (listId) {
-          getPlaylistEntries(session, listId)
-            .then((entries) => {
-              const at = entries.findIndex((e) => e.item.id === found.id)
-              if (!cancelled && at >= 0) setNext(entries[at + 1]?.item ?? null)
-            })
-            .catch(() => undefined)
-        } else if (isEpisode(found)) {
+        // (A row or grid it was played from is already known; after a reload it is not, and the folder's other videos follow instead.)
+        const fromRow = queueId ? recallPlayList(queueId) : undefined
+        if (fromRow) setTitles(orderQueue(fromRow, shuffle))
+        else if (listId) void readQueue(getPlaylistEntries(session, listId).then((entries) => entries.map((e) => e.item)))
+        else if (collectionId) void readQueue(getCollectionItems(session, collectionId))
+        else if (folderId || libraryId) void readQueue(getVideosUnder(session, (folderId ?? libraryId) as string))
+        // A music video played on its own goes on with the others of its folder.
+        else if (found.musicVideo && found.parentId) void readQueue(getFolderContents(session, found.parentId).then((c) => c.videos))
+        else if (isEpisode(found)) {
           getNextEpisode(session, found)
             .then((following) => {
-              if (!cancelled) setNext(following)
+              if (!cancelled) setEpisodeNext(following)
             })
             .catch(() => undefined)
         }
@@ -755,8 +899,20 @@ function PlayerRoute({
     return () => {
       cancelled = true
     }
-  }, [session, id, listId])
+  }, [session, id, listId, collectionId, folderId, libraryId, queueId, shuffle])
 
+  const next = titles ? nextInQueue(titles, id, loop) : episodeNext
+
+  // The bar at the bottom of the page does not cover the page while it waits for the video or when it could not be loaded.
+  if (mini && (failed || !item)) {
+    return (
+      <DockNotice title={failed ? t('That title could not be loaded.') : t('Preparing playback…')} text="">
+        <button type="button" aria-label={t('Close the video player')} title={t('Close')} onClick={onClose} className={DOCK_BUTTON}>
+          <CloseIcon />
+        </button>
+      </DockNotice>
+    )
+  }
   if (failed) {
     return (
       <div
@@ -785,7 +941,12 @@ function PlayerRoute({
       startAt={startAt}
       next={next}
       onNext={() => next && onNextEpisode(next)}
+      repeat={titles ? { enabled: loop, onChange: (on) => { setLoop(on); writePlayerPrefs({ repeatQueue: on }) } } : undefined}
       onExit={() => onExit(item)}
+      mini={mini}
+      onClose={onClose}
+      onExpand={onExpand}
+      onPlaying={onPlaying}
     />
   )
 }

@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react'
 import {
   buildHomeLineup,
-  getBecauseYouWatched,
+  getRecommendations,
   getContinueAll,
   getHomePool,
   getLatestTitles,
@@ -25,6 +25,7 @@ import { readUiPrefs } from '../platform/web/prefs'
 import { CollectionsRow } from './CollectionCard'
 import { Discover } from './Discover'
 import { HeroCarousel, HeroSkeleton } from './Hero'
+import { usePlayVideo } from './cardActions'
 import { ContinueCard, RowCard } from './MovieCard'
 import { AlbumCard, RowItem } from './music/parts'
 import { Row } from './Row'
@@ -247,7 +248,7 @@ export function HomePage({
     newMusicVideos: recentMusicVideos.status === 'ready' && recentMusicVideos.data.length > 0 && (
       <Row title={t('New music videos')} action={<SeeAll onClick={() => actions.onSection('musicvideos')} label={t('Music videos')} />}>
         {recentMusicVideos.data.map((m) => (
-          <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpenMovie} />
+          <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpenMovie} list={recentMusicVideos.data} />
         ))}
       </Row>
     ),
@@ -322,13 +323,16 @@ function ContinueAll({
   // what is remembered is shown at once, but never trusted).
   const load = useCallback(() => getContinueAll(session, undefined, withMusicVideos).then((rows) => ({ rows, playbackVersion })), [session, withMusicVideos, playbackVersion])
   const { state } = useSwr(swrKey(swrScope(session), 'home', 'continue', withMusicVideos ? 'mv' : ''), load, { fresh: 0 })
+  const playVideo = usePlayVideo()
   if (state.status !== 'ready') return null
   const items = state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0)
   if (items.length === 0) return null
+  const videos = items.filter((m) => m.musicVideo)
   return (
     <Row title={t('Continue watching')}>
       {items.map((m) => (
-        <ContinueCard key={m.id} session={session} movie={m} onPlay={onPlay} onOpen={onOpen} />
+        // A music video goes on with the other music videos of the row.
+        <ContinueCard key={m.id} session={session} movie={m} onPlay={(v) => (v.musicVideo && playVideo ? playVideo(v, { list: videos }) : onPlay(v))} onOpen={onOpen} />
       ))}
     </Row>
   )
@@ -363,7 +367,7 @@ function NextUpRow({
   )
 }
 
-/** "Because you watched X": what the server finds similar to the last thing you finished. */
+/** Rows of suggestions: "Because you watched X" for a few of the last things you finished, and "Because you liked X" for a favourite. */
 function BecauseRow({
   session,
   playbackVersion,
@@ -377,16 +381,19 @@ function BecauseRow({
   onOpenMovie: (movie: Movie) => void
   onOpenShow: (show: Movie) => void
 }) {
-  const load = useCallback(() => getBecauseYouWatched(session).then((row) => ({ row, playbackVersion })), [session, playbackVersion])
+  const load = useCallback(() => getRecommendations(session).then((rows) => ({ rows, playbackVersion })), [session, playbackVersion])
   const { state } = useSwr(swrKey(swrScope(session), 'home', 'because'), load, { fresh: 5 * 60_000 })
-  if (state.status !== 'ready' || !state.data.row) return null
-  const { seed, items } = state.data.row
+  if (state.status !== 'ready' || state.data.rows.length === 0) return null
   return (
-    <Row title={t('Because you watched {title}', { title: seed.name })}>
-      {items.map((m) => (
-        <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={m.isSeries ? onOpenShow : onOpenMovie} />
+    <>
+      {state.data.rows.map(({ kind, seed, items }) => (
+        <Row key={`${kind}-${seed.id}`} title={kind === 'liked' ? t('Because you liked {title}', { title: seed.name }) : t('Because you watched {title}', { title: seed.name })}>
+          {items.map((m) => (
+            <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={m.isSeries ? onOpenShow : onOpenMovie} />
+          ))}
+        </Row>
       ))}
-    </Row>
+    </>
   )
 }
 

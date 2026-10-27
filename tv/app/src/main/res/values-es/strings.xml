@@ -98,6 +98,7 @@
     <string name="nav_collections">Colecciones</string>
     <string name="row_new_anime">Anime nuevo</string>
     <string name="row_because">Porque viste %1$s</string>
+    <string name="row_liked">Porque te gustó %1$s</string>
     <string name="row_collections">Colecciones</string>
     <string name="discover_title">Descubre algo nuevo</string>
     <string name="pick_movie">Película al azar</string>
@@ -131,6 +132,18 @@
     <string name="music_shuffle_all">Mezclar todas las canciones</string>
     <string name="music_play_album">Reproducir álbum</string>
     <string name="music_shuffle">Aleatorio</string>
+    <string name="music_radio">Radio</string>
+    <string name="music_mix_day">Mix del día</string>
+    <string name="music_mix_none">El servidor no pudo hacer una mezcla de canciones para esto</string>
+    <string name="player_subtitles_search">Buscar en internet…</string>
+    <string name="subtitles_search_language">Buscar subtítulos en…</string>
+    <string name="subtitles_results">Subtítulos encontrados</string>
+    <string name="subtitles_machine">traducción automática</string>
+    <string name="subtitles_none">No se encontraron subtítulos en ese idioma</string>
+    <string name="subtitles_saved">Subtítulos guardados en el servidor y activados</string>
+    <string name="subtitles_forbidden">Tu cuenta no puede buscar ni guardar subtítulos en este servidor</string>
+    <string name="subtitles_no_plugin">El servidor no tiene un plugin de subtítulos para este título</string>
+    <string name="subtitles_unreachable">No se pudo llegar a la búsqueda de subtítulos. Inténtalo en un momento</string>
     <string name="music_popular">Canciones populares</string>
     <string name="music_albums_of">Álbumes</string>
     <string name="music_songs">%1$d canciones</string>

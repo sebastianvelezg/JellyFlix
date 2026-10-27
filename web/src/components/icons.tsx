@@ -154,6 +154,19 @@ export const ShuffleIcon = () => (
   </Icon>
 )
 
+export const VisualizerIcon = () => (
+  <Icon width={20} height={20}>
+    <path d="M5 20v-6M9 20V8M13 20V4M17 20v-9M21 20v-4" />
+  </Icon>
+)
+
+export const RadioIcon = () => (
+  <Icon width={18} height={18}>
+    <circle cx="12" cy="12" r="2" />
+    <path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19a10 10 0 0 1 0-14" />
+  </Icon>
+)
+
 /** The app mark: the Jellyflix jellyfish, with its own glow. */
 export const LogoMark = ({ size = 28 }: { size?: number }) => (
   <img src={logo} width={size} height={size} alt="" aria-hidden="true" draggable={false} />
@@ -283,6 +296,13 @@ export const AnimeIcon = () => (
 )
 
 /** A screen with a note on it: music videos. */
+/** A folder: the folders of the music video library. */
+export const FolderIcon = () => (
+  <Icon width={34} height={34} strokeWidth={1.6}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </Icon>
+)
+
 export const MusicVideoIcon = () => (
   <Icon>
     <rect x="3" y="5" width="18" height="14" rx="2.5" />

@@ -1,5 +1,5 @@
 import { StateMessage } from './StateMessage'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import {
   FILTER_LABELS,
   getContinueEpisodes,
@@ -33,6 +33,7 @@ import { CollectionsRow } from './CollectionCard'
 import { HeroCarousel, HeroSkeleton } from './Hero'
 import { FiltersButton, FiltersPanel } from './LibraryFilters'
 import { ShuffleIcon } from './icons'
+import { usePlayVideo } from './cardActions'
 import { ContinueCard, RowCard } from './MovieCard'
 import { PagedGrid } from './PagedGrid'
 import { Row } from './Row'
@@ -126,7 +127,7 @@ export function CatalogPage({
   sections,
   retrySections,
   ...common
-}: CatalogCommon & { section: Section; sections: AsyncState<LibrarySections>; retrySections: () => void }) {
+}: CatalogCommon & { section: Section; sections: AsyncState<LibrarySections>; retrySections: () => void; /** Something shown right under the banner (the music video views). */ toolbar?: ReactNode }) {
   if (sections.status === 'loading') {
     return (
       <p role="status" className="py-24 text-center text-neutral-400">
@@ -162,7 +163,8 @@ function LibraryView({
   onOpenSeries,
   onOpenCollection,
   onSeeCollections,
-}: CatalogCommon & { section: Section; libraries: MovieLibrary[] }) {
+  toolbar,
+}: CatalogCommon & { section: Section; libraries: MovieLibrary[]; toolbar?: ReactNode }) {
   const kind = kindOf(section)
   const copy = copyFor(kind)
   const [prefs] = useState(() => readBrowsePrefs(section))
@@ -251,6 +253,7 @@ function LibraryView({
         />
       )}
       <div className={`space-y-9 ${showRows && (bannerPending || featured.length > 0) ? 'relative -mt-14' : 'pt-6'}`}>
+        {toolbar}
         {showRows && (
           <>
             {kind !== 'series' ? (
@@ -277,7 +280,7 @@ function LibraryView({
             {recent.status === 'ready' && recent.data.length > 0 && (
               <Row title={t('Recently added')}>
                 {recent.data.map((m) => (
-                  <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} />
+                  <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} list={recent.data} />
                 ))}
               </Row>
             )}
@@ -537,7 +540,7 @@ function GenreRow({
       }
     >
       {state.data.map((m) => (
-        <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} />
+        <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} list={state.data} />
       ))}
     </Row>
   )
@@ -581,13 +584,15 @@ function ContinueRow({
     [session, kind, playbackVersion],
   )
   const { state } = useSwr(swrKey(swrScope(session), `continue-${kind}s`), load, { fresh: 0 })
+  const playVideo = usePlayVideo()
   if (state.status !== 'ready') return null
   const movies = state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0)
   if (movies.length === 0) return null
   return (
     <Row title={t('Continue watching')}>
       {movies.map((m) => (
-        <ContinueCard key={m.id} session={session} movie={m} onPlay={onPlay} onOpen={onOpen} />
+        // A music video goes on with the next ones of the row.
+        <ContinueCard key={m.id} session={session} movie={m} onPlay={(v) => (v.musicVideo && playVideo ? playVideo(v, { list: movies }) : onPlay(v))} onOpen={onOpen} />
       ))}
     </Row>
   )
@@ -663,7 +668,7 @@ function FavoritesRow({
   return (
     <Row title={t('Your favorites')}>
       {movies.map((m) => (
-        <RowCard key={m.id} session={session} movie={m} onOpen={onOpen} />
+        <RowCard key={m.id} session={session} movie={m} onOpen={onOpen} list={movies} />
       ))}
     </Row>
   )

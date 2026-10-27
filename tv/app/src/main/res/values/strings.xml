@@ -98,6 +98,7 @@
     <string name="nav_collections">Collections</string>
     <string name="row_new_anime">New anime</string>
     <string name="row_because">Because you watched %1$s</string>
+    <string name="row_liked">Because you liked %1$s</string>
     <string name="row_collections">Collections</string>
     <string name="discover_title">Discover something new</string>
     <string name="pick_movie">Random movie</string>
@@ -131,6 +132,18 @@
     <string name="music_shuffle_all">Shuffle all songs</string>
     <string name="music_play_album">Play album</string>
     <string name="music_shuffle">Shuffle</string>
+    <string name="music_radio">Radio</string>
+    <string name="music_mix_day">Mix of the day</string>
+    <string name="music_mix_none">The server could not make a mix of songs for this</string>
+    <string name="player_subtitles_search">Search online…</string>
+    <string name="subtitles_search_language">Search subtitles in…</string>
+    <string name="subtitles_results">Subtitles found</string>
+    <string name="subtitles_machine">machine translated</string>
+    <string name="subtitles_none">No subtitles found in that language</string>
+    <string name="subtitles_saved">Subtitles saved on the server and switched on</string>
+    <string name="subtitles_forbidden">Your account may not search for or save subtitles on this server</string>
+    <string name="subtitles_no_plugin">The server has no subtitle plugin for this title</string>
+    <string name="subtitles_unreachable">Could not reach the subtitle search. Try again in a moment</string>
     <string name="music_popular">Popular songs</string>
     <string name="music_albums_of">Albums</string>
     <string name="music_songs">%1$d songs</string>

@@ -22,6 +22,18 @@ export interface PlayerPrefs {
   subtitleLanguage: string | null
   /** Start the next episode on its own when one ends. */
   autoplayNext: boolean
+  /** How many seconds the "Up next" countdown runs before the next title starts by itself. */
+  autoplayCountdown: number
+  /** Play a queue again from its first title after the last one (a folder of music videos, a playlist, a collection). */
+  repeatQueue: boolean
+  /** Cinema mode: the picture fades in from black, the controls get out of the way sooner and also while paused. */
+  cinemaMode: boolean
+  /** Music: seconds the end of a song fades into the start of the next one (0 = no crossfade). */
+  crossfadeSeconds: number
+  /** Music: the next song is made ready ahead of time so there is no pause between songs. */
+  gapless: boolean
+  /** Music: the full-screen player shows bars that move with the sound. */
+  visualizer: boolean
   /** The most the video may stream at, in megabits per second; 0 is no limit (the original quality). */
   maxBitrateMbps: number
 }
@@ -40,6 +52,12 @@ export interface BrowsePrefs {
   advanced?: AdvancedFilters
 }
 
+/** How long a song can fade into the next one, in seconds (0 = off). */
+export const CROSSFADE_CHOICES = [0, 2, 4, 6, 8, 10, 12] as const
+
+/** How long the "Up next" countdown can run, in seconds. */
+export const COUNTDOWN_CHOICES = [3, 5, 8, 10, 15] as const
+
 /** The limits the player offers, in megabits per second (0 = original quality). */
 export const QUALITY_CHOICES = [0, 40, 20, 10, 8, 4, 2] as const
 
@@ -55,6 +73,12 @@ const PLAYER_DEFAULTS: PlayerPrefs = {
   subtitlePosition: 'low',
   subtitleLanguage: null,
   autoplayNext: true,
+  autoplayCountdown: 8,
+  cinemaMode: false,
+  repeatQueue: false,
+  crossfadeSeconds: 0,
+  gapless: true,
+  visualizer: false,
   maxBitrateMbps: 0,
 }
 const BROWSE_DEFAULTS: BrowsePrefs = { sort: 'title', filter: 'all' }
@@ -87,6 +111,12 @@ export function readPlayerPrefs(): PlayerPrefs {
     subtitlePosition: SUBTITLE_POSITIONS.includes(p.subtitlePosition) ? p.subtitlePosition : 'low',
     subtitleLanguage: typeof p.subtitleLanguage === 'string' ? p.subtitleLanguage : null,
     autoplayNext: p.autoplayNext !== false,
+    autoplayCountdown: (COUNTDOWN_CHOICES as readonly number[]).includes(p.autoplayCountdown) ? p.autoplayCountdown : 8,
+    cinemaMode: p.cinemaMode === true,
+    repeatQueue: p.repeatQueue === true,
+    crossfadeSeconds: (CROSSFADE_CHOICES as readonly number[]).includes(p.crossfadeSeconds) ? p.crossfadeSeconds : 0,
+    gapless: p.gapless !== false,
+    visualizer: p.visualizer === true,
     maxBitrateMbps: (QUALITY_CHOICES as readonly number[]).includes(p.maxBitrateMbps) ? p.maxBitrateMbps : 0,
   }
 }

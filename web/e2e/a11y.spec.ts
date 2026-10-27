@@ -53,7 +53,6 @@ test('home, movies, series, anime and music pages', async ({ page }) => {
     ['#/music', 'Recently added'],
     ['#/music/albums', 'All albums'],
     ['#/music/songs', 'All songs'],
-    ['#/music/playlists', 'All playlists'],
     ['#/settings', 'Account'],
   ] as const) {
     await page.evaluate((h) => (location.hash = h), hash)

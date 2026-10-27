@@ -216,7 +216,7 @@ function DetailsContent({
         <div className="mt-10">
           <Row title={t('More like this')}>
             {similarState.data.map((m) => (
-              <RowCard key={m.id} session={session} movie={m} onOpen={onOpen} />
+              <RowCard key={m.id} session={session} movie={m} onOpen={onOpen} list={similarState.data} />
             ))}
           </Row>
         </div>

@@ -4,12 +4,14 @@ import {
   createVideoPlaylist,
   deletePlaylist,
   episodeCode,
+  firstOfQueue,
   getPlaylistEntries,
   getVideoPlaylist,
   getVideoPlaylists,
   isEpisode,
   isWatchLater,
   moveInPlaylist,
+  newShuffleSeed,
   posterUrl,
   removeFromPlaylist,
   renamePlaylist,
@@ -22,7 +24,7 @@ import {
   type VideoPlaylist,
 } from '../core'
 import { t } from '../i18n'
-import { BackIcon, PlayIcon, PlusIcon } from './icons'
+import { BackIcon, PlayIcon, PlusIcon, ShuffleIcon } from './icons'
 import { Img } from './Img'
 import { frame } from './MovieCard'
 import { StateMessage } from './StateMessage'
@@ -144,6 +146,7 @@ export function ListPage({
   id,
   overrides,
   onPlay,
+  onShuffle,
   onOpenMovie,
   onOpenSeries,
   onBack,
@@ -152,6 +155,8 @@ export function ListPage({
   id: string
   overrides: Record<string, Movie>
   onPlay: (item: Movie) => void
+  /** Plays the list in a random order: `seed` makes it the same order on every page of the queue. */
+  onShuffle: (first: Movie, seed: string) => void
   onOpenMovie: (movie: Movie) => void
   onOpenSeries: (seriesId: string) => void
   onBack: () => void
@@ -271,6 +276,19 @@ export function ListPage({
         {first && (
           <button type="button" className="btn-primary" onClick={() => onPlay(overrides[first.item.id] ?? first.item)}>
             <PlayIcon /> {t('Play all')}
+          </button>
+        )}
+        {first && entries.length > 1 && (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              const seed = newShuffleSeed()
+              const start = firstOfQueue(entries.map((e) => e.item), seed)
+              if (start) onShuffle(overrides[start.id] ?? start, seed)
+            }}
+          >
+            <ShuffleIcon /> {t('Shuffle')}
           </button>
         )}
         {renaming === null && (

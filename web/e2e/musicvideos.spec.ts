@@ -28,7 +28,8 @@ test('music videos: a tab with a library of them, its cards, its title page and 
   const frame = await card.locator('div').first().boundingBox()
   expect(frame && frame.width / frame.height).toBeCloseTo(16 / 9, 1)
 
-  await card.click()
+  // (The middle of the picture is the play button; the rest of the card opens the title.)
+  await card.click({ position: { x: 12, y: 12 } })
   await expect(page.getByRole('heading', { name: 'Test Music Video 001', level: 1 })).toBeVisible()
   await expect(page.getByText('Test Artist 2', { exact: true })).toBeVisible()
 

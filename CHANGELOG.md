@@ -3,6 +3,39 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 Jellyflix Web and Jellyflix TV are released together and share one version number.
 
+## [Unreleased]
+
+## [1.2.0] - 2026-10-27
+
+A better video player, music that flows from one song to the next, mixes made for you, music videos you can browse by folder, play from their card and keep playing in a mini bar, and more varied suggestions. The TV app gets subtitle search, mixes and radio, and play-through.
+
+### Web app
+- **Subtitles from the internet:** the subtitle menu has a *Search online…* button. It asks the subtitle plugin of your server (Open Subtitles and the like) in a language you choose, lists what it found (matches for your exact file first, machine translations last) and saves the one you pick on the server, next to the video. The video starts again where you were with the new subtitle on. Needs an account that may manage subtitles.
+- **Cinema mode** (Settings -> Playback, or in the player's menu): the picture fades in from black and out at the very end, and the controls leave sooner, also while paused.
+- **Up next:** the card now shows in the last 20 seconds of a long title (so you can jump straight to the next one during the credits), the countdown after a title has a bar and its length (3 to 15 seconds) is chosen in Settings.
+- **Collections play through:** the Play button of a collection goes on to the next film of the saga, like a playlist does.
+- **Gapless playback and crossfade for music** (Settings -> Playback -> Music): the next song is made ready before the one playing ends, so there is no pause between songs (also when the server converts them), and with a crossfade length chosen the old song fades out while the new one fades in.
+- **Mix of the day and radio:** the music home has a *Made for you* row with a mix of the day (your favourites, the radios of the artists you play most and a few surprises; the same all day, with a button to make another) and the radio of your top artists. Artist and album pages have a *Radio* button and every song a *Start a radio* action, all from the server's instant mix.
+- **Visualizer:** a button in the full-screen player draws bars that move with the real sound over the cover. While it is on, songs are loaded in a way that lets the browser read their sound; where that is not possible the bars move to a made-up rhythm. They stand still when paused or when the system asks for less motion.
+- **More varied suggestions:** up to three rows on the main page, each from a different starting point (a few of the titles you finished lately, and one favourite: *Because you liked X*), alternating, with no title in two rows.
+
+- **Music videos by folder, played one after the other:**
+  - The Music videos section has two views, like Jellyfin: *Suggestions* (the usual page with all the videos) and *Folders*.
+  - **Folders** shows the folders of the library; a folder opens with a way back up (a breadcrumb), and has **Play folder** and **Shuffle**, which play every video inside it, including the folders inside it. A folder card plays its folder without opening it. With one library, **Play all** and **Shuffle** play the whole library.
+  - **Videos follow each other:** the 3-2-1 countdown runs over the last 3 seconds of a music video and the next one of its queue starts the moment it ends, from its beginning (no pause in between). The next video keeps the screen as it was: in full screen it also plays in full screen, in a window it stays in a window. A video played on its own goes on with the others of its folder. **Repeat the list** (in the player's menu, for any queue: folder, library, playlist, collection) starts again from the first video after the last one.
+  - A playlist page has **Shuffle** too. A shuffled queue keeps one random order from the first video to the last.
+  - **Play from the card, and it goes on:** a music video's card has a round play button in the middle of its picture: it plays the video at once, and the rest of the card still opens its page (on a touch screen the button is always there). Wherever a music video is played from, the next one follows it: from a row (Recently added, New music videos, Continue watching, your favorites, top rated...) the next of that row, from the grid of all videos the next ones of the grid, from a folder the rest of that folder. A video with no list at all goes on with the others of its folder, as before. (A row's list is kept in memory: after a reload the video goes on with its folder instead.)
+  - **A mini player for music videos:** leaving a music video with Back (or Esc) does not stop it: it goes on playing in a bar at the bottom of the page, like the music, with its picture as a small thumbnail, play/pause, next, a timeline, a button to open it full screen again (the same video, without a cut) and one to close it. You can browse, search and pick another video meanwhile; playing another one takes the place of the one in the bar, and the next video of its queue follows inside the bar. The video and the music take turns: a video pauses the music and holds the bar, and starting a song closes the video.
+
+- **The full-screen music player takes its colours from the cover:** the blur behind the cover, the bars of the visualizer (a gradient between the cover's two main colours), the glow and the accent of that screen (seek bar, buttons) follow the song that is playing and fade into the next song's colours. A cover with no colour of its own (black and white), or one the browser cannot read, keeps the accent chosen in Appearance.
+
+### TV app
+- The same more varied suggestions on Home: *Because you watched X* for several recent titles and *Because you liked X* for a favourite.
+- **Subtitles from the internet:** the Audio and subtitles menu has *Search online…*: pick a language, then one of what your server's subtitle plugin found (a match of your file is starred); it is saved on the server and switched on, and the video carries on from the same second. Needs an account that may manage subtitles.
+- **Mix of the day and radio:** the music page has a *Mix of the day* (a few of your favourites, the radios of three of them and a few surprises; the same all day while the app is open) and album and artist pages have a *Radio* button, from the server's instant mix.
+- **Play through:** the Play button of a collection goes on to the next film of the saga, and a music video played on its own goes on with the other videos of its folder (with autoplay on), like on the web.
+- Left to the web app on purpose: browsing music videos by folder, repeating a list, the mini player and the play button on cards (the TV player is always full screen and the remote opens a title first), cinema mode, the Up next card with a countdown, crossfade, the visualizer and the cover colours.
+
 ## [1.1.0] - 2026-10-23
 
 Three new kinds of library (music videos, books and Live TV), a menu you can arrange, and a tidier look. Web and TV get all of it together.

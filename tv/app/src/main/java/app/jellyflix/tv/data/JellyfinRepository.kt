@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import app.jellyflix.tv.R
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.artistApi
@@ -11,6 +12,7 @@ import org.jellyfin.sdk.api.client.extensions.authenticationApi
 import org.jellyfin.sdk.api.client.extensions.displayPreferenceApi
 import org.jellyfin.sdk.api.client.extensions.filterApi
 import org.jellyfin.sdk.api.client.extensions.imageApi
+import org.jellyfin.sdk.api.client.extensions.instantMixApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.client.extensions.lyricApi
@@ -21,6 +23,7 @@ import org.jellyfin.sdk.api.client.extensions.pluginApi
 import org.jellyfin.sdk.api.client.extensions.scheduledTaskApi
 import org.jellyfin.sdk.api.client.extensions.userApi
 import org.jellyfin.sdk.api.client.extensions.sessionApi
+import org.jellyfin.sdk.api.client.extensions.subtitleApi
 import org.jellyfin.sdk.api.client.extensions.showApi
 import org.jellyfin.sdk.api.client.extensions.trickPlayApi
 import kotlinx.coroutines.sync.withLock
@@ -588,30 +591,68 @@ class JellyfinRepository(context: Context) {
     }
 
     /**
-     * "Because you watched X": the title you finished most recently (a series, when it was an episode) and what the server finds
-     * similar to it that you have not seen. Null when there is nothing worth a row.
+     * Rows of suggestions from different starting points: a few of the titles you finished most recently ("Because you watched X";
+     * a series when it was an episode) and one of your favourites ("Because you liked X"), each with what the server finds similar
+     * that you have not seen and that is not already in another row. Empty when nothing has been watched yet.
      */
-    suspend fun becauseYouWatched(session: Session): Pair<MediaItem, List<MediaItem>>? {
+    suspend fun recommendations(session: Session, rows: Int = Recommendations.ROWS): List<Recommendation> = coroutineScope {
         val api = api(session)
         val userId = userId(session)
-        val last = api.libraryApi.getItems(
-            userId = userId,
-            includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.EPISODE),
-            recursive = true,
-            filters = listOf(ItemFilter.IS_PLAYED),
-            sortBy = listOf(ItemSortBy.DATE_PLAYED),
-            sortOrder = listOf(SortOrder.DESCENDING),
-            limit = 1,
-            enableTotalRecordCount = false,
-        ).content.items.firstOrNull() ?: return null
-        val seedId = if (last.type == BaseItemKind.EPISODE) last.seriesId ?: return null else last.id
-        val similar = api.libraryApi.getSimilarItems(itemId = seedId, userId = userId, limit = 24).content.items
-            .filter { it.userData?.played != true }
-            .map { toItem(api, it) }
-            .take(16)
-        if (similar.size < 4) return null
-        val seed = if (last.type == BaseItemKind.EPISODE) last.seriesName.orEmpty() else last.name.orEmpty()
-        return toItem(api, last).copy(title = seed) to similar
+        val played = async {
+            runCatching {
+                api.libraryApi.getItems(
+                    userId = userId,
+                    includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.EPISODE),
+                    recursive = true,
+                    filters = listOf(ItemFilter.IS_PLAYED),
+                    sortBy = listOf(ItemSortBy.DATE_PLAYED),
+                    sortOrder = listOf(SortOrder.DESCENDING),
+                    limit = 40,
+                    enableTotalRecordCount = false,
+                ).content.items
+            }.getOrDefault(emptyList())
+        }
+        val favorites = async {
+            runCatching {
+                api.libraryApi.getItems(
+                    userId = userId,
+                    includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+                    recursive = true,
+                    filters = listOf(ItemFilter.IS_FAVORITE),
+                    sortBy = listOf(ItemSortBy.RANDOM),
+                    limit = 6,
+                    enableTotalRecordCount = false,
+                ).content.items
+            }.getOrDefault(emptyList())
+        }
+        val watchedSeeds = Recommendations.distinctSeeds(
+            played.await().mapNotNull { dto ->
+                if (dto.type == BaseItemKind.EPISODE) dto.seriesId?.let { Recommendations.Seed(it, dto.seriesName.orEmpty()) }
+                else Recommendations.Seed(dto.id, dto.name.orEmpty())
+            },
+        ).take(rows + 2)
+        if (watchedSeeds.isEmpty()) return@coroutineScope emptyList()
+        val likedSeeds = favorites.await().shuffled()
+            .filter { fav -> watchedSeeds.none { it.id == fav.id } }
+            .take(3)
+            .map { Recommendations.Seed(it.id, it.name.orEmpty()) }
+
+        suspend fun similarTo(seed: Recommendations.Seed): List<MediaItem> =
+            runCatching { api.libraryApi.getSimilarItems(itemId = seed.id, userId = userId, limit = 24).content.items.map { toItem(api, it) } }
+                .getOrDefault(emptyList())
+        val watchedLists = watchedSeeds.map { async { similarTo(it) } }
+        val likedLists = likedSeeds.map { async { similarTo(it) } }
+
+        val used = watchedSeeds.map { it.id }.toMutableSet()
+        val liked = likedSeeds.withIndex().firstNotNullOfOrNull { (i, seed) ->
+            Recommendations.take(RecommendationKind.LIKED, seed, likedLists[i].await(), used)
+        }
+        val watched = mutableListOf<Recommendation>()
+        for ((i, seed) in watchedSeeds.withIndex()) {
+            if (watched.size >= rows - (if (liked != null) 1 else 0)) break
+            Recommendations.take(RecommendationKind.WATCHED, seed, watchedLists[i].await(), used)?.let { watched += it }
+        }
+        Recommendations.arrange(watched, liked)
     }
 
     /** The lyrics the server has for a song (its own tags or a lyrics plugin); null when it has none. */
@@ -635,6 +676,44 @@ class JellyfinRepository(context: Context) {
         val saved = api.downloadRemoteLyrics(songId, best.id).content
         return Lyrics.parse(saved.lyrics.map { it.start to it.text }, saved.metadata.offset ?: 0)
             ?: Lyrics.parse(best.lyrics.lyrics.map { it.start to it.text }, best.lyrics.metadata.offset ?: 0)
+    }
+
+    /** The music videos directly in a folder, in name order: what follows a video that is played on its own. */
+    suspend fun folderVideos(session: Session, folderId: UUID): List<MediaItem> {
+        val api = api(session)
+        return api.libraryApi.getItems(
+            userId = userId(session),
+            parentId = folderId,
+            includeItemTypes = listOf(BaseItemKind.MUSIC_VIDEO),
+            sortBy = listOf(ItemSortBy.SORT_NAME),
+            sortOrder = listOf(SortOrder.ASCENDING),
+            limit = 500,
+            enableTotalRecordCount = false,
+        ).content.items.map { toItem(api, it) }
+    }
+
+    /** Subtitles of one video in one language, from the server's subtitle plugin, best first. Empty when nothing was found. */
+    suspend fun searchSubtitles(session: Session, itemId: UUID, language: String): List<RemoteSubtitle> =
+        sortRemoteSubtitles(
+            api(session).subtitleApi.searchRemoteSubtitles(itemId = itemId, language = language).content.mapNotNull { s ->
+                val id = s.id ?: return@mapNotNull null
+                RemoteSubtitle(
+                    id = id,
+                    name = s.name.orEmpty(),
+                    provider = s.providerName.orEmpty(),
+                    language = s.threeLetterIsoLanguageName ?: language,
+                    format = s.format.orEmpty().lowercase(),
+                    downloads = s.downloadCount,
+                    rating = s.communityRating,
+                    exactMatch = s.isHashMatch == true,
+                    machineTranslated = s.machineTranslated == true || s.aiTranslated == true,
+                )
+            },
+        )
+
+    /** Saves one of the found subtitles on the server; the video then has one more subtitle track. */
+    suspend fun saveSubtitle(session: Session, itemId: UUID, subtitleId: String) {
+        api(session).subtitleApi.downloadRemoteSubtitles(itemId = itemId, subtitleId = subtitleId)
     }
 
     /** What is in a collection, oldest first so a saga reads in order. */
@@ -1144,6 +1223,38 @@ class JellyfinRepository(context: Context) {
         ).content.items.map { toSong(api, it) }
     }
 
+    /** The server's instant mix of songs that go with [itemId] (a song, an album or an artist), best fit first: its "radio". */
+    suspend fun radio(session: Session, itemId: UUID, limit: Int = 50): List<Song> {
+        val api = api(session)
+        return api.instantMixApi.getInstantMixFromItem(itemId = itemId, userId = userId(session), limit = limit).content.items.map { toSong(api, it) }
+    }
+
+    /** Songs marked as favourites: in a random order, or by name ([stable]) so the same ones come back every time. */
+    suspend fun favoriteSongs(session: Session, libs: List<Lib>, limit: Int = 40, stable: Boolean = false): List<Song> {
+        val api = api(session)
+        return api.libraryApi.getItems(
+            userId = userId(session),
+            parentId = musicParent(libs),
+            includeItemTypes = listOf(BaseItemKind.AUDIO),
+            recursive = true,
+            isFavorite = true,
+            sortBy = listOf(if (stable) ItemSortBy.SORT_NAME else ItemSortBy.RANDOM),
+            limit = limit,
+            enableTotalRecordCount = false,
+        ).content.items.map { toSong(api, it) }
+    }
+
+    /**
+     * Today's mix: a few of your favourites, the radios of three of them and a handful of random songs, taken in turn. Which favourites
+     * are the starting points follows [seed] (the day), so it is the same mix all day long.
+     */
+    suspend fun dayMix(session: Session, libs: List<Lib>, seed: Long): List<Song> = coroutineScope {
+        val favourites = favoriteSongs(session, libs, 200, stable = true).shuffled(kotlin.random.Random(seed))
+        val radios = favourites.take(3).map { async { runCatching { radio(session, it.id, 25) }.getOrDefault(emptyList()) } }.awaitAll()
+        val surprise = runCatching { randomSongs(session, libs, 15) }.getOrDefault(emptyList())
+        blendSongs(listOf(favourites.take(15)) + radios + listOf(surprise), DAY_MIX_SIZE)
+    }
+
     /** A mix of songs for "Shuffle everything". */
     suspend fun randomSongs(session: Session, libs: List<Lib>, limit: Int = 50): List<Song> {
         val api = api(session)
@@ -1617,6 +1728,7 @@ class JellyfinRepository(context: Context) {
             artist = artist,
             format = format,
             runtimeMs = dto.runTimeTicks?.div(10_000),
+            parentId = if (dto.type == BaseItemKind.MUSIC_VIDEO) dto.parentId else null,
             cast = dto.people.orEmpty().filter { it.type == PersonKind.ACTOR || it.type == PersonKind.GUEST_STAR }.take(24).map {
                 CastMember(
                     id = it.id,

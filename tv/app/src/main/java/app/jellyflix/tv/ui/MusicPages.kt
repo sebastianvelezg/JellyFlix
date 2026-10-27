@@ -163,6 +163,7 @@ fun AlbumScreen(vm: AppViewModel, state: AlbumPageState) {
         actions = {
             Pill(stringResource(R.string.music_play_album), onClick = { tracks?.let { vm.playSongs(it) } }, accent = true, modifier = Modifier.focusRequester(play))
             Pill(stringResource(R.string.music_shuffle), onClick = { tracks?.let { vm.playSongs(it, shuffle = true) } })
+            Pill(stringResource(R.string.music_radio), onClick = { vm.playRadio(album.id) })
         },
         songs = { SongList(vm, tracks) },
     )
@@ -207,6 +208,7 @@ fun ArtistScreen(vm: AppViewModel, state: ArtistPageState) {
                 accent = true,
                 modifier = Modifier.padding(top = 8.dp).focusRequester(play),
             )
+            Pill(stringResource(R.string.music_radio), onClick = { vm.playRadio(artist.id) })
         }
         LazyColumn(Modifier.weight(1f).fillMaxSize(), contentPadding = PaddingValues(top = 56.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             if (!popular.isNullOrEmpty()) {

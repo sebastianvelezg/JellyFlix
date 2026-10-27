@@ -5,10 +5,12 @@ import {
   isEpisode,
   NO_EXTRAS,
   negotiatePlayback,
+  newSubtitleIndex,
   pickAudio,
   pickSubtitle,
   PlaybackError,
   playbackTitle,
+  retryRequest,
   ticksToSeconds,
   type Movie,
   type PlaybackExtras,
@@ -20,6 +22,8 @@ import { loadSubtitleFile } from '../../platform/web/browser'
 import { lockPageScroll } from '../../platform/web/scrollLock'
 import { detectCapabilities } from '../../platform/web/capabilities'
 import { readPlayerPrefs, readSeriesPrefs, writePlayerPrefs, writeSeriesPrefs } from '../../platform/web/prefs'
+import { CloseIcon } from '../icons'
+import { DockNotice, DOCK_BUTTON } from './dock'
 import { PlayerStage } from './PlayerStage'
 import { t } from '../../i18n'
 
@@ -46,7 +50,12 @@ export function Player({
   startAt,
   next = null,
   onNext,
+  repeat,
   onExit,
+  mini = false,
+  onClose,
+  onExpand,
+  onPlaying,
 }: {
   session: Session
   /** A fresh copy of the title (its resume position is used to start). An episode gets series features. */
@@ -58,7 +67,17 @@ export function Player({
   /** What follows this one (the next episode, or the next title of the playlist), once known. */
   next?: Movie | null
   onNext?: () => void
+  /** Present when this is part of a queue: the choice to play it again from the start after the last title. */
+  repeat?: { enabled: boolean; onChange: (enabled: boolean) => void }
   onExit: () => void
+  /** A bar at the bottom of the page instead of the whole screen (a music video that was left with Back, still playing). */
+  mini?: boolean
+  /** Stop and take the mini bar away. */
+  onClose?: () => void
+  /** Bring the video back full screen. */
+  onExpand?: () => void
+  /** The video started playing. */
+  onPlaying?: () => void
 }) {
   const [request, setRequest] = useState<Request>({ nonce: 0 })
   const [state, setState] = useState<State>({ status: 'loading' })
@@ -98,6 +117,8 @@ export function Player({
     },
     [],
   )
+  // The tracks the video had when a subtitle was being saved on the server (so the one that appears afterwards is known).
+  const pendingSubtitles = useRef<number[] | null>(null)
   const subtitlesInitialised = useRef(false)
   const audioInitialised = useRef(false)
   const currentPlan = useRef<PlaybackPlan | null>(null)
@@ -115,8 +136,8 @@ export function Player({
     }
   }, [session, movie.id])
 
-  // The page behind the player stops scrolling for as long as it is open.
-  useEffect(() => lockPageScroll(), [])
+  // The page behind the player stops scrolling for as long as it is open (not while it is a bar at the bottom of the page).
+  useEffect(() => (mini ? undefined : lockPageScroll()), [mini])
 
   useEffect(() => {
     let cancelled = false
@@ -149,6 +170,17 @@ export function Player({
               nonce: prev.nonce + 1,
             }))
             return
+          }
+        }
+        // A subtitle was just saved from the internet: it is the new track, so switch it on.
+        if (pendingSubtitles.current) {
+          const added = newSubtitleIndex(pendingSubtitles.current, plan.subtitleTracks.map((track) => track.index))
+          pendingSubtitles.current = null
+          if (added !== null) {
+            setSubtitleIndex(added)
+            const language = plan.subtitleTracks.find((track) => track.index === added)?.language ?? null
+            writePlayerPrefs({ subtitleLanguage: language })
+            if (seriesId) writeSeriesPrefs(seriesId, { subtitleLanguage: language })
           }
         }
         currentPlan.current = plan
@@ -188,6 +220,16 @@ export function Player({
     [seriesId],
   )
 
+  const subtitleSaved = useCallback(
+    (startSeconds: number) => {
+      const plan = currentPlan.current
+      if (!plan) return
+      pendingSubtitles.current = plan.subtitleTracks.map((track) => track.index)
+      requestStream(retryRequest(plan, { fallback: state.status === 'ready' ? state.fallback : false, startSeconds }))
+    },
+    [requestStream, state],
+  )
+
   if (state.status === 'ready') {
     return (
       <PlayerStage
@@ -201,11 +243,13 @@ export function Player({
         subtitleIndex={subtitleIndex}
         next={next}
         onNext={onNext}
+        repeat={repeat}
         extras={extras}
         localSubtitle={localSubtitle}
         subtitleFileError={subtitleFileError}
         onSubtitleFile={chooseSubtitleFile}
         onClearLocalSubtitle={clearLocalSubtitle}
+        onSubtitleSaved={subtitleSaved}
         onSpeed={setSpeed}
         onSubtitle={(index) => {
           setSubtitleIndex(index)
@@ -216,7 +260,30 @@ export function Player({
         }}
         onRequest={requestStream}
         onExit={onExit}
+        mini={mini}
+        onClose={onClose}
+        onExpand={onExpand}
+        onPlaying={onPlaying}
       />
+    )
+  }
+
+  // The bar has no room for a spinner screen or a message page: it says the same in a line, and does not cover the page.
+  if (mini) {
+    return (
+      <DockNotice
+        title={playbackTitle(movie)}
+        text={state.status === 'loading' ? t('Preparing “{title}”…', { title: playbackTitle(movie) }) : state.message}
+      >
+        {state.status === 'error' && (
+          <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={retry}>
+            {t('Try again')}
+          </button>
+        )}
+        <button type="button" aria-label={t('Close the video player')} title={t('Close')} onClick={onClose} className={DOCK_BUTTON}>
+          <CloseIcon />
+        </button>
+      </DockNotice>
     )
   }
 
@@ -241,7 +308,15 @@ export function Player({
             <button type="button" className="btn-primary" onClick={retry}>
               {t('Try again')}
             </button>
-            <button type="button" className="btn" onClick={onExit}>
+            {/* A video that could not be played is not kept in the bar: leaving here closes it. */}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                onExit()
+                onClose?.()
+              }}
+            >
               {t('Back')}
             </button>
           </div>

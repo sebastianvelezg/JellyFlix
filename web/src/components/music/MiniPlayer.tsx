@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { coverUrl, currentTrack, upcoming, type Session } from '../../core'
-import { CloseIcon, LyricsIcon, QueueIcon } from '../icons'
+import { CloseIcon, LyricsIcon, QueueIcon, VisualizerIcon } from '../icons'
 import { Img } from '../Img'
 import { Seeker, Transport, VolumeControl } from './controls'
 import { useMusic, useMusicState } from './MusicProvider'
@@ -9,6 +9,12 @@ import { Cover } from './parts'
 import { lockPageScroll } from '../../platform/web/scrollLock'
 import { PlayOnButton } from '../remote/PlayOnButton'
 import { LyricsPanel } from './Lyrics'
+import { Visualizer } from './Visualizer'
+import { readPlayerPrefs } from '../../platform/web/prefs'
+import { useAppearance } from '../../platform/web/appearance'
+import { useCoverPalette } from '../../platform/web/coverPalette'
+import type { CoverPalette } from '../../theme/coverColors'
+import { themeVariables, type ThemeChoice } from '../../theme/themes'
 import { getLanguage, t } from '../../i18n'
 
 /**
@@ -19,10 +25,13 @@ export function MiniPlayer({
   session,
   onOpenAlbum,
   onOpenArtist,
+  hidden = false,
 }: {
   session: Session
   onOpenAlbum: (albumId: string) => void
   onOpenArtist: (artistId: string) => void
+  /** A video is playing in the bar at the bottom of the page: it has that place, and the music (paused) waits behind it. */
+  hidden?: boolean
 }) {
   const music = useMusic()
   const { queue, error, status } = useMusicState()
@@ -51,7 +60,7 @@ export function MiniPlayer({
     }
   }, [fullScreen])
 
-  if (!queue || !track) return null
+  if (!queue || !track || hidden) return null
 
   const openArtist = (id: string) => {
     setOpen(false)
@@ -169,6 +178,25 @@ export function MiniPlayer({
 
 type Panel = 'player' | 'queue' | 'lyrics'
 
+/** The accent colours of the page, made from the cover's main colour (readable on the chosen canvas like any accent), for one screen. */
+function coverTheme(canvas: string, palette: CoverPalette): React.CSSProperties {
+  const vars = themeVariables({ canvas: canvas as ThemeChoice['canvas'], accent: palette.primary })
+  const accent: Record<string, string> = { '--glow': 'color-mix(in srgb, var(--color-accent-strong) 55%, transparent)' }
+  for (const name of ACCENT_VARIABLES) accent[name] = vars[name] as string
+  return accent as React.CSSProperties
+}
+
+const ACCENT_VARIABLES = [
+  '--color-accent',
+  '--color-accent-strong',
+  '--color-accent-deep',
+  '--color-accent-top',
+  '--color-accent-top-hover',
+  '--color-accent-deep-hover',
+  '--color-accent-ink',
+  '--color-cyan',
+]
+
 /** The wide layout (queue beside the player) starts here, as in the stylesheet's `lg`. */
 function isWide(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1024px)').matches === true
@@ -197,6 +225,17 @@ function NowPlaying({
 }) {
   const music = useMusic()
   const { queue, error } = useMusicState()
+  // Bars that move with the sound, over the cover (remembered on this device).
+  const [visual, setVisual] = useState(() => readPlayerPrefs().visualizer)
+  useEffect(() => {
+    // Opening the full-screen player with the bars on makes sure the sound is being read.
+    if (visual) void music.setVisualizer(true)
+  }, [music, visual])
+  // The colours of the cover of the song: they tint the blur behind it, the bars, the glow and the accent of this screen, so each song
+  // has its own look (a cover with no colour of its own, or one the page cannot read, keeps the accent chosen in Appearance).
+  const coverSrc = queue ? coverUrl(session.serverUrl, currentTrack(queue) ?? { id: '' }, 300) : null
+  const palette = useCoverPalette(coverSrc)
+  const { theme } = useAppearance()
   if (!queue) return null
   const track = currentTrack(queue)
   if (!track) return null
@@ -207,19 +246,27 @@ function NowPlaying({
       role="dialog"
       aria-modal="true"
       aria-label={t('Now playing')}
+      data-cover-colors={palette ? `${palette.primary} ${palette.secondary}` : undefined}
+      style={palette ? coverTheme(theme.canvas, palette) : undefined}
       className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[var(--color-bg)]"
     >
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30 blur-3xl">
-        <Img
-          session={session}
-          src={coverUrl(session.serverUrl, track, 300)}
-          className="h-full w-full scale-125 object-cover"
-          fallback={null}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-40 blur-3xl">
+        <Img session={session} src={coverSrc} className="h-full w-full scale-125 object-cover" fallback={null} />
+      </div>
+      {/* Two soft pools of the cover's colours, which fade into the ones of the next song. */}
+      <div aria-hidden="true" data-testid="cover-glow" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          className="absolute -left-[15%] -top-[20%] h-[75%] w-[65%] rounded-full blur-[120px] transition-[background-color,opacity] duration-1000"
+          style={{ backgroundColor: palette?.primary, opacity: palette ? 0.5 : 0 }}
+        />
+        <div
+          className="absolute -bottom-[25%] -right-[15%] h-[75%] w-[65%] rounded-full blur-[120px] transition-[background-color,opacity] duration-1000"
+          style={{ backgroundColor: palette?.secondary, opacity: palette ? 0.38 : 0 }}
         />
       </div>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--color-bg)]/40 via-[var(--color-bg)]/70 to-[var(--color-bg)]"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--color-bg)]/30 via-[var(--color-bg)]/55 to-[var(--color-bg)]"
       />
 
       <header className="gutter-x relative flex items-center justify-between pb-4 pt-[calc(1rem+var(--safe-top))]">
@@ -261,13 +308,16 @@ function NowPlaying({
             <section
               className={`${panel === 'queue' ? 'hidden lg:flex' : 'flex'} min-h-0 flex-col items-center justify-center gap-6 short:flex-row short:gap-10`}
             >
-              <Cover
-                session={session}
-                item={track}
-                width={600}
-                eager
-                className="w-full max-w-[min(26rem,55vh)] shadow-[0_30px_90px_-20px_var(--glow)] short:w-[min(15rem,62vh)] short:shrink-0"
-              />
+              <div className="relative w-full max-w-[min(26rem,55vh)] short:w-[min(15rem,62vh)] short:shrink-0">
+                <Cover
+                  session={session}
+                  item={track}
+                  width={600}
+                  eager
+                  className={`w-full shadow-[0_30px_90px_-20px_var(--glow)] transition-opacity duration-300 ${visual ? 'opacity-35' : ''}`}
+                />
+                {visual && <Visualizer colors={palette} className="absolute inset-0 h-full w-full p-4" />}
+              </div>
               <div className="flex w-full max-w-md flex-col items-center gap-6 short:gap-3">
                 <div className="w-full text-center">
                   <h2 className="truncate text-2xl font-bold tracking-tight text-white">{track.name}</h2>
@@ -427,7 +477,19 @@ function NowPlaying({
             )}
           </div>
           <footer className="gutter-x relative flex items-center justify-end gap-1 pb-[calc(1rem+var(--safe-bottom))] pt-1">
-            <Tools panel={panel} onPanel={onPanel} backTo={backTo} />
+            <Tools
+              panel={panel}
+              onPanel={onPanel}
+              backTo={backTo}
+              visualizer={{
+                on: visual,
+                toggle: () => {
+                  const on = !visual
+                  setVisual(on)
+                  void music.setVisualizer(on)
+                },
+              }}
+            />
           </footer>
         </>
       )}
@@ -436,11 +498,27 @@ function NowPlaying({
 }
 
 /** Sleep timer, "Play on…", the words and the queue: along the bottom of the full-screen player, like the bar of the other pages. */
-function Tools({ panel, onPanel, backTo }: { panel: Panel; onPanel: (panel: Panel) => void; backTo: Panel }) {
+function Tools({
+  panel,
+  onPanel,
+  backTo,
+  visualizer,
+}: {
+  panel: Panel
+  onPanel: (panel: Panel) => void
+  backTo: Panel
+  /** The bars over the cover (offered where the cover is). */
+  visualizer?: { on: boolean; toggle: () => void }
+}) {
   return (
     <>
       <SleepTimer />
       <PlayOnButton current up className={TOOL} />
+      {visualizer && (
+        <button type="button" className={TOOL} aria-label={t('Visualizer')} title={t('Visualizer')} aria-pressed={visualizer.on} onClick={visualizer.toggle}>
+          <VisualizerIcon />
+        </button>
+      )}
       <button
         type="button"
         className={TOOL}

@@ -8,6 +8,8 @@ export interface AttachOptions {
   /** Value for the Authorization header (hls.js requests). */
   authorization: string
   startSeconds: number
+  /** Start playing as soon as the stream is ready (default). False only loads it (a song prepared ahead of time). */
+  autoplay?: boolean
   /** Called once when playback cannot continue and automatic recovery gave up. */
   onFatal: (message: string) => void
 }
@@ -49,12 +51,13 @@ function seekOnceReady(video: HTMLMediaElement, seconds: number) {
  */
 export function attachMedia(opts: AttachOptions): Attached {
   const { video, plan, token, authorization, startSeconds, onFatal } = opts
+  const autoplay = opts.autoplay !== false
   let destroyed = false
   let teardown: (() => void) | null = null
   let usingHlsJs = false
 
   const play = () => {
-    if (!destroyed) void video.play().catch(() => undefined)
+    if (autoplay && !destroyed) void video.play().catch(() => undefined)
   }
 
   const attachNative = () => {

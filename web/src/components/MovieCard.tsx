@@ -12,7 +12,8 @@ import {
   type Session,
 } from '../core'
 import { CardMenu } from './CardMenu'
-import { useCardActions } from './cardActions'
+import { useCardActions, usePlayVideo } from './cardActions'
+import type { PlayQueueRef } from './route'
 import { CheckIcon, HeartIcon, InfoIcon, PlayIcon } from './icons'
 import { Img } from './Img'
 import { Subtext } from './Subtext'
@@ -33,8 +34,9 @@ function progressPercent(movie: Movie): number {
     : 0
 }
 
+// (`group-hover/card` is the whole card of MovieCard, with its play button over the picture: hovering that button keeps the picture lifted.)
 export const frame =
-  'relative overflow-hidden rounded-xl bg-[var(--color-surface-2)] ring-1 ring-white/[.08] transition duration-300 ease-out group-hover:z-10 group-hover:scale-[1.04] group-hover:shadow-[0_14px_44px_-10px_var(--glow)] group-hover:ring-[var(--color-accent)]/70 group-focus-visible:scale-[1.04] group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-accent)]'
+  'relative overflow-hidden rounded-xl bg-[var(--color-surface-2)] ring-1 ring-white/[.08] transition duration-300 ease-out group-hover:z-10 group-hover:scale-[1.04] group-hover:shadow-[0_14px_44px_-10px_var(--glow)] group-hover:ring-[var(--color-accent)]/70 group-hover/card:z-10 group-hover/card:scale-[1.04] group-hover/card:shadow-[0_14px_44px_-10px_var(--glow)] group-hover/card:ring-[var(--color-accent)]/70 group-focus-visible:scale-[1.04] group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-accent)]'
 
 /** "1h 52m" or "48m". */
 export function formatRuntime(seconds: number): string {
@@ -42,13 +44,21 @@ export function formatRuntime(seconds: number): string {
   return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m` : `${minutes}m`
 }
 
-/** The round play button that fades in over a hovered card, and (when given) how long the title is. */
-function HoverPlay({ runtime }: { runtime?: string }) {
+const PLAY_BUTTON =
+  'flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-accent-strong)] pl-0.5 text-[var(--color-accent-ink)] shadow-[0_0_30px_var(--glow)] ring-1 ring-white/30'
+
+/**
+ * The round play button that fades in over a hovered card, and (when given) how long the title is. With `real` the button is a real one
+ * (drawn by the card, outside this picture) and only the shade and the length are drawn here.
+ */
+function HoverPlay({ runtime, real = false }: { runtime?: string; real?: boolean }) {
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 transition duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-accent-strong)] pl-0.5 text-[var(--color-accent-ink)] shadow-[0_0_30px_var(--glow)] ring-1 ring-white/30">
-        <PlayIcon />
-      </span>
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 transition duration-300 group-hover:opacity-100 group-hover/card:opacity-100 group-focus-visible:opacity-100">
+      {!real && (
+        <span className={PLAY_BUTTON}>
+          <PlayIcon />
+        </span>
+      )}
       {runtime && <Subtext as="span" className="absolute bottom-2 left-2.5 text-xs font-medium text-neutral-100" text={runtime} />}
     </div>
   )
@@ -89,16 +99,24 @@ function usePrefetchOnHover(session: Session, id: string) {
   }
 }
 
-/** Poster card used in grids and rows. Click opens the movie page. */
+/**
+ * Poster card used in grids and rows. Click opens the movie page. A music video's card also has a play button in the middle of its
+ * picture that plays it at once; `list` (the videos of the row or grid, in order) or `queue` (a folder, a library) say what follows it.
+ */
 export function MovieCard({
   session,
   movie,
   onOpen,
+  list,
+  queue,
 }: {
   session: Session
   movie: Movie
   onOpen: (movie: Movie) => void
+  list?: readonly Movie[]
+  queue?: PlayQueueRef
 }) {
+  const playVideo = usePlayVideo()
   const progress = progressPercent(movie)
   const title = movie.musicVideo && movie.artist ? t('{name} by {artist}', { name: movie.name, artist: movie.artist }) : movie.name
   // A book's card says what kind it is (EPUB, PDF, Audiobook...) and a music video's, who it is by.
@@ -110,6 +128,7 @@ export function MovieCard({
   // A music video's picture is a wide frame, not a poster; the artist goes under the title.
   const wide = !!movie.musicVideo
   const subtext = wide ? [movie.artist, movie.year].filter(Boolean).join(' · ') : movie.book ? [kindLabel, movie.year].filter(Boolean).join(' · ') : movie.year
+  const canPlay = wide && !!playVideo
 
   return (
     <div className="group/card relative">
@@ -127,7 +146,7 @@ export function MovieCard({
           className="h-full w-full object-cover"
           fallback={<Placeholder name={movie.name} />}
         />
-        <HoverPlay runtime={runtime} />
+        <HoverPlay runtime={runtime} real={canPlay} />
         {movie.favorite && (
           <span className="absolute left-2 top-2 rounded-full bg-black/60 p-1 text-rose-400 backdrop-blur" title={t('Favorite')}>
             <HeartIcon filled />
@@ -157,13 +176,27 @@ export function MovieCard({
       <p className="mt-2.5 truncate text-sm font-medium text-neutral-100 transition group-hover:text-white">{movie.name}</p>
       <Subtext as="p" className="block min-h-4 truncate text-xs text-neutral-500" text={subtext} />
     </button>
+    {canPlay && (
+      // Over the middle of the picture (not of the whole card, which has its title under it). The card around it opens the title.
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex aspect-video items-center justify-center">
+        <button
+          type="button"
+          onClick={() => playVideo(movie, { list, queue })}
+          aria-label={t('Play {title}', { title })}
+          title={t('Play')}
+          className={`${PLAY_BUTTON} pointer-events-auto z-20 opacity-0 transition duration-200 hover:scale-110 focus-visible:opacity-100 group-hover/card:opacity-100 pointer-coarse:opacity-100`}
+        >
+          <PlayIcon />
+        </button>
+      </div>
+    )}
     {remember && <CardMenu session={session} movie={movie} onOpen={onOpen} onChange={remember} />}
     </div>
   )
 }
 
 /** A poster card sized for horizontal rows. */
-export function RowCard(props: { session: Session; movie: Movie; onOpen: (movie: Movie) => void }) {
+export function RowCard(props: { session: Session; movie: Movie; onOpen: (movie: Movie) => void; list?: readonly Movie[]; queue?: PlayQueueRef }) {
   return (
     <div className={`shrink-0 snap-start ${props.movie.musicVideo ? 'w-[calc(var(--poster-w)*1.75)]' : 'w-[var(--poster-w)]'}`}>
       <MovieCard {...props} />

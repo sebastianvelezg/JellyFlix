@@ -20,7 +20,7 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - **Home** is the first tab when you have at least two kinds of library. One **banner** mixes movies and series: the two newest titles, then six picked at random from your whole library (unwatched, rated 6 or more, with a backdrop),
   a new one every ten seconds. It waits while you hover or focus it, and never moves with "reduce motion".
 - **Discover something new**: a random movie (preferring unwatched), a series you have never started (its button plays episode 1, never a special) and a random album (or shuffle the whole library). Press **Another** for a different pick.
-- Rows that follow you: **Continue watching** (movies and episodes together), **Next up**, **Because you watched…**, **New since your last visit**, **Coming up** (episodes about to air), **Watch later**, your playlists and favorites,
+- Rows that follow you: **Continue watching** (movies and episodes together), **Next up**, **Because you watched…** and **Because you liked…** (several rows, each from a different title), **New since your last visit**, **Coming up** (episodes about to air), **Watch later**, your playlists and favorites,
   the latest movies, collections, new series, new anime, new music videos, new books and new music.
 - **Surprise me** opens a random unwatched movie; "Top rated in *genre*" rows change on every visit.
 - Search across movies, series, episodes, collections, albums, artists and songs (press `/`), with recent searches and result filters.
@@ -40,9 +40,11 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - Direct play when the browser can decode the file, otherwise the server's HLS conversion through hls.js, with an automatic one-time fallback. Jellyflix never transcodes; it tells Jellyfin what the browser can play.
 - Timeline with buffered range, hover time and **seek-bar pictures** (trickplay, when the server has made them), "ends at", speed 0.5×–2×, volume, fullscreen, picture-in-picture, a screen that stays awake.
 - **Subtitles**: text subtitles with size, colour, background and position; timing you can move (−0.5 / −0.1 / +0.1 / +0.5 s, or **Z** and **X**), remembered per movie and series; **load a `.srt` or `.vtt` from your own device**
-  (converted in the browser, never uploaded). Image subtitles (PGS, VobSub) and styled `.ass` are not supported.
-- **Audio tracks** (switching keeps your position), **skip intro / recap / credits / preview** when the server has segments, **chapters**, **Next episode** with an *Up next* card and autoplay.
-- A **quality limit** and an explanation of how the video is playing and why the server converts it. Playlists play through.
+  (converted in the browser, never uploaded). **Search online…** in the subtitle menu asks the subtitle plugin of your server (Open Subtitles and the like) in a language you choose, lists what it found
+  (matches for your exact file first, machine translations last) and saves the one you pick on the server, next to the video; it needs an account that may manage subtitles. Image subtitles (PGS, VobSub) and styled `.ass` are not supported.
+- **Audio tracks** (switching keeps your position), **skip intro / recap / credits / preview** when the server has segments, **chapters**, **Next episode** with an *Up next* card (in the last 20 seconds of a long title, so you can jump to the next one during the credits) and autoplay, whose countdown (3 to 15 seconds, with a bar) is chosen in Settings.
+- **Cinema mode** (Settings → Playback, or the player's menu): the picture fades in from black and out at the very end, and the controls leave sooner, also while paused.
+- A **quality limit** and an explanation of how the video is playing and why the server converts it. Playlists and collections play through.
 - Progress is reported to Jellyfin (start, every ten seconds, pause, seek, stop); resume where you left off. Reporting failures never interrupt playback.
 - Keyboard: **Space/K** play/pause, **←/→ or J/L** ±10 s, **↑/↓** volume, **0–9** jump, **M** mute, **C** subtitles, **F** fullscreen, **N** next episode, **S** skip, **P** picture-in-picture, **Esc** back. Press `?` anywhere for the full list.
 
@@ -56,12 +58,17 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - **Audiobooks** play in the music player and go on from where they were left. Reading and downloading need an account that may download files.
 
 ### Music videos and Live TV
-- **Music videos** have wide cards with the artist under the title, a page of their own, the usual player, search, a "New music videos" row on Home and a place in "Continue watching".
+- **Music videos** have wide cards with the artist under the title, a page of their own, the usual player, search, a "New music videos" row on Home and a place in "Continue watching". The section has two views, like Jellyfin: *Suggestions* (rows and all the videos) and *Folders* (play a folder or shuffle it, with a way back up).
+  - **Play from the card:** a round play button in the middle of a card's picture plays the video at once (the rest of the card opens its page). Whatever it is played from goes on: the next video of the row or grid, or of the folder; a video played on its own goes on with the others of its folder. **Repeat the list** is in the player's menu.
+  - **Videos flow:** the 3-2-1 runs over the last 3 seconds of a video and the next one starts the moment it ends, in full screen if the one before was.
+  - **A mini player:** leaving a music video with Back keeps it playing in a bar at the bottom of the page (thumbnail, play/pause, next, timeline, full screen, close) while you look for another; picking another takes its place, and a video and the music take turns.
 - **Live TV** lists your channels with what is on each (their quality and notes in the name are shown as small tags), has a search by name or number, favorites, and a **guide** (a time grid of the next hours). Watching a channel opens the stream your server provides, with no seek bar (it is live), the arrow keys for the channel before and after, a quality choice, and the usual reports to the server. Recording and timers are not built.
 
 ### Music
-- Its own home (Jump back in, Recently added, Playlists, Discover, Most played, Favorite songs) and **Albums, Artists, Songs, Playlists** with sort, genre, favorites and search. **Shuffle all** plays a random mix.
-- A **player bar** on every page that keeps playing while you browse, and a **full-screen player**: cover, controls, an "Up next" queue you can reorder and a **sleep timer**. Media keys and lock-screen controls work.
+- Its own home (Jump back in, Recently added, Playlists, Discover, Most played, Favorite songs) and **Albums, Artists and Songs** with sort, genre, favorites and search. **Shuffle all** plays a random mix.
+- **Made for you:** a **mix of the day** (your favourites, the radios of the artists you play most and a few surprises; the same all day, with a button to make another) and the radio of your top artists. Artist and album pages have a **Radio** button and every song a *Start a radio* action, all from the server's instant mix.
+- **Gapless and crossfade** (Settings → Playback → Music): the next song is made ready before the one playing ends, and with a crossfade length chosen the old song fades out while the new one fades in.
+- A **player bar** on every page that keeps playing while you browse, and a **full-screen player**: cover, controls, an "Up next" queue you can reorder and a **sleep timer**. Media keys and lock-screen controls work. The blur behind the cover, the accent of that screen and the **visualizer** (bars that move with the real sound, drawn between the cover's two main colours) follow the cover of the song.
 - **Lyrics** in a view of their own: timed lyrics follow the song and scroll to the current line (press a line to jump there); lyrics without times scroll, with a **Find timed lyrics** button that asks your server's lyrics plugin
   (for example LrcLib) and saves the result on the server (administrators only).
 - Songs the browser cannot play are converted by the server; an unplayable song is reported and skipped.
@@ -368,7 +375,7 @@ is unchanged; credentials stay in your shell and nothing is written to disk.
 - **Jellyfin:** developed against 12.x; the SDK targets 10.10 and newer. Plugin routes (Intro Skipper, Playback Reporting…) are only used when the server has them.
 - **Browsers:** developed and tested in Chrome. Edge, Firefox and Safari are expected to work and are not regularly tested. HLS needs MSE (hls.js) or native HLS (Safari).
 - **Media:** direct play of what the browser can decode (H.264 / AAC everywhere; HEVC where the browser supports it, and 10-bit HEVC only when it reports Main10); everything else is converted by the server. DTS and TrueHD audio and image-based subtitles are not supported.
-- **Not built:** recording and timers for live TV, a reader for Mobi and RAR comics, several saved servers or users, a version picker, subtitle search and download, instant mix, gapless or crossfade playback, an equalizer, styled `.ass` subtitles, casting (Chromecast, AirPlay), offline mode.
+- **Not built:** recording and timers for live TV, a reader for Mobi and RAR comics, several saved servers or users, a version picker, an equalizer, styled `.ass` subtitles, casting (Chromecast, AirPlay), offline mode.
 - "Play on…" needs the other app to be open and cannot wake it; it lists any controllable device of your account, so an official Jellyfin web tab left open also appears.
 - On an iPhone or iPad, Safari lets a page start sound or video only after a tap, so a title sent to it may open ready and need one tap on Play.
 

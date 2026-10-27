@@ -86,7 +86,7 @@ export function Transport({ size = 'compact' }: { size?: 'compact' | 'large' }) 
 }
 
 /** A thin range input whose filled part follows the value (see `.music-range` in the stylesheet). */
-function Range({
+export function Range({
   label,
   value,
   max,
@@ -126,16 +126,25 @@ function Range({
   )
 }
 
-/** The song's timeline: elapsed time, a draggable bar, and the length. */
-export function Seeker({ showTimes = true, className = '' }: { showTimes?: boolean; className?: string }) {
-  const music = useMusic()
-  const { duration } = useMusicState()
-  const position = useMusicPosition()
+/** A timeline: elapsed time, a draggable bar that seeks when let go, and the length. Used for songs and for the video in the mini bar. */
+export function SeekBar({
+  value: current,
+  max,
+  onSeek,
+  showTimes = true,
+  className = '',
+}: {
+  value: number
+  max: number
+  onSeek: (seconds: number) => void
+  showTimes?: boolean
+  className?: string
+}) {
   const [scrub, setScrub] = useState<number | null>(null)
-  const value = scrub ?? position
+  const value = scrub ?? current
   const commit = () => {
     if (scrub !== null) {
-      music.seek(scrub)
+      onSeek(scrub)
       setScrub(null)
     }
   }
@@ -145,15 +154,23 @@ export function Seeker({ showTimes = true, className = '' }: { showTimes?: boole
       <Range
         label={t('Seek')}
         value={value}
-        max={duration}
+        max={max}
         onChange={setScrub}
         onCommit={commit}
-        valueText={t('{time} of {total}', { time: formatTime(value), total: formatTime(duration) })}
+        valueText={t('{time} of {total}', { time: formatTime(value), total: formatTime(max) })}
         className="flex-1"
       />
-      {showTimes && <span className="w-10 text-xs tabular-nums text-neutral-400">{formatTime(duration)}</span>}
+      {showTimes && <span className="w-10 text-xs tabular-nums text-neutral-400">{formatTime(max)}</span>}
     </div>
   )
+}
+
+/** The song's timeline. */
+export function Seeker({ showTimes = true, className = '' }: { showTimes?: boolean; className?: string }) {
+  const music = useMusic()
+  const { duration } = useMusicState()
+  const position = useMusicPosition()
+  return <SeekBar value={position} max={duration} onSeek={(seconds) => music.seek(seconds)} showTimes={showTimes} className={className} />
 }
 
 export function VolumeControl({ className = '' }: { className?: string }) {

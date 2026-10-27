@@ -24,6 +24,11 @@ import app.jellyflix.tv.data.Appearance
 import app.jellyflix.tv.data.HomeLayout
 import app.jellyflix.tv.data.PlayHistory
 import app.jellyflix.tv.data.PlaylistEntry
+import app.jellyflix.tv.data.RemoteSubtitle
+import app.jellyflix.tv.data.SUBTITLE_SEARCH_LANGUAGES
+import app.jellyflix.tv.data.defaultSearchLanguage
+import app.jellyflix.tv.data.newSubtitleIndex
+import app.jellyflix.tv.data.playThroughFrom
 import app.jellyflix.tv.data.PosterSize
 import app.jellyflix.tv.data.ThemeChoice
 import app.jellyflix.tv.data.resolveTheme
@@ -57,6 +62,7 @@ import app.jellyflix.tv.data.Chapter
 import app.jellyflix.tv.data.DirectOnlyException
 import app.jellyflix.tv.data.Playlist
 import app.jellyflix.tv.data.PluginsReport
+import app.jellyflix.tv.data.Recommendation
 import app.jellyflix.tv.data.Section
 import app.jellyflix.tv.data.TvSettings
 import app.jellyflix.tv.data.Segment
@@ -291,8 +297,8 @@ class HomeState {
     var sinceVisit by mutableStateOf<List<MediaItem>>(emptyList())
     /** Episodes about to air, soonest first. */
     var upcoming by mutableStateOf<List<UpcomingEpisode>>(emptyList())
-    /** "Because you watched X": the title's name and what is like it. */
-    var because by mutableStateOf<Pair<String, List<MediaItem>>?>(null)
+    /** Rows of suggestions ("Because you watched X", "Because you liked X"). */
+    var because by mutableStateOf<List<Recommendation>>(emptyList())
     var pickMovie by mutableStateOf<Pick<MediaItem>>(Pick.Loading)
     var pickSeries by mutableStateOf<Pick<FreshSeries>>(Pick.Loading)
     val list = LazyListState()
@@ -724,7 +730,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         home.favorites = emptyList()
         home.sinceVisit = emptyList()
         home.upcoming = emptyList()
-        home.because = null
+        home.because = emptyList()
         home.pickMovie = Pick.Loading
         home.pickSeries = Pick.Loading
         home.heroIndex = 0
@@ -735,6 +741,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         musicHome.newAlbums = emptyList()
         musicHome.jumpBack = emptyList()
         musicHome.tryThese = emptyList()
+        dayMix = null
         musicHome.pick = Pick.Loading
         musicLoaded = false
         musicView = MusicView.Overview
@@ -925,7 +932,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 saveHomeLater()
             }
             launchSafe {
-                runCatching { io { repo.becauseYouWatched(s) } }.getOrNull()?.let { (seed, similar) -> home.because = seed.title to similar }
+                runCatching { io { repo.recommendations(s) } }.getOrNull()?.let { home.because = it }
             }
             refreshOrganised()
             refreshNews(l)
@@ -1311,6 +1318,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Plays the radio of a song, an album or an artist: the songs that go with it, from the server's instant mix. */
+    fun playRadio(itemId: UUID) {
+        val s = session ?: return
+        launchSafe {
+            val songs = runCatching { io { repo.radio(s, itemId) } }.getOrDefault(emptyList())
+            if (songs.isEmpty()) notice = str(R.string.music_mix_none) else playSongs(songs)
+        }
+    }
+
+    /** The mix of the day that was made last: kept, so it is the same all day while the app is open (the surprises in it are random). */
+    private var dayMix: Pair<Long, List<Song>>? = null
+
+    /** Today's mix of songs made for you; it is the same all day (it follows the date). */
+    fun playDayMix() {
+        val s = session ?: return
+        val l = libs ?: return
+        val today = java.time.LocalDate.now().toEpochDay()
+        launchSafe {
+            val songs = dayMix?.takeIf { it.first == today }?.second
+                ?: runCatching { io { repo.dayMix(s, l.music, today) } }.getOrDefault(emptyList()).also { if (it.isNotEmpty()) dayMix = today to it }
+            if (songs.isEmpty()) notice = str(R.string.music_mix_none) else playSongs(songs)
+        }
+    }
+
     fun shuffleEverything() {
         val s = session ?: return
         val l = libs ?: return
@@ -1419,7 +1450,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         home.watchLater = home.watchLater.p()
         home.favorites = home.favorites.p()
         home.sinceVisit = home.sinceVisit.p()
-        home.because = home.because?.let { (seed, similar) -> seed to similar.p() }
+        home.because = home.because.map { it.copy(items = it.items.p()) }
         for (lib in listOf(movies, series, anime, musicVideos, books, collectionList)) {
             for (i in lib.items.indices) if (lib.items[i].id == id) lib.items[i] = change(lib.items[i])
         }
@@ -1756,6 +1787,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Playback ---------------------------------------------------------------------------------------------
 
+    /** Plays [first] and then the titles after it in [items] (a collection): when one ends the next starts. */
+    fun playThrough(items: List<MediaItem>, first: MediaItem) {
+        playContext = playThroughFrom(items, first)
+        play(first)
+    }
+
+    /** A music video played on its own goes on with the other videos of its folder, like the web app's. */
+    private fun queueFolderOf(s: Session, video: MediaItem) {
+        val folder = video.parentId ?: return
+        launchSafe {
+            val siblings = runCatching { io { repo.folderVideos(s, folder) } }.getOrNull() ?: return@launchSafe
+            val rest = playThroughFrom(siblings, video) ?: return@launchSafe
+            if (playContext == null) playContext = rest
+        }
+    }
+
     /** Plays [item] from [startMs] (default: where it was left); a series plays its next episode. */
     fun play(item: MediaItem, startMs: Long = item.resumeMs, mediaSourceId: String? = null) {
         val s = session ?: return
@@ -1774,6 +1821,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val plan = io { repo.plan(s, target, null, null, resume, mediaSourceId = mediaSourceId.takeIf { target === item }, limits = settings.limits) }
                     val top = pages.lastIndex
                     if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(plan) else pages.add(Page.Player(plan))
+                    if (target.kind == BaseItemKind.MUSIC_VIDEO && playContext == null) queueFolderOf(s, target)
                 }
             } catch (e: DirectOnlyException) {
                 errorRes = R.string.error_direct_only
@@ -1808,6 +1856,83 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 back()
             }
         }
+    }
+
+    /**
+     * "Search online…" in the player's subtitle menu: choose a language, then one of what the server's subtitle plugin found. The chosen one
+     * is saved on the server, next to the video, and switched on; the video carries on from [positionMs].
+     */
+    fun searchSubtitles(plan: PlaybackPlan, positionMs: Long) {
+        val first = defaultSearchLanguage(plan.subtitleLanguage, java.util.Locale.getDefault().language)
+        var languages: DialogSpec? = null
+        languages = DialogSpec(
+            str(R.string.subtitles_search_language),
+            SUBTITLE_SEARCH_LANGUAGES.map { (code, name) -> DialogChoice(name, selected = code == first) { findSubtitles(plan, code, positionMs, languages) } },
+        )
+        showDialog(languages)
+    }
+
+    private fun findSubtitles(plan: PlaybackPlan, language: String, positionMs: Long, back: DialogSpec?) {
+        val s = session ?: return
+        busy = true
+        launchSafe {
+            try {
+                val found = io { repo.searchSubtitles(s, plan.item.id, language) }
+                if (found.isEmpty()) {
+                    notice = str(R.string.subtitles_none)
+                } else {
+                    showDialog(
+                        DialogSpec(
+                            str(R.string.subtitles_results),
+                            found.take(40).map { sub -> DialogChoice(subtitleLabel(sub)) { saveSubtitle(plan, sub, positionMs) } },
+                            parent = back,
+                        ),
+                    )
+                }
+            } catch (e: Exception) {
+                notice = subtitleProblem(e)
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    /** One line for a subtitle found: a match of the file is starred, then its name, where it comes from and how often it was taken. */
+    private fun subtitleLabel(sub: RemoteSubtitle): String =
+        listOfNotNull(
+            if (sub.exactMatch) "★" else null,
+            sub.name.ifBlank { sub.language },
+            sub.provider.ifBlank { null },
+            sub.downloads?.let { "↓$it" },
+            if (sub.machineTranslated) str(R.string.subtitles_machine) else null,
+        ).joinToString(" · ")
+
+    private fun saveSubtitle(plan: PlaybackPlan, sub: RemoteSubtitle, positionMs: Long) {
+        val s = session ?: return
+        busy = true
+        launchSafe {
+            try {
+                io { repo.saveSubtitle(s, plan.item.id, sub.id) }
+                // Ask again: the server lists the saved file as one more track of the video, which is then switched on.
+                val before = plan.subtitleTracks.map { it.index }
+                val refreshed = io { repo.plan(s, plan.item, plan.audioIndex, plan.subtitleIndex, positionMs, plan.directAllowed, plan.mediaSourceId, settings.limits) }
+                val added = newSubtitleIndex(before, refreshed.subtitleTracks.map { it.index })
+                val next = if (added == null) refreshed else io { repo.plan(s, plan.item, plan.audioIndex, added, positionMs, plan.directAllowed, plan.mediaSourceId, settings.limits) }
+                val top = pages.lastIndex
+                if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(next)
+                notice = str(R.string.subtitles_saved)
+            } catch (e: Exception) {
+                notice = subtitleProblem(e)
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    private fun subtitleProblem(e: Exception): String = when ((e as? org.jellyfin.sdk.api.client.exception.InvalidStatusException)?.status) {
+        403 -> str(R.string.subtitles_forbidden)
+        404 -> str(R.string.subtitles_no_plugin)
+        else -> str(R.string.subtitles_unreachable)
     }
 
     /** Swaps the playing stream for one with other audio or subtitles, continuing from [positionMs]. */

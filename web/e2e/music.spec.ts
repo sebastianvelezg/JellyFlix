@@ -175,6 +175,8 @@ test('music: a song the browser cannot play directly falls back to the server co
 test('music: with the server transcoding, music plays through hls.js', async ({ page }) => {
   mock = await startMock({ movieCount: 3, musicArtists: 3, playMode: 'hls' })
   await signIn(page, mock)
+  // Seeking to the very end would otherwise hand over to the next song at once (gapless), which has its own test.
+  await page.evaluate(() => localStorage.setItem('jellyflix.player', JSON.stringify({ gapless: false })))
   await playSong(page)
   expect(mock.requests.some((r) => r.path === '/audio/tr0001-1-1/master.m3u8')).toBe(true)
   await bar(page).getByRole('slider', { name: 'Seek' }).focus()

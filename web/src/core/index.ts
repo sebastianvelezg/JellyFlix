@@ -224,6 +224,7 @@ export {
 export {
   collectionBackdropUrl,
   collectionPlayTarget,
+  nextInCollection,
   COLLECTION_SORT_LABELS,
   collectionPosterUrl,
   getCollection,
@@ -237,8 +238,11 @@ export {
 } from './collections'
 export {
   buildHomeLineup,
+  distinctSeeds,
   getAddedSince,
   getBecauseYouWatched,
+  getRecommendations,
+  RECOMMENDATION_ROWS,
   getContinueAll,
   getFreshSeries,
   getHomePool,
@@ -248,8 +252,13 @@ export {
   newestFirst,
   type BecauseYouWatched,
   type FreshSeries,
+  type Recommendation,
+  type RecommendationKind,
 } from './home'
 export * from './lyrics'
+export * from './subtitleSearch'
+export * from './upNext'
+export * from './mixes'
 export {
   findPlugin,
   getPlugins,
@@ -478,3 +487,4 @@ export {
   type GuideBlock,
   type Program,
 } from './liveTv'
+export * from './musicVideos'

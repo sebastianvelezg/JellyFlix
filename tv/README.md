@@ -24,7 +24,7 @@ What differs is how it is used: everything is built for a remote control and a T
 ### Home and discovery
 - A rotating **banner** (the newest titles plus random picks, movies and series in turns, ten seconds each, paused while the remote is on it, the next picture loaded ahead), then **Discover something new** (a random movie, a series you never started,
   a random album, each with Play / Details / a refresh button), Continue watching, Next up, **Watch later**, your **playlists** and **favorites**, **New since your last visit**, **Coming up** (episodes about to air, with "Today", "Tomorrow" or the date),
-  Latest movies, Collections, New series, New anime and **Because you watched X**. Each row is left out when it would be empty. Back from a title lands on the poster you left.
+  Latest movies, Collections, New series, New anime and **Because you watched X** and **Because you liked X** (several rows, each from a different title). Each row is left out when it would be empty. Back from a title lands on the poster you left.
 - **Movies, Series and Anime** open with a banner of their newest titles, then the sort and filter choices and the poster grid, as one page. **Music** opens with a wide random album. Every page starts clear of the top bar, so a focused button is never cut by it.
 - **Search** across movies, series, collections, albums and artists.
 
@@ -34,7 +34,7 @@ What differs is how it is used: everything is built for a remote control and a T
 </p>
 
 ### Music videos, books and Live TV
-- **Music videos**: a tab with wide cards (the artist under the title), a title page, the usual player, search, a "New music videos" row on Home and a place in Continue watching.
+- **Music videos**: a tab with wide cards (the artist under the title), a title page, the usual player, search, a "New music videos" row on Home and a place in Continue watching. A video played on its own goes on with the other videos of its folder when it ends (with autoplay on). Browsing by folder, repeating the list and the mini player are for the web app.
 - **Books**: a tab with books and audiobooks. **Audiobooks** play in the music player from where they were left. Books to read are not shown on the TV: choosing one says so and points to the web app or a phone.
 - **Live TV**: your channels with what is on each (quality and notes of the name as small tags), "now and next", a guide view, and favorites. Watching a channel opens the stream your server provides: no seek bar, OK shows the controls, up and down (or the remote's channel keys) change channel, and a channel the server cannot play shows a message. Recording and timers are not built.
 
@@ -57,7 +57,7 @@ What differs is how it is used: everything is built for a remote control and a T
 - **ExoPlayer** with own controls. The server is asked how to play each title for this TV: it direct-plays what the TV can decode and converts the rest to H.264 + AAC over HLS (also the fallback when the audio cannot be decoded or the player fails).
 - **Plays at the picture's own size.** At start the app asks the TV what it can do (which video decoders it has and the largest picture each takes, 10-bit, the HDR kinds the screen shows, which audio it can decode or pass through HDMI)
   and tells the server. A 4K file is sent as 4K and a 1080p file as 1080p; only what the TV cannot decode is converted.
-- **Audio and subtitles menu** (text subtitles as separate files, image ones burned in by the server), **skip intro / recap / credits / preview** when the server has segments (Intro Skipper or another provider), a **Next episode** button in the last 25 seconds and autoplay.
+- **Audio and subtitles menu** (text subtitles as separate files, image ones burned in by the server; **Search online…** asks your server's subtitle plugin (Open Subtitles and the like) in a language you pick, lists what it found and saves the chosen one on the server and switches it on), **skip intro / recap / credits / preview** when the server has segments (Intro Skipper or another provider), a **Next episode** button in the last 25 seconds and autoplay.
 - **Chapters**: a gap in the progress bar marks each one, the current chapter's name shows above it, a Chapters button lists them and the remote's next / previous keys go chapter by chapter.
 - **Pictures on the seek bar** (trickplay) when the server has made them. Nothing is asked until the bar first shows, then only the one sheet that holds the picture is downloaded.
 - **Info panel** (the Info button or the remote's Info key): how the title is played (as it is, or converted, with the picture copied or re-encoded and **why**), the file's container and bitrate, video, audio, what the player is decoding right now with dropped frames, and what the screen is doing.
@@ -66,6 +66,7 @@ What differs is how it is used: everything is built for a remote control and a T
 
 ### Music
 - Overview (random album, shuffle all songs, jump back in, new albums, albums to try), all albums, artists and playlists; album, artist and playlist pages.
+- **Mix of the day** (a few of your favourites, the radios of three of them and a few surprises; the same all day while the app is open) and a **Radio** button on album and artist pages, from your server's instant mix. Songs follow each other without a gap (crossfade, the visualizer and the cover colours are for the web app).
 - A **now-playing bar** on every screen while music is queued, and a **full-screen player** with three faces chosen with three buttons along the bottom right: the cover and controls alone, the same with the **queue** beside them
   (with a **Reorder** mode: OK lifts a song, Up and Down move it, OK drops it), or the **lyrics** filling the screen. The **sleep timer** steps through off, 15, 30, 45, 60 minutes and "after this song".
 - **Lyrics**: from the song's tags or a lyrics plugin such as LrcLib. Timed lyrics are large and centred and follow the music (press OK, then Up and Down choose a line and OK jumps the song there); lyrics without times scroll and offer
@@ -249,7 +250,7 @@ Jellyfin returns playlist ids without dashes, so they are never parsed as UUIDs.
 - **Devices:** Android TV and Google TV running Android 9 or newer. The emulator only offers software decoders and one 60 Hz mode, so a few things can only be confirmed on a real TV: HDR and Dolby decisions, 4K, the automatic frame-rate switch,
   a screen that crops the picture (the *Screen margin* setting) and the version picker for merged titles. If you try one of these, please [open an issue](https://github.com/sebastianvelezg/JellyFlix/issues/new/choose) with what you saw.
 - **Servers:** developed against Jellyfin 12.x. Skip intro / recap / credits need segments from the server (for example the Intro Skipper plugin); without them the buttons simply do not appear.
-- **Not built:** voice search, music playing after you leave the app, server discovery on the network, searching and downloading subtitles, recording and timers for live TV, a reader for books. Administration tools are on the web app only, on purpose.
+- **Not built:** voice search, music playing after you leave the app, server discovery on the network, recording and timers for live TV, a reader for books. Administration tools are on the web app only, on purpose.
 
 ## License
 
