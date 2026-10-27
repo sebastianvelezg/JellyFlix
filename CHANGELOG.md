@@ -18,7 +18,7 @@ A better video player, music that flows from one song to the next, mixes made fo
 - **More varied suggestions:** up to three rows on the main page, each from a different starting point (a few of the titles you finished lately, and one favourite: *Because you liked X*), alternating, with no title in two rows.
 
 - **Music videos by folder, played one after the other:**
-  - The Music videos section has three views, like Jellyfin: *Suggestions* (the usual page with all the videos), *Folders* and *Playlists*.
+  - The Music videos section has two views, like Jellyfin: *Suggestions* (the usual page with all the videos) and *Folders*.
   - **Folders** shows the folders of the library; a folder opens with a way back up (a breadcrumb), and has **Play folder** and **Shuffle**, which play every video inside it, including the folders inside it. A folder card plays its folder without opening it. With one library, **Play all** and **Shuffle** play the whole library.
   - **Videos follow each other:** when a music video ends the next one of its queue starts after a short countdown (3 seconds at most). A video played on its own goes on with the others of its folder. **Repeat the list** (in the player's menu, for any queue: folder, library, playlist, collection) starts again from the first video after the last one.
   - A playlist page has **Shuffle** too. A shuffled queue keeps one random order from the first video to the last.

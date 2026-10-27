@@ -23,7 +23,6 @@ describe('routes', () => {
     { page: 'admin' },
     { page: 'music', tab: 'home' },
     { page: 'music', tab: 'albums' },
-    { page: 'music', tab: 'playlists' },
     { page: 'album', id: 'al0001-1' },
     { page: 'artist', id: 'ar0001' },
     { page: 'playlist', id: 'pl1' },

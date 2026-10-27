@@ -693,7 +693,8 @@ describe('music', () => {
     await ui.click(await songsList.findByRole('button', { name: 'Play Song 1.1 by Test Artist 001' }))
     expect(within(await player()).getByText('Song 1.1')).toBeInTheDocument()
 
-    await ui.click(screen.getByRole('button', { name: 'Playlists' }))
+    // Playlists are on the music home, not a tab of their own.
+    await ui.click(within(screen.getByRole('navigation', { name: 'Music sections' })).getByRole('button', { name: 'Home' }))
     await ui.click(await screen.findByRole('button', { name: 'Open playlist Road trip' }))
     const playlist = await onPage('Road trip')
     expect(await playlist.findByText(/5 songs/)).toBeInTheDocument()

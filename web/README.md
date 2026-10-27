@@ -56,7 +56,7 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - **Audiobooks** play in the music player and go on from where they were left. Reading and downloading need an account that may download files.
 
 ### Music videos and Live TV
-- **Music videos** have wide cards with the artist under the title, a page of their own, the usual player, search, a "New music videos" row on Home and a place in "Continue watching". They can be browsed by **folder** (play a folder or shuffle it, with the videos following each other, and repeat the list), and the section also lists your playlists.
+- **Music videos** have wide cards with the artist under the title, a page of their own, the usual player, search, a "New music videos" row on Home and a place in "Continue watching". They can be browsed by **folder** (play a folder or shuffle it, with the videos following each other, and repeat the list).
 - **Live TV** lists your channels with what is on each (their quality and notes in the name are shown as small tags), has a search by name or number, favorites, and a **guide** (a time grid of the next hours). Watching a channel opens the stream your server provides, with no seek bar (it is live), the arrow keys for the channel before and after, a quality choice, and the usual reports to the server. Recording and timers are not built.
 
 ### Music

@@ -143,15 +143,13 @@ test('a video played on its own goes on with the others of its folder', async ({
   await expect(page.getByRole('status', { name: 'Up next' })).toHaveCount(0)
 })
 
-test('playlists tab: your video playlists, and a playlist can be shuffled', async ({ page }) => {
+test('a playlist of music videos can be shuffled (and the section has no Playlists view)', async ({ page }) => {
   mock = await startMock(options)
   await signIn(page, mock)
   await tabs(page).getByRole('button', { name: 'Music videos' }).click()
-  await views(page).getByRole('button', { name: 'Playlists' }).click()
-  await expect(page.getByText('You have no playlists yet. Make one with the ⋯ menu of any video.')).toBeVisible()
+  await expect(views(page).getByRole('button')).toHaveText(['Suggestions', 'Folders'])
 
   // Make a playlist from the card menu of two videos.
-  await views(page).getByRole('button', { name: 'Suggestions' }).click()
   const more = (n: string) =>
     page.getByRole('region', { name: 'All music videos' }).getByRole('button', { name: `More options for Test Music Video ${n}` })
   await more('001').click({ force: true })
@@ -165,7 +163,7 @@ test('playlists tab: your video playlists, and a playlist can be shuffled', asyn
   await picker.getByRole('button', { name: /^Mix tape/ }).click()
   await expect(picker).toBeHidden()
 
-  await views(page).getByRole('button', { name: 'Playlists' }).click()
+  await page.goto('/#/lists')
   await page.getByRole('button', { name: 'Open playlist Mix tape' }).click()
   await page.getByRole('button', { name: 'Shuffle', exact: true }).click()
   await expect(page).toHaveURL(/#\/play\/mv000[12]\?list=vp\d+&shuffle=[0-9a-z]{8}$/)

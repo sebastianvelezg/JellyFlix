@@ -23,7 +23,7 @@ import { useCallback, useEffect, useState } from 'react'
  *                       next title of it when this one ends; &shuffle=<seed> plays that queue in a random order)
  *   #/folder/<id>       a folder of music videos
  */
-export const MUSIC_TABS = ['home', 'albums', 'artists', 'songs', 'playlists'] as const
+export const MUSIC_TABS = ['home', 'albums', 'artists', 'songs'] as const
 export type MusicTab = (typeof MUSIC_TABS)[number]
 
 /**

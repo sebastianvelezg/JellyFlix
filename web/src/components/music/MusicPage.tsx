@@ -48,7 +48,6 @@ const TABS: Array<[MusicTab, string]> = [
   ['albums', tr('Albums')],
   ['artists', tr('Artists')],
   ['songs', tr('Songs')],
-  ['playlists', tr('Playlists')],
 ]
 
 const GRID = 'poster-grid'
@@ -125,7 +124,6 @@ export function MusicPage({
       {tab === 'albums' && <Albums session={session} libraryId={libraryId} {...nav} />}
       {tab === 'artists' && <Artists session={session} libraryId={libraryId} {...nav} />}
       {tab === 'songs' && <Songs session={session} libraryId={libraryId} {...nav} />}
-      {tab === 'playlists' && <Playlists session={session} {...nav} />}
     </div>
   )
 }
@@ -421,38 +419,3 @@ function Songs({ session, libraryId, onOpenAlbum }: { session: Session; libraryI
   )
 }
 
-function Playlists({ session, onOpenPlaylist }: { session: Session } & Navigation) {
-  const { state, retry } = useAsync(useCallback(() => getPlaylists(session), [session]))
-  if (state.status === 'loading') {
-    return (
-      <div role="status" aria-label={t('Loading playlists')} className={GRID}>
-        {Array.from({ length: 6 }, (_, i) => (
-          <AlbumCardSkeleton key={i} />
-        ))}
-      </div>
-    )
-  }
-  if (state.status === 'error') {
-    return (
-      <StateMessage kind="error" size="section" message={t('Could not load playlists: {message}', { message: state.message })}>
-        <button type="button" className="btn" onClick={retry}>
-          {t('Try again')}
-        </button>
-      </StateMessage>
-    )
-  }
-  if (state.data.length === 0) {
-    return <StateMessage kind="empty" size="section" message={t('No playlists yet. Create one in Jellyfin and it will show up here.')} />
-  }
-  return (
-    <section aria-label={t('All playlists')}>
-      <ul className={GRID}>
-        {state.data.map((playlist) => (
-          <li key={playlist.id}>
-            <PlaylistCard session={session} playlist={playlist} onOpen={() => onOpenPlaylist(playlist.id)} />
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}

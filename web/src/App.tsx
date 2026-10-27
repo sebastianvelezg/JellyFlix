@@ -492,7 +492,6 @@ function Shell({
                 <MusicVideosPage
                   onOpen={openMovie}
                   onOpenFolder={(id) => go({ page: 'folder', id })}
-                  onOpenList={(id) => go({ page: 'list', id })}
                   onPlayQueue={playQueue}
                   {...catalog}
                 />
