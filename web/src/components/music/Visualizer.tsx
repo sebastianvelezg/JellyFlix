@@ -1,7 +1,15 @@
 import { useEffect, useRef } from 'react'
+import { parseHex, toHex, type Rgb } from '../../theme/colors'
+import type { CoverPalette } from '../../theme/coverColors'
 import { useMusic, useMusicState } from './MusicProvider'
 
 const BARS = 40
+const FALLBACK: Rgb = [77, 141, 255]
+
+/** One step of a colour towards another. */
+function ease(from: Rgb, to: Rgb): Rgb {
+  return [0, 1, 2].map((c) => (from[c] as number) + ((to[c] as number) - (from[c] as number)) * 0.2) as Rgb
+}
 /** How fast a bar falls when the sound drops (a share of its height per frame); rising is immediate. */
 const FALL = 0.12
 
@@ -10,11 +18,18 @@ const FALL = 0.12
  * (the song was loaded with CORS); otherwise they move to a made-up rhythm, and say so in `data-source`.
  * Nothing moves for people who asked their system for less motion, or while the music is paused.
  */
-export function Visualizer({ className = '' }: { className?: string }) {
+export function Visualizer({ className = '', colors }: { className?: string; colors?: CoverPalette | null }) {
   const music = useMusic()
   const { status } = useMusicState()
   const canvas = useRef<HTMLCanvasElement>(null)
   const playing = status === 'playing'
+  // The colours of the cover, read each frame so that a new song changes them without restarting the drawing.
+  const palette = useRef(colors)
+  useEffect(() => {
+    palette.current = colors
+  }, [colors])
+  // The colours the bars have now, on their way to the cover's, so a change of song fades them instead of jumping.
+  const shown = useRef<[Rgb, Rgb] | null>(null)
 
   useEffect(() => {
     const element = canvas.current
@@ -64,12 +79,27 @@ export function Visualizer({ className = '' }: { className?: string }) {
       last = now
       const { width, height } = element
       context.clearRect(0, 0, width, height)
-      const accent = getComputedStyle(element).getPropertyValue('--color-accent').trim() || '#4d8dff'
+      // The cover's two colours, left to right; the page's accent when the cover has none (or has not been read yet).
+      const style = getComputedStyle(element)
+      const accent = style.getPropertyValue('--color-accent').trim() || '#4d8dff'
+      const wanted: [Rgb, Rgb] = palette.current
+        ? [parseHex(palette.current.primary) ?? FALLBACK, parseHex(palette.current.secondary) ?? FALLBACK]
+        : [parseHex(accent) ?? FALLBACK, parseHex(style.getPropertyValue('--color-cyan').trim() || accent) ?? FALLBACK]
+      const from = shown.current ?? wanted
+      // A fifth of the way there each frame: a change of song fades the colours over about a third of a second.
+      const mixed: [Rgb, Rgb] = [ease(from[0], wanted[0]), ease(from[1], wanted[1])]
+      shown.current = mixed
+      const left = toHex(mixed[0])
+      const right = toHex(mixed[1])
+      element.dataset.colors = `${left} ${right}`
       const slot = width / BARS
       const barWidth = Math.max(2, slot * 0.58)
-      context.fillStyle = accent
-      context.shadowColor = accent
-      context.shadowBlur = 12
+      const fill = context.createLinearGradient(0, 0, width, 0)
+      fill.addColorStop(0, left)
+      fill.addColorStop(1, right)
+      context.fillStyle = fill
+      context.shadowColor = left
+      context.shadowBlur = 14
       for (let i = 0; i < BARS; i += 1) {
         const h = Math.max(slot * 0.4, (heights[i] ?? 0) * height * 0.9)
         const x = i * slot + (slot - barWidth) / 2

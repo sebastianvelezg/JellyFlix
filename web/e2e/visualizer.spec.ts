@@ -68,6 +68,36 @@ test('visualizer: bars over the cover read the real sound, the song keeps playin
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.player') ?? '{}').visualizer)).toBe(false)
 })
 
+test('cover colours: the blur, the bars and the accent of the full-screen player follow the cover of the song', async ({ page }) => {
+  mock = await startMock({ movieCount: 3, musicArtists: 3 })
+  await signIn(page, mock)
+  await playAndOpen(page)
+
+  const now = page.getByRole('dialog', { name: 'Now playing' })
+  // The colours of the cover are read (album 1-1 is a red-orange cover with a band of another colour) and put on the screen.
+  await expect(now).toHaveAttribute('data-cover-colors', /^#[0-9a-f]{6} #[0-9a-f]{6}$/i)
+  const colours = (await now.getAttribute('data-cover-colors')) as string
+  const [primary, secondary] = colours.split(' ') as [string, string]
+  expect(primary).not.toBe(secondary)
+  await expect(page.getByTestId('cover-glow').locator('div').first()).toHaveCSS('opacity', '0.5')
+
+  // The accent of this screen is made from the cover (what the seek bar and the buttons use), not the one chosen in Appearance.
+  const accent = (el: Element) => getComputedStyle(el).getPropertyValue('--color-accent').trim()
+  const pageAccent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim())
+  expect(await now.evaluate(accent)).not.toBe(pageAccent)
+
+  // The bars are drawn in the same colours, from the first one to the last.
+  await now.getByRole('button', { name: 'Visualizer' }).click()
+  await expect(page.getByTestId('visualizer')).toHaveAttribute('data-colors', `${primary.toLowerCase()} ${secondary.toLowerCase()}`, {
+    timeout: 10_000,
+  })
+
+  // Another album, other colours; and once the screen is closed nothing of it stays on the page.
+  await page.keyboard.press('Escape')
+  await expect(now).toBeHidden()
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim())).toBe(pageAccent)
+})
+
 test('visualizer: the next songs keep being read, also the one made ready ahead of time', async ({ page }) => {
   mock = await startMock({ movieCount: 3, musicArtists: 3 })
   await signIn(page, mock)

@@ -11,6 +11,10 @@ import { PlayOnButton } from '../remote/PlayOnButton'
 import { LyricsPanel } from './Lyrics'
 import { Visualizer } from './Visualizer'
 import { readPlayerPrefs } from '../../platform/web/prefs'
+import { useAppearance } from '../../platform/web/appearance'
+import { useCoverPalette } from '../../platform/web/coverPalette'
+import type { CoverPalette } from '../../theme/coverColors'
+import { themeVariables, type ThemeChoice } from '../../theme/themes'
 import { getLanguage, t } from '../../i18n'
 
 /**
@@ -171,6 +175,25 @@ export function MiniPlayer({
 
 type Panel = 'player' | 'queue' | 'lyrics'
 
+/** The accent colours of the page, made from the cover's main colour (readable on the chosen canvas like any accent), for one screen. */
+function coverTheme(canvas: string, palette: CoverPalette): React.CSSProperties {
+  const vars = themeVariables({ canvas: canvas as ThemeChoice['canvas'], accent: palette.primary })
+  const accent: Record<string, string> = { '--glow': 'color-mix(in srgb, var(--color-accent-strong) 55%, transparent)' }
+  for (const name of ACCENT_VARIABLES) accent[name] = vars[name] as string
+  return accent as React.CSSProperties
+}
+
+const ACCENT_VARIABLES = [
+  '--color-accent',
+  '--color-accent-strong',
+  '--color-accent-deep',
+  '--color-accent-top',
+  '--color-accent-top-hover',
+  '--color-accent-deep-hover',
+  '--color-accent-ink',
+  '--color-cyan',
+]
+
 /** The wide layout (queue beside the player) starts here, as in the stylesheet's `lg`. */
 function isWide(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1024px)').matches === true
@@ -205,6 +228,11 @@ function NowPlaying({
     // Opening the full-screen player with the bars on makes sure the sound is being read.
     if (visual) void music.setVisualizer(true)
   }, [music, visual])
+  // The colours of the cover of the song: they tint the blur behind it, the bars, the glow and the accent of this screen, so each song
+  // has its own look (a cover with no colour of its own, or one the page cannot read, keeps the accent chosen in Appearance).
+  const coverSrc = queue ? coverUrl(session.serverUrl, currentTrack(queue) ?? { id: '' }, 300) : null
+  const palette = useCoverPalette(coverSrc)
+  const { theme } = useAppearance()
   if (!queue) return null
   const track = currentTrack(queue)
   if (!track) return null
@@ -215,19 +243,27 @@ function NowPlaying({
       role="dialog"
       aria-modal="true"
       aria-label={t('Now playing')}
+      data-cover-colors={palette ? `${palette.primary} ${palette.secondary}` : undefined}
+      style={palette ? coverTheme(theme.canvas, palette) : undefined}
       className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[var(--color-bg)]"
     >
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-30 blur-3xl">
-        <Img
-          session={session}
-          src={coverUrl(session.serverUrl, track, 300)}
-          className="h-full w-full scale-125 object-cover"
-          fallback={null}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-40 blur-3xl">
+        <Img session={session} src={coverSrc} className="h-full w-full scale-125 object-cover" fallback={null} />
+      </div>
+      {/* Two soft pools of the cover's colours, which fade into the ones of the next song. */}
+      <div aria-hidden="true" data-testid="cover-glow" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          className="absolute -left-[15%] -top-[20%] h-[75%] w-[65%] rounded-full blur-[120px] transition-[background-color,opacity] duration-1000"
+          style={{ backgroundColor: palette?.primary, opacity: palette ? 0.5 : 0 }}
+        />
+        <div
+          className="absolute -bottom-[25%] -right-[15%] h-[75%] w-[65%] rounded-full blur-[120px] transition-[background-color,opacity] duration-1000"
+          style={{ backgroundColor: palette?.secondary, opacity: palette ? 0.38 : 0 }}
         />
       </div>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--color-bg)]/40 via-[var(--color-bg)]/70 to-[var(--color-bg)]"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--color-bg)]/30 via-[var(--color-bg)]/55 to-[var(--color-bg)]"
       />
 
       <header className="gutter-x relative flex items-center justify-between pb-4 pt-[calc(1rem+var(--safe-top))]">
@@ -277,7 +313,7 @@ function NowPlaying({
                   eager
                   className={`w-full shadow-[0_30px_90px_-20px_var(--glow)] transition-opacity duration-300 ${visual ? 'opacity-35' : ''}`}
                 />
-                {visual && <Visualizer className="absolute inset-0 h-full w-full p-4" />}
+                {visual && <Visualizer colors={palette} className="absolute inset-0 h-full w-full p-4" />}
               </div>
               <div className="flex w-full max-w-md flex-col items-center gap-6 short:gap-3">
                 <div className="w-full text-center">

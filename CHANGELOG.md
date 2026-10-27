@@ -23,6 +23,8 @@ A better video player, music that flows from one song to the next, mixes made fo
   - **Videos follow each other:** when a music video ends the next one of its queue starts after a short countdown (3 seconds at most). A video played on its own goes on with the others of its folder. **Repeat the list** (in the player's menu, for any queue: folder, library, playlist, collection) starts again from the first video after the last one.
   - A playlist page has **Shuffle** too. A shuffled queue keeps one random order from the first video to the last.
 
+- **The full-screen music player takes its colours from the cover:** the blur behind the cover, the bars of the visualizer (a gradient between the cover's two main colours), the glow and the accent of that screen (seek bar, buttons) follow the song that is playing and fade into the next song's colours. A cover with no colour of its own (black and white), or one the browser cannot read, keeps the accent chosen in Appearance.
+
 ### TV app
 - The same more varied suggestions on Home: *Because you watched X* for several recent titles and *Because you liked X* for a favourite.
 

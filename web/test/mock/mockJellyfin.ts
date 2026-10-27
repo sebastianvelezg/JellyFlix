@@ -15,6 +15,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { cbzBytes, epubBytes, pdfBytes } from './bookFiles.ts'
 import {
+  ALBUM_ID,
   MUSIC_LIBRARY,
   musicDto,
   musicRows,
@@ -951,7 +952,15 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
     }
     const image = /^\/Items\/([^/]+)\/Images\/(?:Primary|Backdrop|Logo|Thumb)$/.exec(path)
     if (image && req.method === 'GET') {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#334"/><text x="20" y="150" fill="#fff">${image[1]}</text><text x="20" y="180" fill="#9cf">${(query.tag ?? '').replace(/[^\w-]/g, '')}</text></svg>`
+      // An album cover has colours of its own (a main one and a band of another along the bottom), the others are a flat dark blue.
+      const album = ALBUM_ID.exec(image[1] as string)
+      if (album) {
+        const hue = (Number(album[1]) * 97 + Number(album[2]) * 53) % 360
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="hsl(${hue} 70% 45%)"/><rect y="130" width="200" height="70" fill="hsl(${(hue + 150) % 360} 70% 45%)"/></svg>`
+        res.writeHead(200, { 'Content-Type': 'image/svg+xml' }).end(svg)
+        return
+      }
+      const svg =`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#334"/><text x="20" y="150" fill="#fff">${image[1]}</text><text x="20" y="180" fill="#9cf">${(query.tag ?? '').replace(/[^\w-]/g, '')}</text></svg>`
       res.writeHead(200, { 'Content-Type': 'image/svg+xml' }).end(svg)
       return
     }
