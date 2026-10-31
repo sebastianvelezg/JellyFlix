@@ -3,6 +3,7 @@ import { createReadStream, existsSync, readFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { CSP } from './scripts/csp.mjs'
 
 /**
  * Writes `sw.js` next to the built app: the service worker (scripts/sw.template.js) with the list of files to keep for opening the
@@ -56,6 +57,8 @@ export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), serviceWorker(), pdfjsFiles()],
   server: { host: 'localhost', port: 5173 },
+  // The production build is previewed (and tested) with the same policy it is served with; the dev server needs inline code for hot reload.
+  preview: { headers: { 'Content-Security-Policy': CSP } },
   // hls.js (~570 kB) is a lazily loaded chunk, only fetched when a stream needs HLS.
   build: {
     chunkSizeWarningLimit: 700,

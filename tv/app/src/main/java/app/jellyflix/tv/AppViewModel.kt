@@ -749,6 +749,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         resetMusic()
         store.clear()
         session = null
+        // The pictures of the screensaver belong to the account that was signed in: the next one asks for its own.
+        screensaverShown = false
+        screensaverPictures = emptyList()
+        screensaverFor = null
+        lastChannel = null
         libs = null
         hasCollections = false
         pages.clear()

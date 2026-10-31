@@ -27,6 +27,7 @@ import {
   type SyncState,
 } from '../../core'
 import { VideoSync } from '../../platform/web/syncVideo'
+import { readKids } from '../../platform/web/kids'
 import { useRemote } from '../remote/RemoteProvider'
 import type { Navigate, Route } from '../route'
 import { t } from '../../i18n'
@@ -195,7 +196,8 @@ export function SyncPlayProvider({ session, go, children }: { session: Session; 
           // The group chose a title: it opens here, held at the start until everyone is ready.
           playing.current = false
           const id = currentItemId(message.queue)
-          if (!id) return
+          // A group never starts a title on a device in Kids mode (the button is hidden there, but a group joined earlier could still send one).
+          if (!id || readKids().enabled) return
           if (bound.current?.itemId === id) bound.current.video.apply({ type: 'seek', positionSeconds: message.queue.startSeconds })
           else goRef.current({ page: 'play', id, startOver: false, ...(message.queue.startSeconds > 0 ? { startAt: message.queue.startSeconds } : {}) })
           return

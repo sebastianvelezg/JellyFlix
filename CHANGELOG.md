@@ -7,6 +7,14 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 A visual polish of the whole web app, without changing its identity (calmer, simpler and more consistent), and the first three phases of the roadmap: the player and the way a title starts, the household, and the bigger pieces.
 
+### Audit before the release: security and performance
+- **A strict Content-Security-Policy (web):** the app is now served (Docker image, `npm run serve`) with a policy that runs only its own scripts: no inline script and no `eval`, no script from another site, no plug-ins except the browser's PDF viewer, no `<base>` or form sent elsewhere, and it cannot be put in a frame of another site. The pre-paint look script moved to its own file (`paint.js`) for that. A test keeps the policy of nginx and of the Node server identical. Also a `Permissions-Policy` that turns the camera, microphone, location, payment and USB off.
+- **Dependencies:** `follow-redirects` (a high-severity advisory inside axios) is updated; no known vulnerability remains in what ships to users (`npm audit --omit=dev`). The ones left are in the lint tools, which are not part of the app.
+- **Signing out forgets more (web):** the recent searches and the *Last watched* channel are cleared when you sign out, so the next account on the same browser does not see them.
+- **Signing out forgets more (TV):** the screensaver pictures of the account that left are dropped, so the next account does not see another account's backdrops. The session is also excluded from Android's cloud backup and from device-to-device transfer.
+- **Kids mode:** a title chosen by a watch-together group is ignored on a device in Kids mode.
+- **Performance (web):** the page of playlists is no longer pulled into the first download by the rows that show a playlist card.
+
 ### The bigger pieces: Live TV, watching together, the TV screensaver (phase 3 of the roadmap)
 - **Live TV by kind:** the channels can be narrowed to *Movies*, *Series*, *Sports*, *News*, *Kids* or *Favorites* (the server decides a channel's kind from what it broadcasts). The choice is kept, and the arrows of the player change channel inside it. (TV too.)
 - **Strip of channels in the player:** a row at the bottom of the live player shows the channels around the current one, with what is on each; one click changes channel. On the TV the controls say which channel up and down lead to.

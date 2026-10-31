@@ -96,6 +96,9 @@ test('live tv: watching a channel opens the stream, cannot be sought, changes ch
   await waitPlaying(page)
   await page.keyboard.press('ArrowUp')
   await expect(page).toHaveURL(/#\/live\/ch0001$/)
+  // The keys are bound to the channel on screen: let the player show it before pressing again (a person cannot press within a frame).
+  await expect(watching(page, '1 · Test Channel 01')).toBeVisible()
+  await waitPlaying(page)
   await page.keyboard.press('ArrowUp')
   await expect(page).toHaveURL(/#\/live\/ch0003$/)
   await waitPlaying(page)

@@ -21,6 +21,9 @@ You can expect an answer within about a week. This is a volunteer project, so th
   `localStorage` if the user ticks "Keep me signed in", and in the app's private storage on the TV.
 - Tokens are sent in the `Authorization` header. The only places a token is put in a URL are a media request that cannot carry headers (a `<video src>`) and the address of the
   server's WebSocket (a browser cannot add headers to a socket), which is how Jellyfin's own web client works.
+- The web app is served with a strict Content-Security-Policy (only its own scripts run: no inline script, no `eval`, nothing from another site), and signing out also forgets
+  the recent searches and the last Live TV channel kept in the browser.
+- On the TV the session is excluded from Android's cloud backup and from device-to-device transfer.
 - There is no telemetry and no server of ours to receive anything.
 
 ## Hosting advice

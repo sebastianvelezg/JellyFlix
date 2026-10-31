@@ -28,7 +28,8 @@ import { PersonPage } from './components/PersonPage'
 import { formatRoute, useRoute, type MusicTab, type Navigate, type PlayQueueRef, type PlayRoute, type Route } from './components/route'
 import { CloseIcon } from './components/icons'
 import { DockNotice, DOCK_BUTTON } from './components/player/dock'
-import { readPlayerPrefs, writePlayerPrefs } from './platform/web/prefs'
+import { readPlayerPrefs, writePlayerPrefs, writeUiPrefs } from './platform/web/prefs'
+import { clearRecentSearches } from './platform/web/recentSearches'
 import { SearchPage } from './components/SearchPage'
 import { useLanguage } from './components/useLanguage'
 import { clearSwr, swrKey, swrScope, useSwr } from './components/useSwr'
@@ -92,6 +93,12 @@ function PageLoading() {
 
 const EXPIRED = tr('Your session expired or was signed out elsewhere. Please sign in again.')
 
+/** What this browser remembers about the person who used it (the searches, the last channel), so the next account does not see it. */
+function forgetTraces(): void {
+  clearRecentSearches()
+  writeUiPrefs({ lastChannel: null })
+}
+
 /**
  * Top-level state: restoring a saved session, signed out (connection form) or signed in
  * (header + browse / title pages, with the player layered on top). The section home pages stay
@@ -112,6 +119,7 @@ export default function App() {
     void webSessionStore.clear()
     clearSwr()
     clearActivity()
+    forgetTraces()
     setSession(null)
     setNotice(t(EXPIRED))
     setOverrides({})
@@ -192,6 +200,7 @@ export default function App() {
     setOverrides({})
     clearSwr()
     clearActivity()
+    forgetTraces()
     navigate({ page: 'home' }, { replace: true })
     await webSessionStore.clear()
     if (current) await logout(current)

@@ -12,7 +12,6 @@ import {
   isWatchLater,
   moveInPlaylist,
   newShuffleSeed,
-  posterUrl,
   removeFromPlaylist,
   renamePlaylist,
   reorder,
@@ -26,42 +25,14 @@ import {
 import { t } from '../i18n'
 import { BackIcon, PlayIcon, PlusIcon, ShuffleIcon } from './icons'
 import { Img } from './Img'
-import { frame } from './MovieCard'
+import { ListCard } from './ListCard'
+import { countText, shownName } from './listText'
 import { StateMessage } from './StateMessage'
 import { Subtext } from './Subtext'
 import { notifyPlaylistsChanged } from './playlistEvents'
 import { showToast } from './toast'
 import { errorText, useAsync } from './useAsync'
 
-const countText = (n: number | undefined) => (n == null ? '' : n === 1 ? t('1 title') : t('{count} titles', { count: n }))
-const shownName = (list: Pick<VideoPlaylist, 'name'>) => (isWatchLater(list) ? t('Watch later') : list.name)
-
-/** A poster for a playlist (the server makes one from its first titles), or its name on a plain tile. */
-export function ListCard({ session, list, onOpen }: { session: Session; list: VideoPlaylist; onOpen: (id: string) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(list.id)}
-      className="group block w-full text-left outline-none"
-      aria-label={t('Open playlist {name}', { name: shownName(list) })}
-    >
-      <div className={`aspect-[2/3] ${frame}`}>
-        <Img
-          session={session}
-          src={posterUrl(session.serverUrl, list)}
-          className="h-full w-full object-cover"
-          fallback={
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[var(--color-surface-3)] to-[var(--color-surface)] p-3 text-center text-sm font-medium text-neutral-500">
-              {shownName(list)}
-            </div>
-          }
-        />
-      </div>
-      <p className="mt-2.5 truncate text-sm font-medium text-neutral-100 transition group-hover:text-white">{shownName(list)}</p>
-      <Subtext as="p" className="block min-h-4 text-xs text-neutral-500" text={countText(list.itemCount)} />
-    </button>
-  )
-}
 
 /** All your playlists of movies and episodes, and a box to make a new one. */
 export function ListsPage({ session, onOpen, onBack }: { session: Session; onOpen: (id: string) => void; onBack: () => void }) {
