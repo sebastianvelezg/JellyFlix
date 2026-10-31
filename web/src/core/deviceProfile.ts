@@ -31,6 +31,17 @@ export interface DeviceCapabilities {
   hls: boolean
 }
 
+/**
+ * The capabilities without some audio codecs the device could play: the server converts those instead (DTS-like trouble in
+ * another form: a receiver that stays silent on AC-3, a codec that plays with the wrong channels).
+ */
+export function withoutAudioCodecs(caps: DeviceCapabilities, avoid: readonly string[]): DeviceCapabilities {
+  if (avoid.length === 0) return caps
+  const audio = { ...caps.audio }
+  for (const codec of avoid) if (codec in audio) audio[codec as keyof typeof audio] = false
+  return { ...caps, audio }
+}
+
 const pick = (entries: Array<[boolean, string]>) =>
   entries.filter(([ok]) => ok).map(([, name]) => name)
 

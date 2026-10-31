@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { chapterAt, formatTime, type Chapter, type TrackOption } from '../../core'
+import { chapterAt, formatTime, timeLabelText, type Chapter, type TrackOption } from '../../core'
+import type { TimeLabel } from '../../platform/web/prefs'
 import type { SubtitleStyle } from './SubtitleOverlay'
 import type { TrickplayPreview } from './useTrickplay'
 import {
@@ -17,6 +18,7 @@ import {
 } from '../icons'
 import { getLanguage, t } from '../../i18n'
 import { PlayOnButton } from '../remote/PlayOnButton'
+import { EpisodesMenu, type EpisodesControl } from './EpisodesMenu'
 import { SettingsMenu } from './SettingsMenu'
 
 const iconButton =
@@ -55,6 +57,9 @@ export interface ControlsProps {
   audioIndex?: number
   subtitleTracks: TrackOption[]
   subtitleIndex: number | null
+  /** The second subtitle track (shown above the first), and how to change it; leaving the handler out hides the choice. */
+  secondSubtitleIndex?: number | null
+  onSecondSubtitle?: (index: number | null) => void
   subtitleStatus: 'idle' | 'loading' | 'failed'
   subtitleStyle: SubtitleStyle
   /** How many seconds later the subtitles show (negative: earlier). */
@@ -83,10 +88,18 @@ export interface ControlsProps {
   onSpeed: (speed: number) => void
   /** The settings menu opened or closed; the controls must stay visible while it is open. */
   onMenuOpenChange: (open: boolean) => void
+  /** Present for an episode: a button that lists the seasons and episodes of its series. */
+  episodes?: EpisodesControl
   /** Present when there is a next episode: adds a skip button. */
   nextEpisode?: { label: string; onPlay: () => void }
   /** Chapter markers on the timeline, and a list in the settings menu. */
   chapters: Chapter[]
+  /** Draw where each chapter starts on the seek bar. */
+  chapterMarks: boolean
+  /** What the labels on the left and the right of the seek bar show. */
+  timeLabels: { left: TimeLabel; right: TimeLabel }
+  /** The seek bar was grabbed (true) or let go (false): the player may pause meanwhile. */
+  onScrubbing?: (scrubbing: boolean) => void
   /** Small pictures of the moment you point at on the timeline, when the server has made them. */
   trickplay?: TrickplayPreview | null
   /** Present when the browser can float the video in its own window. */
@@ -106,6 +119,11 @@ export function Controls(p: ControlsProps) {
     remaining > 0 && !p.paused
       ? new Date(p.now + remaining * 1000).toLocaleTimeString(getLanguage(), { hour: 'numeric', minute: '2-digit' })
       : null
+  const labelState = { currentTime: p.currentTime, duration: p.duration, speed: p.speed, now: p.now, locale: getLanguage() }
+  const leftLabel = timeLabelText(p.timeLabels.left, labelState)
+  const rightLabel = timeLabelText(p.timeLabels.right, labelState)
+  // The text "Ends at" below is only for a viewer who did not put the time it ends at beside the bar.
+  const endsAtShown = p.timeLabels.left === 'endsAt' || p.timeLabels.right === 'endsAt'
 
   const iconsLeft = (
     <>
@@ -157,8 +175,8 @@ export function Controls(p: ControlsProps) {
         className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent pb-[max(0.75rem,var(--safe-bottom))] pl-[max(1rem,var(--safe-x))] pr-[max(1rem,var(--safe-x))] pt-20 transition-opacity duration-200 ${hidden}`}
       >
         <div className="flex items-center gap-3">
-          <span className="w-12 shrink-0 text-right text-xs font-medium tabular-nums text-white/90" aria-hidden="true">
-            {formatTime(p.currentTime)}
+          <span className="min-w-12 shrink-0 text-right text-xs font-medium tabular-nums text-white/90" aria-hidden="true">
+            {leftLabel}
           </span>
           <SeekBar
             className="min-w-0 flex-1"
@@ -166,11 +184,13 @@ export function Controls(p: ControlsProps) {
             duration={p.duration}
             bufferedEnd={p.bufferedEnd}
             chapters={p.chapters}
+            chapterMarks={p.chapterMarks}
             trickplay={p.trickplay}
             onSeek={p.onSeek}
+            onScrubbing={p.onScrubbing}
           />
-          <span className="w-12 shrink-0 text-xs font-medium tabular-nums text-white/60" aria-hidden="true">
-            {formatTime(p.duration)}
+          <span className="min-w-12 shrink-0 text-xs font-medium tabular-nums text-white/60" aria-hidden="true">
+            {rightLabel}
           </span>
           <span className="sr-only" aria-label={t('Playback position')}>
             {formatTime(p.currentTime)} / {formatTime(p.duration)}
@@ -178,10 +198,11 @@ export function Controls(p: ControlsProps) {
         </div>
         <div className="mt-0.5 flex items-center gap-1">
           {iconsLeft}
-          {endsAt && <span className="ml-3 hidden text-xs text-white/60 lg:inline">{t('Ends at {time}', { time: endsAt })}</span>}
+          {endsAt && !endsAtShown && <span className="ml-3 hidden text-xs text-white/60 lg:inline">{t('Ends at {time}', { time: endsAt })}</span>}
 
           <div className="ml-auto flex items-center gap-0.5">
             {p.speed !== 1 && <span className="mr-1 rounded-full bg-white/12 px-2 py-0.5 text-xs font-semibold tabular-nums text-white">{p.speed}×</span>}
+            {p.episodes && <EpisodesMenu control={p.episodes} iconButton={iconButton} onOpenChange={p.onMenuOpenChange} />}
             <PlayOnButton current up className={iconButton} onOpenChange={p.onMenuOpenChange} />
             <SettingsMenu {...p} iconButton={iconButton} />
             {p.pictureInPicture && (
@@ -242,16 +263,20 @@ function SeekBar({
   duration,
   bufferedEnd,
   chapters,
+  chapterMarks,
   trickplay,
   onSeek,
+  onScrubbing,
 }: {
   className?: string
   currentTime: number
   duration: number
   bufferedEnd: number
   chapters: Chapter[]
+  chapterMarks: boolean
   trickplay?: TrickplayPreview | null
   onSeek: (seconds: number) => void
+  onScrubbing?: (scrubbing: boolean) => void
 }) {
   const [scrub, setScrub] = useState<number | null>(null)
   const [hover, setHover] = useState<{ x: number; seconds: number } | null>(null)
@@ -265,6 +290,7 @@ function SeekBar({
     if (scrub !== null) {
       onSeek(scrub)
       setScrub(null)
+      onScrubbing?.(false)
     }
   }
 
@@ -283,6 +309,7 @@ function SeekBar({
       <div className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-white/25 transition-all duration-150 group-hover:h-[5px] group-focus-within:h-[5px]">
         <div className="absolute inset-y-0 left-0 rounded-full bg-white/30" style={{ width: `${bufferedPct}%` }} />
         {duration > 0 &&
+          chapterMarks &&
           chapters
             .filter((c) => c.startSeconds > 0 && c.startSeconds < duration)
             .map((c) => (
@@ -326,7 +353,10 @@ function SeekBar({
         step={1}
         value={Math.min(value, enabled ? duration : 0)}
         disabled={!enabled}
-        onChange={(e) => setScrub(Number(e.target.value))}
+        onChange={(e) => {
+          if (scrub === null) onScrubbing?.(true)
+          setScrub(Number(e.target.value))
+        }}
         onPointerUp={commit}
         onKeyUp={commit}
         onBlur={commit}

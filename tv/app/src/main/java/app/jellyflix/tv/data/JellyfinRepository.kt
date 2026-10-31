@@ -1537,7 +1537,7 @@ class JellyfinRepository(context: Context) {
             audioStreamIndex = audioIndex,
             subtitleStreamIndex = subtitleIndex,
             maxStreamingBitrate = limits.maxBitrate,
-            deviceProfile = deviceProfile(),
+            deviceProfile = deviceProfile(limits.avoidAudio),
             enableDirectPlay = directAllowed,
             enableDirectStream = directAllowed,
             enableTranscoding = limits.transcodeAllowed,
@@ -1550,9 +1550,10 @@ class JellyfinRepository(context: Context) {
      * played as it is, at the file's own size (a 4K file stays 4K, a 1080p file stays 1080p); the server converts only what the
      * TV cannot decode (an audio format, 10-bit video on a TV without it, HDR on a screen without it) and keeps the picture size.
      */
-    private fun deviceProfile(): DeviceProfile {
+    private fun deviceProfile(avoidAudio: Set<String> = emptySet()): DeviceProfile {
         val caps = TvCapabilities.get(appContext)
-        val audio = caps.audio.joinToString(",")
+        // Formats chosen in Settings are left out, so the server converts them although the TV could play them.
+        val audio = caps.audio.filterNot { it in avoidAudio }.joinToString(",")
         val codecProfiles = caps.video.map { (codec, v) ->
             val conditions = buildList {
                 add(condition(ProfileConditionValue.VIDEO_BIT_DEPTH, ProfileConditionType.LESS_THAN_EQUAL, if (v.tenBit) "10" else "8"))

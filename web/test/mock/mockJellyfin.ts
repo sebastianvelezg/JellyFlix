@@ -80,6 +80,10 @@ export interface MockOptions {
   remoteDevices?: Array<{ id: string; name: string; client?: string }>
   /** Titles come with trickplay pictures for the seek bar (default: none). */
   trickplay?: boolean
+  /** Every video also has a second text subtitle (Spanish, stream 9, saying "Segunda linea de prueba"). */
+  secondSubtitle?: boolean
+  /** "Test Movie 002" also exists as a 4K version (a second media source, `ms-m0002-4k`). */
+  versions?: boolean
   /** A second device of another account, "Kitchen tablet", playing a title that the server converts (for the administrator's session list). */
   adminSessions?: boolean
   /** Episodes that have not aired yet, for "Coming up" (default: none). */
@@ -385,7 +389,7 @@ function episodeDto(show: string, season: number, episode: number, user: UserSta
 }
 
 /** The DTO for any id the mock knows (movie, series, season or episode), or undefined. */
-function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; musicVideoFolders?: number; books?: number; audiobooks?: number; liveTv?: number; trickplay?: boolean }, full = false) {
+function dtoFor(id: string, user: UserState, counts: { movieCount: number; musicArtists: number; collections: number; musicVideos?: number; musicVideoFolders?: number; books?: number; audiobooks?: number; liveTv?: number; trickplay?: boolean; versions?: boolean }, full = false) {
   const { movieCount } = counts
   if (CHANNEL_ID.test(id)) return Number(id.slice(2)) <= (counts.liveTv ?? 0) ? channelDto(Number(id.slice(2)), user) : undefined
   if (BOOK_ID.test(id)) return Number(id.slice(2)) <= (counts.books ?? 0) ? bookDto(Number(id.slice(2)), user, full) : undefined
@@ -422,7 +426,7 @@ function dtoFor(id: string, user: UserState, counts: { movieCount: number; music
   if (season) return seasonDto(season[1] as string, Number(season[2]), user)
   if (SHOW_ID.test(id)) return full ? fullShowDto(id, user) : showDto(id, user)
   const n = Number(id.slice(1))
-  if (/^m\d{4}$/.test(id) && n >= 1 && n <= movieCount) return full ? fullDto(n, user, counts.trickplay) : movieDto(n, user)
+  if (/^m\d{4}$/.test(id) && n >= 1 && n <= movieCount) return full ? fullDto(n, user, counts.trickplay, counts.versions) : movieDto(n, user)
   return undefined
 }
 
@@ -650,7 +654,7 @@ function movieDto(n: number, user: UserState) {
   }
 }
 
-function fullDto(n: number, user: UserState, trickplay = false) {
+function fullDto(n: number, user: UserState, trickplay = false, versions = false) {
   return {
     ...movieDto(n, user),
     // Ten pictures, one every three seconds, on one sheet of 5 x 2.
@@ -674,6 +678,19 @@ function fullDto(n: number, user: UserState, trickplay = false) {
         Bitrate: 335_000,
         MediaStreams: STREAMS.map((st) => (st.Type === 'Video' ? { ...st, Width: 1920, Height: 800 } : st)),
       },
+      // The same film again, in 4K (only "Test Movie 002", and only when asked for).
+      ...(versions && n === 2
+        ? [
+            {
+              Id: `ms-${movieId(n)}-4k`,
+              Name: 'Test Movie 002 (4K)',
+              Container: 'mkv',
+              Size: 9_000_000_000,
+              Bitrate: 40_000_000,
+              MediaStreams: STREAMS.map((st) => (st.Type === 'Video' ? { ...st, Width: 3840, Height: 1600 } : st)),
+            },
+          ]
+        : []),
     ],
   }
 }
@@ -1895,7 +1912,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       const isTrack = TRACK_ID.test(id) || AUDIOBOOK_ID.test(id)
       const isChannel = CHANNEL_ID.test(id)
       const source: Record<string, unknown> = {
-        Id: `ms-${id}`,
+        Id: dto.MediaSourceId?.endsWith('-4k') ? `ms-${id}-4k` : `ms-${id}`,
         ETag: 'etag1',
         Container: 'mp4',
         RunTimeTicks: DURATION_SECONDS * TICKS,
@@ -1907,6 +1924,9 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
           ? [{ Index: 0, Type: 'Audio', Codec: 'mp3', IsDefault: true, DisplayTitle: 'MP3 - Stereo' }]
           : [
               ...STREAMS,
+              ...(opts.secondSubtitle
+                ? [{ Index: 9, Type: 'Subtitle', Codec: 'subrip', Language: 'spa', IsDefault: false, IsTextSubtitleStream: true, DisplayTitle: 'Spanish - SUBRIP' }]
+                : []),
               ...Array.from({ length: savedSubtitles.get(id) ?? 0 }, (_, i) => ({
                 Index: 4 + i,
                 Type: 'Subtitle',
@@ -2116,9 +2136,10 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
     }
     if (/^\/Videos\/[^/]+\/[^/]+\/Subtitles\/\d+\/Stream\.vtt$/.test(path)) {
       if (!needAuth()) return
+      const line = path.includes('/Subtitles/9/') ? 'Segunda linea de prueba' : 'Mock subtitle line'
       res
         .writeHead(200, { 'Content-Type': 'text/vtt' })
-        .end('WEBVTT\n\n00:00:00.000 --> 00:00:29.000\nMock subtitle line\n')
+        .end(`WEBVTT\n\n00:00:00.000 --> 00:00:29.000\n${line}\n`)
       return
     }
 

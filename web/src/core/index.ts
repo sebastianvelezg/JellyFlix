@@ -118,6 +118,7 @@ export {
 } from './details'
 
 export type { DeviceCapabilities } from './deviceProfile'
+export { withoutAudioCodecs } from './deviceProfile'
 export {
   describePlayback,
   closeLiveStream,
@@ -155,6 +156,8 @@ export {
   type StreamRequest,
 } from './streamRequest'
 
+export { defaultVersion, setPlayChoice, takePlayChoice, type PlayChoice, type VersionRef } from './playChoice'
+export { timeLabelText, type TimeLabelKind, type TimeLabelState } from './timeLabels'
 export { formatRuntime, formatTime, secondsToTicks, ticksToSeconds, TICKS_PER_SECOND } from './ticks'
 export {
   activeSegment,

@@ -5,9 +5,17 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
-A visual and usability polish of the whole web app, without changing its identity: calmer, simpler and more consistent.
+A visual polish of the whole web app, without changing its identity (calmer, simpler and more consistent), and the first phase of the roadmap: the player and the way a title starts.
 
-### Web app
+### Player and the way a title starts (phase 1 of the roadmap)
+- **Second subtitle:** a second track shows above the first (a step smaller, in another colour) to learn a language or to read a dub. It is chosen on a page of the player's menu, only while a first subtitle is on, and the language is remembered.
+- **Episodes in the player:** a button with a tab per season lists the episodes of the series; picking one plays it without leaving the player. (TV too.)
+- **Choose before you play:** under Play, a title with more than one version of the file (4K and 1080p), more than one audio track or subtitles to choose from gets three small dropdowns: version, audio and subtitle. The version you choose is offered first next time. (The TV app already chose the version.)
+- **Skip by kind:** intros, recaps, credits and previews each get their own choice in Settings: show a button, skip by itself, or do nothing. A button nobody pressed goes away after ten seconds on the web. (TV too; the old single switch still decides intros, recaps and credits until you choose.)
+- **The seek bar:** the labels on each side can show the time played, the time left, the total length, the time it ends, or nothing; the chapter marks can be turned off; and dragging the bar can pause the picture until you let go.
+- **Converted sound:** a list in Settings of sound formats (AC-3, E-AC-3, FLAC; DTS and TrueHD on the TV) that the server converts although the device could play them, for a receiver that stays silent. The picture is not touched.
+
+### Interface polish (web)
 - **Player settings menu in pages:** the long list became a short menu (Audio, Subtitles, Quality, Speed, Subtitle look, Chapters) that opens one page at a time, with the switches (autoplay, repeat the list, cinema mode) at the bottom. Escape closes it.
 - **Cleaner player bar:** the times sit on either side of the seek bar, the volume slider appears on hover, and the seek bar is a solid accent line.
 - **One toolbar for every library:** Movies, Series, Anime, Books, Music videos, Music and Collections share a single row of pill filters (library, genre, sort, more filters, Surprise me) that scrolls on a phone instead of wrapping. Selected letters and filters are white pills.
@@ -18,6 +26,7 @@ A visual and usability polish of the whole web app, without changing its identit
 
 ### TV app
 - The focused card no longer draws a blue glow; the blue frame and a slightly smaller zoom remain.
+- Settings → Playback has a choice per kind of skippable stretch and a list of sound formats the server should convert; the player has an *Episodes* button for episodes.
 
 ## [1.2.0] - 2026-10-27
 

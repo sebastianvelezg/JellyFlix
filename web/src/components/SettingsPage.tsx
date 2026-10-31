@@ -6,15 +6,23 @@ import {
   countSeriesPrefs,
   COUNTDOWN_CHOICES,
   CROSSFADE_CHOICES,
+  CONVERTIBLE_AUDIO,
   QUALITY_CHOICES,
   readPlayerPrefs,
   readUiPrefs,
   writePlayerPrefs,
   writeUiPrefs,
+  SKIP_ACTIONS,
+  SKIP_KINDS,
+  TIME_LABELS,
+  type ConvertibleAudio,
+  type SkipAction,
+  type SkipKind,
   type SubtitleSize,
+  type TimeLabel,
 } from '../platform/web/prefs'
 import { BackIcon } from './icons'
-import { LANGUAGES, t, type LanguageChoice } from '../i18n'
+import { LANGUAGES, t, tr, type LanguageChoice } from '../i18n'
 import { chooseLanguage } from './useLanguage'
 import { useInstallState } from '../platform/web/pwa'
 import { PluginsSettings } from './PluginsSettings'
@@ -116,6 +124,102 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       <span className="text-sm text-neutral-400">{label}</span>
       <span className="min-w-0 text-sm text-neutral-100">{children}</span>
     </div>
+  )
+}
+
+const TIME_LABEL_TEXT: Record<TimeLabel, string> = {
+  elapsed: tr('Time played'),
+  remaining: tr('Time left'),
+  total: tr('Total length'),
+  endsAt: tr('Time it ends'),
+  none: tr('Nothing'),
+}
+const SKIP_KIND_TEXT: Record<SkipKind, string> = {
+  intro: tr('Skip intros'),
+  recap: tr('Skip recaps'),
+  outro: tr('Skip credits'),
+  preview: tr('Skip previews'),
+}
+const SKIP_ACTION_TEXT: Record<SkipAction, string> = {
+  ask: tr('Offer a button'),
+  auto: tr('Skip by itself'),
+  off: tr('Do nothing'),
+}
+const CONVERT_TEXT: Record<ConvertibleAudio, string> = {
+  ac3: tr('AC-3 (Dolby Digital)'),
+  eac3: tr('E-AC-3 (Dolby Digital Plus)'),
+  flac: tr('FLAC'),
+}
+
+type PlayerPrefsValue = ReturnType<typeof readPlayerPrefs>
+
+/** The bar of the video player, and what the player does on its own: skip buttons, scrubbing, converted sound. */
+function PlayerCard({ player, update }: { player: PlayerPrefsValue; update: (patch: Partial<PlayerPrefsValue>) => void }) {
+  const timeSelect = (id: string, label: string, value: TimeLabel, onChange: (value: TimeLabel) => void) => (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <label htmlFor={id} className="text-sm font-medium text-neutral-100">
+        {label}
+      </label>
+      <select id={id} className="select" value={value} onChange={(e) => onChange(e.target.value as TimeLabel)}>
+        {TIME_LABELS.map((kind) => (
+          <option key={kind} value={kind}>
+            {t(TIME_LABEL_TEXT[kind])}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+  return (
+    <Card title={t('Player')} description={t('The seek bar, the skip buttons and the sound.')}>
+      <Toggle
+        label={t('Chapter marks on the seek bar')}
+        hint={t('Draws where each chapter starts.')}
+        checked={player.chapterMarks}
+        onChange={(chapterMarks) => update({ chapterMarks })}
+      />
+      <Toggle
+        label={t('Pause while dragging the seek bar')}
+        hint={t('The picture waits until you let go.')}
+        checked={player.pauseWhileScrubbing}
+        onChange={(pauseWhileScrubbing) => update({ pauseWhileScrubbing })}
+      />
+      {timeSelect('time-left', t('Left of the seek bar'), player.timeLeft, (timeLeft) => update({ timeLeft }))}
+      {timeSelect('time-right', t('Right of the seek bar'), player.timeRight, (timeRight) => update({ timeRight }))}
+      {SKIP_KINDS.map((kind) => (
+        <div key={kind} className="flex flex-wrap items-center justify-between gap-3">
+          <label htmlFor={`skip-${kind}`} className="text-sm font-medium text-neutral-100">
+            {t(SKIP_KIND_TEXT[kind])}
+          </label>
+          <select
+            id={`skip-${kind}`}
+            className="select"
+            value={player.skipActions[kind]}
+            onChange={(e) => update({ skipActions: { ...player.skipActions, [kind]: e.target.value as SkipAction } })}
+          >
+            {SKIP_ACTIONS.map((action) => (
+              <option key={action} value={action}>
+                {t(SKIP_ACTION_TEXT[action])}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+      <p className="-mt-2 text-xs text-neutral-500">{t('Only titles whose server knows where the intro and the credits are get these buttons.')}</p>
+      <fieldset className="space-y-3">
+        <legend className="mb-1 text-sm font-medium text-neutral-100">{t('Have the server convert this sound')}</legend>
+        <p className="-mt-1 text-xs text-neutral-500">
+          {t('For a receiver that stays silent, or a film whose sound plays with the wrong channels. The picture is not touched.')}
+        </p>
+        {CONVERTIBLE_AUDIO.map((codec) => (
+          <Toggle
+            key={codec}
+            label={t(CONVERT_TEXT[codec])}
+            checked={player.convertAudio.includes(codec)}
+            onChange={(on) => update({ convertAudio: on ? [...player.convertAudio, codec] : player.convertAudio.filter((c) => c !== codec) })}
+          />
+        ))}
+      </fieldset>
+    </Card>
   )
 }
 
@@ -348,6 +452,8 @@ export function SettingsPage({
             {t('The language you pick in the player is switched on automatically next time.')}
           </p>
         </Card>
+
+        <PlayerCard player={player} update={updatePlayer} />
 
         <Card title={t('Music')} description={t('How songs follow each other.')}>
           <Toggle

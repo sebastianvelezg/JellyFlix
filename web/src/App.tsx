@@ -941,6 +941,7 @@ function PlayerRoute({
       startAt={startAt}
       next={next}
       onNext={() => next && onNextEpisode(next)}
+      onPickEpisode={onNextEpisode}
       repeat={titles ? { enabled: loop, onChange: (on) => { setLoop(on); writePlayerPrefs({ repeatQueue: on }) } } : undefined}
       onExit={() => onExit(item)}
       mini={mini}

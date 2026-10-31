@@ -59,11 +59,31 @@ enum class FrameRateMode(@StringRes val label: Int) {
     Always(R.string.fr_always),
 }
 
+/** What to do when playback enters a stretch that can be skipped (an intro, a recap, the credits, a preview). */
+enum class SkipAction(@StringRes val label: Int) {
+    /** Show a button and wait for the viewer. */
+    Ask(R.string.skip_ask),
+    /** Skip it at once. */
+    Auto(R.string.skip_auto),
+    /** Play it: no button, no skipping. */
+    Off(R.string.skip_off),
+}
+
+/** Audio formats the server can be asked to convert even though the TV could play them (a receiver that stays silent on one of them). */
+enum class AudioFormat(val codec: String, @StringRes val label: Int) {
+    Ac3("ac3", R.string.audio_ac3),
+    Eac3("eac3", R.string.audio_eac3),
+    Dts("dts", R.string.audio_dts),
+    TrueHd("truehd", R.string.audio_truehd),
+}
+
 /** What the player asks of the server beyond what the TV can decode. */
 data class PlayLimits(
     val maxBitrate: Int = DEFAULT_MAX_BITRATE,
     /** False: never let the server convert anything; a title the TV cannot play as it is does not start. */
     val transcodeAllowed: Boolean = true,
+    /** Audio codecs (Jellyfin's names) to leave out of what the TV says it plays, so the server converts them. */
+    val avoidAudio: Set<String> = emptySet(),
 ) {
     companion object {
         const val DEFAULT_MAX_BITRATE = 120_000_000
@@ -81,12 +101,26 @@ data class TvSettings(
     val textSize: TextSize = TextSize.Normal,
     val margin: ScreenMargin = ScreenMargin.Off,
     val frameRate: FrameRateMode = FrameRateMode.Seamless,
+    val skipIntro: SkipAction = SkipAction.Ask,
+    val skipRecap: SkipAction = SkipAction.Ask,
+    val skipOutro: SkipAction = SkipAction.Ask,
+    val skipPreview: SkipAction = SkipAction.Ask,
+    val convertAudio: Set<AudioFormat> = emptySet(),
 ) {
     val limits: PlayLimits
         get() = PlayLimits(
             maxBitrate = quality.mbps?.let { it * 1_000_000 } ?: PlayLimits.DEFAULT_MAX_BITRATE,
             transcodeAllowed = !directOnly,
+            avoidAudio = convertAudio.map { it.codec }.toSet(),
         )
+
+    /** What to do in a stretch of this kind. */
+    fun skipFor(kind: SegmentKind): SkipAction = when (kind) {
+        SegmentKind.Intro -> skipIntro
+        SegmentKind.Recap -> skipRecap
+        SegmentKind.Outro -> skipOutro
+        SegmentKind.Preview -> skipPreview
+    }
 
     /** The values as text, to be stored; [decode] reads them back and ignores anything it does not know. */
     fun encode(): Map<String, String> = mapOf(
@@ -99,11 +133,21 @@ data class TvSettings(
         "textSize" to textSize.name,
         "margin" to margin.name,
         "frameRate" to frameRate.name,
+        "skipIntro" to skipIntro.name,
+        "skipRecap" to skipRecap.name,
+        "skipOutro" to skipOutro.name,
+        "skipPreview" to skipPreview.name,
+        "convertAudio" to convertAudio.joinToString(",") { it.name },
     )
 
     companion object {
-        fun decode(read: (String) -> String?): TvSettings {
+        /**
+         * [legacyAutoSkip] is the old single switch ("skip intros, recaps and credits automatically"): until a choice per kind was
+         * saved, it still decides those three.
+         */
+        fun decode(legacyAutoSkip: Boolean = false, read: (String) -> String?): TvSettings {
             val d = TvSettings()
+            val migrated = if (read("skipIntro") == null && legacyAutoSkip) SkipAction.Auto else null
             return TvSettings(
                 subtitleSize = pick(read("subSize"), d.subtitleSize),
                 subtitleColor = pick(read("subColor"), d.subtitleColor),
@@ -114,6 +158,11 @@ data class TvSettings(
                 textSize = pick(read("textSize"), d.textSize),
                 margin = pick(read("margin"), d.margin),
                 frameRate = pick(read("frameRate"), d.frameRate),
+                skipIntro = pick(read("skipIntro"), migrated ?: d.skipIntro),
+                skipRecap = pick(read("skipRecap"), migrated ?: d.skipRecap),
+                skipOutro = pick(read("skipOutro"), migrated ?: d.skipOutro),
+                skipPreview = pick(read("skipPreview"), d.skipPreview),
+                convertAudio = read("convertAudio")?.split(',')?.mapNotNull { name -> AudioFormat.entries.firstOrNull { it.name == name } }?.toSet() ?: emptySet(),
             )
         }
 

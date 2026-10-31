@@ -25,6 +25,15 @@ Goal: playing a title is more flexible and more predictable.
 
 Done when: all eight work on the mock server and on a real one, the tests pass, and the changelog lists them.
 
+**Status: built** (see the changelog). How it ended up differs a little from the table:
+
+- 1.3: the chapter marks were already on the seek bar; it is now a setting (on by default).
+- 1.4: the TV app already chose the version, so it was built for the web only (version, audio and subtitle on the title page; the choice is read once by the player).
+- 1.1: web only. ExoPlayer on the TV shows one text track at a time, so two lines would need its own subtitle renderer: left for later.
+- 1.2, 1.7, 1.8: web and TV. On the TV the old "skip automatically" switch became one choice per kind (the old value still counts until a new choice is saved), and the sound list offers AC-3, E-AC-3, DTS and TrueHD.
+- 1.5 and 1.6 are web only (the TV bar is different). The skip button's ten-second timeout is web only too: a remote needs longer.
+- Not checked on a real server: playing with the new options (playing writes the watch state, so it was only tried against the mock server). The TV Settings screen was seen on the emulator; its player was not.
+
 Risks: 1.1 and 1.4 touch the playback profile and the subtitle overlay (the most delicate code of the player). Do them first, with tests, and check subtitles in direct play and in HLS.
 
 ---

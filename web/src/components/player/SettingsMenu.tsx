@@ -34,7 +34,7 @@ const BACKGROUND_LABELS: Record<SubtitleBackground, string> = { shadow: tr('Shad
 const POSITION_LABELS: Record<SubtitlePosition, string> = { low: tr('Low'), high: tr('Higher') }
 
 /** The menu opens on its list; each row opens one page of choices, with a way back at the top. */
-type View = 'main' | 'audio' | 'subtitles' | 'look' | 'quality' | 'speed' | 'chapters'
+type View = 'main' | 'audio' | 'subtitles' | 'second' | 'look' | 'quality' | 'speed' | 'chapters'
 
 const ROW =
   'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-neutral-100 transition-colors duration-150 hover:bg-white/[.08] focus-visible:bg-white/[.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-accent)] pointer-coarse:py-3.5'
@@ -182,6 +182,9 @@ export function SettingsMenu(p: ControlsProps & { iconButton: string }) {
     : p.subtitleIndex !== null
       ? p.subtitleTracks.find((track) => track.index === p.subtitleIndex)?.label
       : t('Off')
+  // A second line of subtitles goes under a first one that is a track of the file (not a file loaded from the device).
+  const canSecond = !!p.onSecondSubtitle && p.subtitleIndex !== null && !p.localSubtitle && p.subtitleTracks.length > 1
+  const secondNow = p.secondSubtitleIndex != null ? p.subtitleTracks.find((track) => track.index === p.secondSubtitleIndex)?.label : t('Off')
   const qualityNow = p.quality === 0 ? t('Original quality') : t('Up to {mbps} Mbps', { mbps: p.quality })
   const speedNow = p.speed === 1 ? t('Normal') : `${p.speed}×`
   const lookNow = `${t(SUBTITLE_SIZES.find(([size]) => size === p.subtitleStyle.size)?.[1] ?? '')} · ${t(COLOR_LABELS[p.subtitleStyle.color])}`
@@ -241,6 +244,7 @@ export function SettingsMenu(p: ControlsProps & { iconButton: string }) {
             <>
               {hasAudio && <NavRow rowId="audio" label={t('Audio')} value={audioNow} onClick={() => go('audio')} />}
               <NavRow rowId="subtitles" label={t('Subtitles')} value={subtitleNow} onClick={() => go('subtitles')} />
+              {canSecond && <NavRow rowId="second" label={t('Second subtitle')} value={secondNow} onClick={() => go('second')} />}
               <NavRow rowId="quality" label={t('Quality')} value={qualityNow} onClick={() => go('quality')} />
               <NavRow rowId="speed" label={t('Speed')} value={speedNow} onClick={() => go('speed')} />
               <NavRow rowId="look" label={t('Subtitle look')} value={lookNow} onClick={() => go('look')} />
@@ -287,6 +291,23 @@ export function SettingsMenu(p: ControlsProps & { iconButton: string }) {
                       · {t(reason)}
                     </span>
                   ))}
+                </p>
+              </fieldset>,
+            )}
+
+          {view === 'second' &&
+            page(
+              t('Second subtitle'),
+              <fieldset>
+                <legend className={LEGEND}>{t('Second subtitle')}</legend>
+                <Option name="second-subtitle" label={t('Off')} checked={p.secondSubtitleIndex == null} onChange={() => p.onSecondSubtitle?.(null)} />
+                {p.subtitleTracks
+                  .filter((track) => track.index !== p.subtitleIndex)
+                  .map((track) => (
+                    <Option key={track.index} name="second-subtitle" label={track.label} checked={track.index === p.secondSubtitleIndex} onChange={() => p.onSecondSubtitle?.(track.index)} />
+                  ))}
+                <p className="mt-1 border-t border-white/10 px-3 pb-1.5 pt-2.5 text-xs leading-relaxed text-neutral-400">
+                  {t('Shown above the first one, a little smaller and in another colour.')}
                 </p>
               </fieldset>,
             )}

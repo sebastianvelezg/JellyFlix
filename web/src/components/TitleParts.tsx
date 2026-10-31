@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { personImageUrl, type MovieDetails, type Person, type Session } from '../core'
+import { ToolbarSelect } from './Toolbar'
 import { formatBitrate, formatBytes, formatDate } from './format'
 import { BackIcon } from './icons'
 import { Img } from './Img'
@@ -104,6 +105,76 @@ export function PlaySummary({ media }: { media?: MovieDetails['media'] }) {
     <p className="rise rise-3 mt-4 max-w-2xl text-sm text-neutral-400">
       <span className="font-medium text-neutral-300">{t('Plays as')}</span> {parts.join(' · ')}
     </p>
+  )
+}
+
+/** What the viewer picked on the title page; `auto` leaves the choice to the player (the language you used last, the file's default). */
+export interface PlayPick {
+  versionId?: string
+  audio: number | 'auto'
+  subtitle: number | null | 'auto'
+}
+
+/**
+ * Under the Play button: when the title has more than one version, audio track or a subtitle to choose from, three small
+ * dropdowns (version, audio, subtitles) say what Play will give you and let you change it; otherwise the plain summary line.
+ */
+export function PlayOptions({ movie, pick, onChange }: { movie: MovieDetails; pick: PlayPick; onChange: (pick: PlayPick) => void }) {
+  const version = movie.versions.find((v) => v.id === pick.versionId) ?? movie.versions[0]
+  const media = version?.media ?? movie.media
+  if (!media) return null
+  const audio = media.audio
+  const subtitles = media.subtitles.filter((s) => s.isText)
+  if (movie.versions.length < 2 && audio.length < 2 && subtitles.length === 0) return <PlaySummary media={media} />
+  return (
+    <div role="group" aria-label={t('Play options')} className="rise rise-3 mt-4 flex flex-wrap items-center gap-2">
+      {movie.versions.length > 1 && (
+        <ToolbarSelect
+          label={t('Version')}
+          prefix={t('Version')}
+          value={version?.id ?? ''}
+          // Another version has its own tracks, so what was chosen for the other one no longer applies.
+          onChange={(versionId) => onChange({ versionId, audio: 'auto', subtitle: 'auto' })}
+        >
+          {movie.versions.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.label}
+            </option>
+          ))}
+        </ToolbarSelect>
+      )}
+      {audio.length > 1 && (
+        <ToolbarSelect
+          label={t('Audio')}
+          prefix={t('Audio')}
+          value={String(pick.audio)}
+          onChange={(value) => onChange({ ...pick, audio: value === 'auto' ? 'auto' : Number(value) })}
+        >
+          <option value="auto">{t('Automatic')}</option>
+          {audio.map((a) => (
+            <option key={a.index} value={a.index}>
+              {a.label}
+            </option>
+          ))}
+        </ToolbarSelect>
+      )}
+      {subtitles.length > 0 && (
+        <ToolbarSelect
+          label={t('Subtitles')}
+          prefix={t('Subtitles')}
+          value={pick.subtitle === 'auto' ? 'auto' : pick.subtitle === null ? 'off' : String(pick.subtitle)}
+          onChange={(value) => onChange({ ...pick, subtitle: value === 'auto' ? 'auto' : value === 'off' ? null : Number(value) })}
+        >
+          <option value="auto">{t('Automatic')}</option>
+          <option value="off">{t('Off')}</option>
+          {subtitles.map((s) => (
+            <option key={s.index} value={s.index}>
+              {s.label}
+            </option>
+          ))}
+        </ToolbarSelect>
+      )}
+    </div>
   )
 }
 

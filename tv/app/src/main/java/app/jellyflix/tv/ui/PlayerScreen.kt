@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.offset
@@ -80,7 +81,9 @@ import app.jellyflix.tv.data.Chapter
 import app.jellyflix.tv.data.PlaybackPlan
 import app.jellyflix.tv.data.FrameRateMode
 import app.jellyflix.tv.data.TvSettings
+import app.jellyflix.tv.data.MediaItem
 import app.jellyflix.tv.data.Segment
+import app.jellyflix.tv.data.SkipAction
 import app.jellyflix.tv.data.SegmentKind
 import app.jellyflix.tv.data.Track
 import kotlinx.coroutines.delay
@@ -121,6 +124,11 @@ class PlayerActions(
     val onChannelStep: (Int) -> Unit = {},
     /** "Search online…" in the subtitle menu: look for subtitles on the server's plugin, from this position. */
     val onSearchSubtitles: (positionMs: Long) -> Unit = {},
+    /** The seasons of the series (an episode), and the episodes of one of them: the list that changes episode. */
+    val loadSeasons: suspend () -> List<MediaItem> = { emptyList() },
+    val loadEpisodes: suspend (seasonId: java.util.UUID) -> List<MediaItem> = { emptyList() },
+    /** An episode was picked from that list. */
+    val onPlayEpisode: (MediaItem) -> Unit = {},
 )
 
 /**
@@ -131,7 +139,6 @@ class PlayerActions(
 fun PlayerScreen(
     plan: PlaybackPlan,
     accessToken: String,
-    autoSkip: Boolean,
     settings: TvSettings,
     insetX: Dp,
     insetY: Dp,
@@ -190,7 +197,7 @@ fun PlayerScreen(
     val insetXPx = with(density) { insetX.roundToPx() }
     val insetYPx = with(density) { insetY.roundToPx() }
     var controlsVisible by remember { mutableStateOf(false) }
-    // Which side panel is open: audio and subtitles, or chapters.
+    // Which side panel is open: audio and subtitles, chapters, or the episodes.
     var panel by remember { mutableStateOf(Panel.None) }
     val panelOpen = panel != Panel.None
     var showInfo by remember { mutableStateOf(false) }
@@ -217,11 +224,18 @@ fun PlayerScreen(
     val pictureIndex by remember { derivedStateOf { pictures?.indexAt(position) } }
     // The stretch the playhead is in (the last second of it does not count, so a skip does not re-trigger).
     // Read through derivedStateOf: the clock ticks twice a second, but this only changes when a stretch starts or ends.
-    val activeSegment by remember { derivedStateOf { segments.firstOrNull { position >= it.startMs - 250 && position < it.endMs - 1000 } } }
+    // A kind set to "do nothing" in Settings is never active: no button, no skipping.
+    val activeSegment by remember {
+        derivedStateOf {
+            segments.firstOrNull { position >= it.startMs - 250 && position < it.endMs - 1000 && settings.skipFor(it.kind) != SkipAction.Off }
+        }
+    }
     val active = activeSegment
+    // Only a kind set to "ask" draws the button; one set to "skip" is gone in half a second.
+    val askActive = active?.takeIf { settings.skipFor(it.kind) == SkipAction.Ask }
     // The last stretch of an episode (when the server has no credits marker) offers the next one.
     val nearEnd by remember { derivedStateOf { plan.item.isEpisodeLike() && duration > 0 && duration - position in 0L..NEXT_EPISODE_MS } }
-    val nextShown = nearEnd && active == null
+    val nextShown = nearEnd && askActive == null
 
     fun now() = player.currentPosition
     fun poke() {
@@ -343,17 +357,17 @@ fun PlayerScreen(
         }
     }
     LaunchedEffect(Unit) { root.requestFocusSoon() }
-    LaunchedEffect(active?.startMs, autoSkip) {
+    LaunchedEffect(active?.startMs, active?.kind) {
         val segment = active ?: return@LaunchedEffect
-        if (autoSkip) {
+        if (settings.skipFor(segment.kind) == SkipAction.Auto) {
             delay(500)
             player.seekTo(segment.endMs)
         }
     }
-    LaunchedEffect(controlsVisible, panelOpen, active?.startMs, nextShown) {
+    LaunchedEffect(controlsVisible, panelOpen, askActive?.startMs, nextShown) {
         when {
             controlsVisible && !panelOpen -> playPause.requestFocusSoon()
-            !controlsVisible && !panelOpen && (active != null || nextShown) -> skipFocus.requestFocusSoon()
+            !controlsVisible && !panelOpen && (askActive != null || nextShown) -> skipFocus.requestFocusSoon()
             !controlsVisible && !panelOpen -> root.requestFocusSoon()
         }
     }
@@ -444,10 +458,10 @@ fun PlayerScreen(
                 modifier = Modifier.align(Alignment.Center).size(56.dp),
             )
         }
-        if ((active != null || nextShown) && !panelOpen) {
+        if ((askActive != null || nextShown) && !panelOpen) {
             Pill(
                 stringResource(
-                    when (active?.kind) {
+                    when (askActive?.kind) {
                         SegmentKind.Intro -> R.string.skip_intro
                         SegmentKind.Recap -> R.string.skip_recap
                         SegmentKind.Outro -> R.string.skip_credits
@@ -455,7 +469,7 @@ fun PlayerScreen(
                         null -> R.string.next_episode
                     },
                 ),
-                onClick = { if (active != null) { player.seekTo(active.endMs); poke() } else actions.onNextEpisode() },
+                onClick = { if (askActive != null) { player.seekTo(askActive.endMs); poke() } else actions.onNextEpisode() },
                 accent = true,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -480,6 +494,7 @@ fun PlayerScreen(
                 chapters = chapters,
                 currentChapter = currentChapter,
                 onChapters = { panel = Panel.Chapters },
+                onEpisodes = if (plan.item.isEpisodeLike() && plan.item.seriesId != null) ({ panel = Panel.Episodes }) else null,
                 showInfo = showInfo,
                 onInfo = { showInfo = !showInfo },
                 picture = picture,
@@ -514,13 +529,24 @@ fun PlayerScreen(
                 },
                 onClose = { panel = Panel.None },
             )
+            Panel.Episodes -> EpisodesPanel(
+                current = plan.item,
+                loadSeasons = actions.loadSeasons,
+                loadEpisodes = actions.loadEpisodes,
+                onChoose = { episode ->
+                    panel = Panel.None
+                    controlsVisible = false
+                    if (episode.id != plan.item.id) actions.onPlayEpisode(episode)
+                },
+                onClose = { panel = Panel.None },
+            )
             Panel.None -> Unit
         }
         }
     }
 }
 
-private enum class Panel { None, Tracks, Chapters }
+private enum class Panel { None, Tracks, Chapters, Episodes }
 
 /** The time labels on both sides of the seek bar have one width, so a picture above the bar lines up with it. */
 private val TIME_LABEL_WIDTH = 64.dp
@@ -540,6 +566,8 @@ private fun Controls(
     chapters: List<Chapter>,
     currentChapter: Chapter?,
     onChapters: () -> Unit,
+    /** Present for an episode: opens the list of the series' seasons and episodes. */
+    onEpisodes: (() -> Unit)?,
     showInfo: Boolean,
     onInfo: () -> Unit,
     picture: ImageBitmap?,
@@ -620,6 +648,7 @@ private fun Controls(
                 }
                 Pill(stringResource(R.string.player_audio_subtitles), onClick = onTracks)
                 if (chapters.size > 1) Pill(stringResource(R.string.player_chapters), onClick = onChapters)
+                if (onEpisodes != null) Pill(stringResource(R.string.player_episodes), onClick = onEpisodes)
                 Pill(stringResource(R.string.player_info), onClick = onInfo, selected = showInfo)
             }
         }
@@ -657,6 +686,69 @@ private fun TracksPanel(plan: PlaybackPlan, onChoose: (audio: Int?, subtitle: In
                 TrackPill(track.label, selected = track.index == plan.subtitleIndex, onClick = { onChoose(null, track.index) })
             }
             if (!plan.item.isChannel) Pill(stringResource(R.string.player_subtitles_search), onClick = onSearch)
+            Pill(stringResource(R.string.player_close), onClick = onClose, modifier = Modifier.padding(top = 16.dp))
+        }
+    }
+}
+
+/** The series' seasons as a row of buttons, and the episodes of the chosen season below: picking one plays it in place of this one. */
+@Composable
+private fun EpisodesPanel(
+    current: MediaItem,
+    loadSeasons: suspend () -> List<MediaItem>,
+    loadEpisodes: suspend (java.util.UUID) -> List<MediaItem>,
+    onChoose: (MediaItem) -> Unit,
+    onClose: () -> Unit,
+) {
+    val first = remember { FocusRequester() }
+    var seasons by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
+    var seasonId by remember { mutableStateOf(current.seasonId) }
+    var episodes by remember { mutableStateOf<List<MediaItem>?>(null) }
+    LaunchedEffect(current.id) {
+        seasons = loadSeasons()
+        if (seasonId == null) seasonId = seasons.firstOrNull { it.seasonNumber == current.seasonNumber }?.id ?: seasons.firstOrNull()?.id
+    }
+    LaunchedEffect(seasonId) {
+        val id = seasonId ?: return@LaunchedEffect
+        episodes = null
+        episodes = loadEpisodes(id)
+    }
+    // The focus goes to the episode on, once the list is there.
+    LaunchedEffect(episodes) { if (episodes != null) first.requestFocusSoon() }
+    Box(Modifier.fillMaxSize().background(Color(0x99000000))) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(520.dp)
+                .fillMaxHeight()
+                .background(Palette.Surface.copy(alpha = 0.95f))
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(current.title, fontSize = 20.sp, color = Color.White)
+            if (seasons.size > 1) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    seasons.forEach { season ->
+                        Pill(season.name, onClick = { seasonId = season.id }, selected = season.id == seasonId)
+                    }
+                }
+            }
+            val list = episodes
+            if (list == null) {
+                Text(stringResource(R.string.loading), fontSize = 15.sp, color = Palette.TextDim)
+            } else {
+                list.forEachIndexed { i, episode ->
+                    val label = listOfNotNull(episode.episodeNumber?.let { "E$it" }, episode.name).joinToString(" · ") + if (episode.played) "  ✓" else ""
+                    val isCurrent = episode.id == current.id
+                    TrackPill(
+                        label,
+                        selected = isCurrent,
+                        onClick = { onChoose(episode) },
+                        modifier = if (isCurrent || (i == 0 && list.none { it.id == current.id })) Modifier.focusRequester(first) else Modifier,
+                    )
+                }
+            }
             Pill(stringResource(R.string.player_close), onClick = onClose, modifier = Modifier.padding(top = 16.dp))
         }
     }

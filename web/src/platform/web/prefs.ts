@@ -11,6 +11,20 @@ export const SUBTITLE_COLORS: SubtitleColor[] = ['white', 'yellow', 'cyan']
 export const SUBTITLE_BACKGROUNDS: SubtitleBackground[] = ['shadow', 'box', 'none']
 export const SUBTITLE_POSITIONS: SubtitlePosition[] = ['low', 'high']
 
+/** What a time label beside the seek bar shows. */
+export type TimeLabel = 'elapsed' | 'remaining' | 'total' | 'endsAt' | 'none'
+export const TIME_LABELS: TimeLabel[] = ['elapsed', 'remaining', 'total', 'endsAt', 'none']
+
+/** What to do when the picture enters a skippable stretch: offer the button, skip it at once, or ignore it. */
+export type SkipAction = 'ask' | 'auto' | 'off'
+export const SKIP_ACTIONS: SkipAction[] = ['ask', 'auto', 'off']
+export type SkipKind = 'intro' | 'recap' | 'outro' | 'preview'
+export const SKIP_KINDS: SkipKind[] = ['intro', 'recap', 'outro', 'preview']
+
+/** Audio codecs the server can be asked to convert (the browser could play them, but the sound may be wrong or silent). */
+export const CONVERTIBLE_AUDIO = ['ac3', 'eac3', 'flac'] as const
+export type ConvertibleAudio = (typeof CONVERTIBLE_AUDIO)[number]
+
 export interface PlayerPrefs {
   volume: number
   muted: boolean
@@ -36,6 +50,19 @@ export interface PlayerPrefs {
   visualizer: boolean
   /** The most the video may stream at, in megabits per second; 0 is no limit (the original quality). */
   maxBitrateMbps: number
+  /** Draw the start of each chapter on the seek bar. */
+  chapterMarks: boolean
+  /** Dragging the seek bar pauses the video until it is let go (instead of playing on while you look for a place). */
+  pauseWhileScrubbing: boolean
+  /** The labels on the left and the right of the seek bar. */
+  timeLeft: TimeLabel
+  timeRight: TimeLabel
+  /** What to do in each kind of skippable stretch. */
+  skipActions: Record<SkipKind, SkipAction>
+  /** A second subtitle track shown above the first (to learn a language, or to read a dub): its language, null = none. */
+  secondSubtitleLanguage: string | null
+  /** Audio codecs the server converts for this device even though the browser could play them. */
+  convertAudio: ConvertibleAudio[]
 }
 
 /** What you last chose while watching one series (so an anime keeps its Japanese audio and English subtitles). */
@@ -80,6 +107,13 @@ const PLAYER_DEFAULTS: PlayerPrefs = {
   gapless: true,
   visualizer: false,
   maxBitrateMbps: 0,
+  chapterMarks: true,
+  pauseWhileScrubbing: false,
+  timeLeft: 'elapsed',
+  timeRight: 'total',
+  skipActions: { intro: 'ask', recap: 'ask', outro: 'ask', preview: 'ask' },
+  secondSubtitleLanguage: null,
+  convertAudio: [],
 }
 const BROWSE_DEFAULTS: BrowsePrefs = { sort: 'title', filter: 'all' }
 
@@ -118,6 +152,15 @@ export function readPlayerPrefs(): PlayerPrefs {
     gapless: p.gapless !== false,
     visualizer: p.visualizer === true,
     maxBitrateMbps: (QUALITY_CHOICES as readonly number[]).includes(p.maxBitrateMbps) ? p.maxBitrateMbps : 0,
+    chapterMarks: p.chapterMarks !== false,
+    pauseWhileScrubbing: p.pauseWhileScrubbing === true,
+    timeLeft: TIME_LABELS.includes(p.timeLeft) ? p.timeLeft : 'elapsed',
+    timeRight: TIME_LABELS.includes(p.timeRight) ? p.timeRight : 'total',
+    skipActions: Object.fromEntries(
+      SKIP_KINDS.map((kind) => [kind, SKIP_ACTIONS.includes(p.skipActions?.[kind] as SkipAction) ? p.skipActions[kind] : 'ask']),
+    ) as Record<SkipKind, SkipAction>,
+    secondSubtitleLanguage: typeof p.secondSubtitleLanguage === 'string' ? p.secondSubtitleLanguage : null,
+    convertAudio: Array.isArray(p.convertAudio) ? CONVERTIBLE_AUDIO.filter((codec) => (p.convertAudio as string[]).includes(codec)) : [],
   }
 }
 
@@ -145,6 +188,26 @@ export function clearBrowsePrefs(): void {
     } catch {
       // Preferences are a convenience only.
     }
+  }
+}
+
+const VERSION_KEY = 'jellyflix.version'
+
+/** The picture of the version you chose last time ("4K", "1080p"): the title page offers that one first when it has it. */
+export function readVersionPref(): string | null {
+  try {
+    return localStorage.getItem(VERSION_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function writeVersionPref(resolution: string | null): void {
+  try {
+    if (resolution) localStorage.setItem(VERSION_KEY, resolution)
+    else localStorage.removeItem(VERSION_KEY)
+  } catch {
+    // Preferences are a convenience only.
   }
 }
 

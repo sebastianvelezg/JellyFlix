@@ -327,17 +327,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Playback preferences (Settings). */
     var autoplayNext by mutableStateOf(store.autoplayNext)
         private set
-    var autoSkip by mutableStateOf(store.autoSkip)
-        private set
 
     fun updateAutoplayNext(on: Boolean) {
         autoplayNext = on
         store.autoplayNext = on
-    }
-
-    fun updateAutoSkip(on: Boolean) {
-        autoSkip = on
-        store.autoSkip = on
     }
 
     /** Subtitle look, quality limit, text size... (Settings). */
@@ -1831,6 +1824,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (errorRes == R.string.error_generic) errorRes = if (item.isChannel) R.string.error_channel else R.string.error_play
             } finally {
                 busy = false
+            }
+        }
+    }
+
+    /** The seasons of the series the episode being played belongs to (for the player's episode list). */
+    suspend fun seasonsOf(item: MediaItem): List<MediaItem> {
+        val s = session ?: return emptyList()
+        val seriesId = item.seriesId ?: return emptyList()
+        return runCatching { io { repo.seasons(s, seriesId) } }.getOrDefault(emptyList())
+    }
+
+    /** The episodes of one season of that series. */
+    suspend fun episodesOf(item: MediaItem, seasonId: UUID): List<MediaItem> {
+        val s = session ?: return emptyList()
+        val seriesId = item.seriesId ?: return emptyList()
+        return runCatching { io { repo.episodes(s, seriesId, seasonId) } }.getOrDefault(emptyList())
+    }
+
+    /** Plays an episode picked from the player's list, in place of the one being played, from where it was left. */
+    fun playEpisode(episode: MediaItem) {
+        val s = session ?: return
+        launchSafe {
+            try {
+                val plan = io { repo.plan(s, episode, null, null, episode.resumeMs, limits = settings.limits) }
+                val top = pages.lastIndex
+                if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(plan)
+            } catch (e: DirectOnlyException) {
+                errorRes = R.string.error_direct_only
+            } catch (e: Exception) {
+                fail(e)
             }
         }
     }

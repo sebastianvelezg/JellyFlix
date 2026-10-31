@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { buildDeviceProfile, type DeviceCapabilities } from './deviceProfile'
+import { buildDeviceProfile, withoutAudioCodecs, type DeviceCapabilities } from './deviceProfile'
 
 const chromeLike: DeviceCapabilities = {
   containers: { mp4: true, webm: true, mkv: true },
@@ -72,5 +72,18 @@ describe('buildDeviceProfile', () => {
   it('renders subtitles externally (never burned in)', () => {
     const p = buildDeviceProfile(chromeLike)
     expect(p.SubtitleProfiles?.every((s) => s.Method === 'External')).toBe(true)
+  })
+})
+
+describe('withoutAudioCodecs', () => {
+  it('stops claiming the codecs the server should convert', () => {
+    const caps = { ...chromeLike, audio: { ...chromeLike.audio, ac3: true, eac3: true } }
+    expect(buildDeviceProfile(caps).DirectPlayProfiles?.find((d) => d.Container?.includes('mp4'))?.AudioCodec).toContain('ac3')
+    const converted = buildDeviceProfile(withoutAudioCodecs(caps, ['ac3', 'eac3']))
+    expect(converted.DirectPlayProfiles?.find((d) => d.Container?.includes('mp4'))?.AudioCodec).not.toMatch(/ac3|eac3/)
+  })
+
+  it('leaves everything alone when nothing is chosen', () => {
+    expect(withoutAudioCodecs(chromeLike, [])).toBe(chromeLike)
   })
 })

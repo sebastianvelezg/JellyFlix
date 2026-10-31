@@ -141,7 +141,6 @@ class MainActivity : ComponentActivity() {
                 PlayerScreen(
                     plan = page.plan,
                     accessToken = vm.accessToken,
-                    autoSkip = vm.autoSkip,
                     settings = vm.settings,
                     insetX = insetX,
                     insetY = insetY,
@@ -163,6 +162,9 @@ class MainActivity : ComponentActivity() {
                         onExit = { vm.back() },
                         onChannelStep = { vm.stepChannel(page.plan, it) },
                         onSearchSubtitles = { vm.searchSubtitles(page.plan, it) },
+                        loadSeasons = { vm.seasonsOf(page.plan.item) },
+                        loadEpisodes = { seasonId -> vm.episodesOf(page.plan.item, seasonId) },
+                        onPlayEpisode = { vm.playEpisode(it) },
                     ),
                 )
             }

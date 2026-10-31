@@ -1,16 +1,19 @@
 import { StateMessage } from './StateMessage'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   backdropImageUrl,
+  defaultVersion,
   formatRuntime,
   formatTime,
   getMovieDetails,
   getSimilarMovies,
   posterUrl,
+  setPlayChoice,
   ticksToSeconds,
   type Movie,
   type MovieDetails,
   type Person,
+  type PlayChoice,
   type Session,
 } from '../core'
 import { EditButton } from './admin/EditButton'
@@ -19,7 +22,8 @@ import { PlayOnButton } from './remote/PlayOnButton'
 import { CheckIcon, HeartIcon, PlayIcon, RestartIcon, StarIcon } from './icons'
 import { RowCard } from './MovieCard'
 import { Row } from './Row'
-import { CastCard, DetailsSkeleton, Facts, PlaySummary, TitleHero } from './TitleParts'
+import { CastCard, DetailsSkeleton, Facts, PlayOptions, TitleHero, type PlayPick } from './TitleParts'
+import { readVersionPref, writeVersionPref } from '../platform/web/prefs'
 import { detailsKey, swrKey, swrScope, useSwr } from './useSwr'
 import { useToggles } from './useToggles'
 import { t } from '../i18n'
@@ -100,6 +104,28 @@ function DetailsContent({
 }) {
   const { toggle, actionError } = useToggles(session, movie, onChange)
 
+  // What the viewer picked under the Play button (the version of the file, the audio, the subtitle).
+  const [pick, setPick] = useState<PlayPick>(() => ({
+    versionId: defaultVersion(
+      movie.versions.map((v) => ({ id: v.id, resolution: v.media.resolution })),
+      readVersionPref(),
+    ),
+    audio: 'auto',
+    subtitle: 'auto',
+  }))
+  const choose = (next: PlayPick) => {
+    setPick(next)
+    if (next.versionId !== pick.versionId) writeVersionPref(movie.versions.find((v) => v.id === next.versionId)?.media.resolution ?? null)
+  }
+  const play = (startOver: boolean) => {
+    const choice: PlayChoice = {}
+    if (movie.versions.length > 1 && pick.versionId) choice.mediaSourceId = pick.versionId
+    if (pick.audio !== 'auto') choice.audioIndex = pick.audio
+    if (pick.subtitle !== 'auto') choice.subtitleIndex = pick.subtitle
+    if (Object.keys(choice).length > 0) setPlayChoice(movie.id, choice)
+    onPlay(movie, startOver)
+  }
+
   useEffect(() => {
     const previous = document.title
     document.title = `${movie.name} · Jellyflix`
@@ -156,12 +182,12 @@ function DetailsContent({
           )}
 
           <div className="rise rise-3 relative z-20 mt-6 flex flex-wrap items-center gap-2.5">
-            <button type="button" className="btn-primary px-6 py-3 text-base" onClick={() => onPlay(movie, false)}>
+            <button type="button" className="btn-primary px-6 py-3 text-base" onClick={() => play(false)}>
               <PlayIcon />
               {resumeSeconds > 0 ? t('Resume from {time}', { time: formatTime(resumeSeconds) }) : t('Play')}
             </button>
             {resumeSeconds > 0 && (
-              <button type="button" className="btn py-3" onClick={() => onPlay(movie, true)}>
+              <button type="button" className="btn py-3" onClick={() => play(true)}>
                 <RestartIcon /> {t('Start over')}
               </button>
             )}
@@ -186,7 +212,7 @@ function DetailsContent({
             </button>
             <EditButton session={session} target={{ id: movie.id, name: movie.name, type: 'Movie' }} />
           </div>
-          <PlaySummary media={movie.media} />
+          <PlayOptions movie={movie} pick={pick} onChange={choose} />
           {actionError && (
             <p role="alert" className="alert-error mt-3 max-w-xl">
               {actionError}

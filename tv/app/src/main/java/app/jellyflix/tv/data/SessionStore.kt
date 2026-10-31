@@ -63,14 +63,10 @@ class SessionStore(context: Context) {
         get() = prefs.getBoolean("autoplayNext", true)
         set(value) = prefs.edit { putBoolean("autoplayNext", value) }
 
-    /** Intros, recaps and credits are skipped without asking. */
-    var autoSkip: Boolean
-        get() = prefs.getBoolean("autoSkip", false)
-        set(value) = prefs.edit { putBoolean("autoSkip", value) }
-
     /** The choices made in Settings (subtitle look, quality, text size...). They survive signing out. */
     var settings: TvSettings
-        get() = TvSettings.decode { prefs.getString("pref.$it", null) }
+        // (The old single "skip automatically" switch still decides intros, recaps and credits until a choice per kind is saved.)
+        get() = TvSettings.decode(legacyAutoSkip = prefs.getBoolean("autoSkip", false)) { prefs.getString("pref.$it", null) }
         set(value) = prefs.edit { value.encode().forEach { (key, text) -> putString("pref.$key", text) } }
 
     /** The last address typed, so signing in again does not mean typing it again. */
