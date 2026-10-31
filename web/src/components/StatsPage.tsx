@@ -39,7 +39,7 @@ function Months({ stats }: { stats: WatchStats }) {
             </span>
             <span
               aria-hidden="true"
-              className="w-full rounded-t-md bg-[var(--color-accent)] shadow-[0_0_14px_-4px_var(--glow)]"
+              className="w-full rounded-t-md bg-[var(--color-accent)]"
               style={{ height: `${Math.max(month.count > 0 ? 6 : 2, (month.count / peak) * 100)}%`, opacity: month.count > 0 ? 1 : 0.25 }}
             />
             <span aria-hidden="true" className="text-[11px] text-neutral-500">

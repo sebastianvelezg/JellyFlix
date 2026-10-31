@@ -840,7 +840,7 @@ export function PlayerStage({
 
       {showSpinner && (
         <div role="status" aria-label={t('Buffering')} className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-[var(--color-accent)] shadow-[0_0_30px_-4px_var(--glow)]" />
+          <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-[var(--color-accent)]" />
         </div>
       )}
 
@@ -900,7 +900,7 @@ export function PlayerStage({
             <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
               <div
                 data-testid="countdown-bar"
-                className={`h-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)] transition-[width] ease-linear motion-reduce:transition-none ${flow ? 'duration-300' : 'duration-1000'}`}
+                className={`h-full bg-[var(--color-accent)] transition-[width] ease-linear motion-reduce:transition-none ${flow ? 'duration-300' : 'duration-1000'}`}
                 style={{
                   width: `${
                     (flow ? flowSeconds / FLOW_COUNTDOWN_SECONDS : Math.max(0, Math.min(1, (secondsLeft - 1) / Math.max(1, countdownSeconds - 1)))) * 100

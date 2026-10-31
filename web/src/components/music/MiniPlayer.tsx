@@ -81,7 +81,7 @@ export function MiniPlayer({
     <>
       <section
         aria-label={t('Music player')}
-        className="fixed inset-x-0 bottom-[var(--nav-h)] z-40 border-t border-white/10 bg-[var(--color-bg)]/85 pb-[var(--bottom-inset)] backdrop-blur-2xl"
+        className="fixed inset-x-0 bottom-[var(--nav-h)] z-40 border-t border-white/[.08] bg-[var(--color-surface)]/90 shadow-[0_-14px_36px_-14px_rgba(0,0,0,0.75)] backdrop-blur-2xl pb-[var(--bottom-inset)]"
       >
         <div className="gutter-x flex items-center gap-3 py-2.5 sm:gap-6">
           <button
@@ -181,7 +181,7 @@ type Panel = 'player' | 'queue' | 'lyrics'
 /** The accent colours of the page, made from the cover's main colour (readable on the chosen canvas like any accent), for one screen. */
 function coverTheme(canvas: string, palette: CoverPalette): React.CSSProperties {
   const vars = themeVariables({ canvas: canvas as ThemeChoice['canvas'], accent: palette.primary })
-  const accent: Record<string, string> = { '--glow': 'color-mix(in srgb, var(--color-accent-strong) 55%, transparent)' }
+  const accent: Record<string, string> = { '--glow': 'color-mix(in srgb, var(--color-accent-strong) 30%, transparent)' }
   for (const name of ACCENT_VARIABLES) accent[name] = vars[name] as string
   return accent as React.CSSProperties
 }
@@ -314,7 +314,7 @@ function NowPlaying({
                   item={track}
                   width={600}
                   eager
-                  className={`w-full shadow-[0_30px_90px_-20px_var(--glow)] transition-opacity duration-300 ${visual ? 'opacity-35' : ''}`}
+                  className={`w-full shadow-[0_30px_90px_-20px_rgba(0,0,0,0.9)] transition-opacity duration-300 ${visual ? 'opacity-35' : ''}`}
                 />
                 {visual && <Visualizer colors={palette} className="absolute inset-0 h-full w-full p-4" />}
               </div>

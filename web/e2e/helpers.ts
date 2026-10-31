@@ -48,11 +48,17 @@ export async function clickSeekAt(page: Page, fraction: number) {
   await page.mouse.click(box.x + 8 + (box.width - 16) * fraction, box.y + box.height / 2)
 }
 
-export async function openSettings(page: Page) {
+/** Opens the settings menu, and a page of it ('Audio', 'Subtitles', 'Subtitle look', 'Quality', 'Speed', 'Chapters') when one is named. */
+export async function openSettings(page: Page, view?: string) {
   const dialog = page.getByRole('dialog', { name: 'Playback settings' })
   if (!(await dialog.isVisible())) {
     await page.mouse.move(400, 400)
     await player(page).getByRole('button', { name: 'Audio, subtitles and speed' }).click()
+  }
+  if (view) {
+    const back = dialog.getByRole('button', { name: 'Back to settings' })
+    if (await back.isVisible()) await back.click()
+    await dialog.getByRole('button', { name: new RegExp(`^${view}`) }).click()
   }
   return dialog
 }

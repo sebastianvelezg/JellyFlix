@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { personImageUrl, type MovieDetails, type Person, type Session } from '../core'
 import { formatBitrate, formatBytes, formatDate } from './format'
 import { BackIcon } from './icons'
@@ -53,7 +53,7 @@ export function TitleHero({
       <div className="gutter-x relative flex w-full items-end justify-between gap-10 pb-10 pt-44">
         <div className="min-w-0 max-w-3xl flex-1">{children}</div>
         <div className={`rise rise-3 hidden w-52 shrink-0 xl:w-60 ${noPoster ? '' : 'lg:block'}`}>
-          <div className="aspect-[2/3] overflow-hidden rounded-2xl bg-[var(--color-surface-2)] shadow-[0_24px_70px_-12px_var(--glow)] ring-1 ring-white/15">
+          <div className="aspect-[2/3] overflow-hidden rounded-2xl bg-[var(--color-surface-2)] shadow-[0_24px_60px_-16px_rgba(0,0,0,0.85)] ring-1 ring-white/15">
             <Img
               session={session}
               src={poster}
@@ -107,6 +107,21 @@ export function PlaySummary({ media }: { media?: MovieDetails['media'] }) {
   )
 }
 
+/** A list of tracks can run to dozens (43 subtitle languages): it shows two lines, and the rest on request. */
+const LONG_FACT = 180
+
+function LongFact({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <span className={open ? '' : 'line-clamp-2'}>{text}</span>
+      <button type="button" className="mt-1 text-xs font-medium text-[var(--color-accent)] hover:underline" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {open ? t('Show less') : t('Show more')}
+      </button>
+    </>
+  )
+}
+
 export function Facts({ movie }: { movie: MovieDetails }) {
   const media = movie.media
   const rows: Array<[string, ReactNode]> = []
@@ -124,12 +139,12 @@ export function Facts({ movie }: { movie: MovieDetails }) {
   }
   if (rows.length === 0) return null
   return (
-    <section aria-label={t('Details')} className="glass mt-2 rounded-2xl p-5 sm:p-6">
+    <section aria-label={t('Details')} className="mt-2 rounded-2xl border border-white/[.08] bg-white/[.03] p-5 sm:p-6">
       <dl className="grid grid-cols-[6rem_1fr] gap-x-4 gap-y-3 text-sm sm:grid-cols-[7rem_1fr]">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
             <dt className="text-xs font-medium uppercase tracking-wider text-neutral-500">{label}</dt>
-            <dd className="min-w-0 text-neutral-200">{value}</dd>
+            <dd className="min-w-0 text-neutral-200">{typeof value === 'string' && value.length > LONG_FACT ? <LongFact text={value} /> : value}</dd>
           </div>
         ))}
       </dl>
@@ -150,7 +165,7 @@ export function CastCard({ session, person, onSelect }: { session: Session; pers
       aria-label={t('Movies with {name}', { name: person.name })}
       className="group w-24 shrink-0 snap-start text-center outline-none sm:w-28"
     >
-      <div className="mx-auto aspect-square w-20 overflow-hidden rounded-full bg-[var(--color-surface-2)] ring-1 ring-white/10 transition duration-300 group-hover:scale-105 group-hover:shadow-[0_0_28px_-6px_var(--glow)] group-hover:ring-2 group-hover:ring-[var(--color-accent)]/70 group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-accent)] sm:w-24">
+      <div className="mx-auto aspect-square w-20 overflow-hidden rounded-full bg-[var(--color-surface-2)] ring-1 ring-white/10 transition duration-300 group-hover:scale-105 group-hover:ring-2 group-hover:ring-white/40 group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-accent)] sm:w-24">
         <Img
           session={session}
           src={personImageUrl(session.serverUrl, person)}

@@ -67,9 +67,9 @@ const OCEAN: AccentTokens = {
   accent: '#4d8dff',
   strong: '#2563eb',
   deep: '#1d4ed8',
-  top: '#3b82f6',
-  hoverTop: '#5b97fb',
-  hoverDeep: '#2563eb',
+  top: '#2f6df0',
+  hoverTop: '#2a68ea',
+  hoverDeep: '#1d4ed8',
   ink: '#ffffff',
   second: '#38d6f5',
 }
@@ -89,9 +89,9 @@ export const DEFAULT_ACCENT = 'ocean'
 
 const INK_LIGHT = '#ffffff'
 const INK_DARK = '#0b0e17'
-/** Normal-size text needs 4.5:1. The lighter end of a button gradient only has to reach what the original blue always did. */
+/** Normal-size text needs 4.5:1, on the lighter end of a button gradient too. */
 const TEXT = 4.5
-const GRADIENT_TOP = 3.5
+const GRADIENT_TOP = TEXT
 
 /** Raises the lightness of `color` until it reaches `ratio` against `against` (or gives up near white). */
 function liftUntil(color: string, against: string, ratio: number): string {

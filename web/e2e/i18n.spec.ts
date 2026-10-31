@@ -66,6 +66,7 @@ test.describe('a browser set to Spanish', () => {
     await page.mouse.move(400, 300)
     await player.getByRole('button', { name: 'Audio, subtítulos y velocidad' }).click()
     const menu = page.getByRole('dialog', { name: 'Ajustes de reproducción' })
+    await menu.getByRole('button', { name: /^Subtítulos/ }).click()
     await expect(menu.getByText('Cargar un archivo de subtítulos (.srt, .vtt)…')).toBeVisible()
     await menu.getByLabel('English', { exact: true }).check()
     await page.keyboard.press('Escape')

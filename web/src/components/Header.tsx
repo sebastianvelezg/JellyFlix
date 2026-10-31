@@ -271,7 +271,7 @@ function Tabs({
             {section === current && (
               <span
                 aria-hidden="true"
-                className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)]"
+                className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-[var(--color-accent)]"
               />
             )}
           </button>
@@ -344,7 +344,7 @@ function BottomTabs({
               showIcon ? 'text-[11px]' : 'text-sm'
             } ${active ? 'text-[var(--color-accent)]' : 'text-neutral-400 active:text-white'}`}
           >
-            {active && <span aria-hidden="true" className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)]" />}
+            {active && <span aria-hidden="true" className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-[var(--color-accent)]" />}
             {showIcon && <Pic />}
             {showName && <span>{label}</span>}
           </button>
@@ -432,12 +432,12 @@ export function Header({
             onClick={onSettings}
             aria-label={t('Settings')}
             title={t('Settings')}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent-deep)] text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_0_18px_-4px_var(--glow)] transition hover:scale-105 pointer-coarse:h-11 pointer-coarse:w-11"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent-deep)] text-sm font-semibold text-[var(--color-accent-ink)] ring-1 ring-white/20 transition hover:scale-105 pointer-coarse:h-11 pointer-coarse:w-11"
           >
             <span aria-hidden="true">{initial}</span>
           </button>
           {/* On a phone the search box needs the room; signing out is in Settings (the round button). */}
-          <button type="button" className="btn max-lg:hidden" onClick={onSignOut}>
+          <button type="button" className="btn-ghost max-lg:hidden" onClick={onSignOut}>
             {t('Sign out')}
           </button>
         </div>

@@ -1344,6 +1344,8 @@ export const es: Record<string, string> = {
   'Where this folder is': 'Dónde está esta carpeta',
   'This folder is empty.': 'Esta carpeta está vacía.',
   'Repeat the list': 'Repetir la lista',
+  'Back to settings': 'Volver a los ajustes',
+  Sort: 'Orden',
 }
 
 /** Messages with numbers or names in them, written once as a pattern. `$1` is the first captured part. */

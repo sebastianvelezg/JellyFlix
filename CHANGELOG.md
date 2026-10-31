@@ -5,6 +5,20 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+A visual and usability polish of the whole web app, without changing its identity: calmer, simpler and more consistent.
+
+### Web app
+- **Player settings menu in pages:** the long list became a short menu (Audio, Subtitles, Quality, Speed, Subtitle look, Chapters) that opens one page at a time, with the switches (autoplay, repeat the list, cinema mode) at the bottom. Escape closes it.
+- **Cleaner player bar:** the times sit on either side of the seek bar, the volume slider appears on hover, and the seek bar is a solid accent line.
+- **One toolbar for every library:** Movies, Series, Anime, Books, Music videos, Music and Collections share a single row of pill filters (library, genre, sort, more filters, Surprise me) that scrolls on a phone instead of wrapping. Selected letters and filters are white pills.
+- **Details and series pages:** very long audio and subtitle lists fold into two lines with *Show more*; seasons are one scrolling row; an episode's *Play on…* and *Edit* appear when the row is pointed at (always on a touchscreen).
+- **Cards, header and bars:** a calmer hover (small zoom, dark shadow, white ring), white round play buttons, a thinner progress bar, and no decorative glows anywhere (heading stripes, tabs, header indicators, covers, spinners).
+- **Settings and Administration:** real switches instead of check boxes, flat cards, small-caps group names in an account's permissions, and no scroll bar under the tabs on a phone.
+- **Sign-in:** the grid in the background is gone. The primary button now reaches the 4.5:1 text contrast in every theme.
+
+### TV app
+- The focused card no longer draws a blue glow; the blue frame and a slightly smaller zoom remain.
+
 ## [1.2.0] - 2026-10-27
 
 A better video player, music that flows from one song to the next, mixes made for you, music videos you can browse by folder, play from their card and keep playing in a mini bar, and more varied suggestions. The TV app gets subtitle search, mixes and radio, and play-through.

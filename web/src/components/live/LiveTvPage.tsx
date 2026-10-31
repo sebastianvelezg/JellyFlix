@@ -88,7 +88,7 @@ export function LiveTvPage({ session, onPlay, paused = false }: { session: Sessi
     <div className="pt-6">
       <div className="mb-5 flex flex-wrap items-center gap-2.5">
         <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight sm:mr-auto sm:text-2xl">
-          <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
+          <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)]" />
           {t('Live TV')}
         </h1>
         <div role="search" className="relative w-full sm:w-56">

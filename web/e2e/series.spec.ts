@@ -106,7 +106,7 @@ test('series: the audio language you pick is kept for the rest of the series', a
   mock = await startMock({ movieCount: 3, seriesCount: 2, playMode: 'hls' })
   await signIn(page, mock)
   await playFirstEpisode(page)
-  const settings = await openSettings(page)
+  const settings = await openSettings(page, 'Audio')
   await settings.getByLabel('Spanish · AAC Stereo').click()
   await expect
     .poll(() => mock.requests.some((r) => r.path === '/videos/s0001-ep-1-1/master.m3u8' && r.query.AudioStreamIndex === '2'))
@@ -120,7 +120,7 @@ test('series: the audio language you pick is kept for the rest of the series', a
     .poll(() => mock.requests.some((r) => r.path === '/videos/s0001-ep-1-2/master.m3u8' && r.query.AudioStreamIndex === '2'))
     .toBe(true)
   await waitPlaying(page)
-  const again = await openSettings(page)
+  const again = await openSettings(page, 'Audio')
   await expect(again.getByLabel('Spanish · AAC Stereo')).toBeChecked()
   const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.series') ?? '{}'))
   expect(prefs.s0001).toMatchObject({ audioLanguage: 'spa' })
@@ -131,7 +131,7 @@ test('series: the audio language you pick is kept for the rest of the series', a
   await page.goto('/#/show/s0002')
   await page.getByRole('button', { name: 'Play S1 E1', exact: true }).click()
   await waitPlaying(page)
-  const other = await openSettings(page)
+  const other = await openSettings(page, 'Audio')
   await expect(other.getByLabel('English · AAC Stereo')).toBeChecked()
 })
 

@@ -18,11 +18,12 @@
   --color-accent-strong: #2563eb;
   --color-accent-ink: #fff;
   --color-accent-deep: #1d4ed8;
-  --color-accent-top: #3b82f6;
-  --color-accent-top-hover: #5b97fb;
-  --color-accent-deep-hover: #2563eb;
+  --color-accent-top: #2f6df0;
+  --color-accent-top-hover: #2a68ea;
+  --color-accent-deep-hover: #1d4ed8;
   --color-cyan: #38d6f5;
-  --glow: color-mix(in srgb, var(--color-accent-strong) 55%, transparent);
+  /* The soft light behind buttons, covers and the playing bar; kept faint so it lifts a surface without drawing the eye. */
+  --glow: color-mix(in srgb, var(--color-accent-strong) 30%, transparent);
 
   /* Poster width in rows, and the narrowest a poster may get in a grid. Settings → Appearance → Poster size scales them. */
   /* Shape and motion shared by cards, panels and menus. */
@@ -135,6 +136,11 @@ body {
   overflow-x: clip;
 }
 
+/* Body copy never leaves one word alone on its last line. */
+p {
+  text-wrap: pretty;
+}
+
 ::selection {
   background: color-mix(in srgb, var(--color-accent) 40%, transparent);
   color: #fff;
@@ -164,7 +170,7 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[.06] px-4 py-2 text-sm font-medium text-neutral-100 backdrop-blur-md transition duration-200 hover:border-white/25 hover:bg-white/[.13] active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-gradient-to-b from-[var(--color-accent-top)] to-[var(--color-accent-deep)] px-5 py-2 text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_0_28px_-6px_var(--glow)] transition duration-200 hover:from-[var(--color-accent-top-hover)] hover:to-[var(--color-accent-deep-hover)] hover:shadow-[0_0_36px_-4px_var(--glow)] active:scale-[.97] disabled:cursor-wait disabled:opacity-60;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-gradient-to-b from-[var(--color-accent-top)] to-[var(--color-accent-deep)] px-5 py-2 text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_6px_18px_-8px_rgba(0,0,0,0.7)] transition duration-200 hover:from-[var(--color-accent-top-hover)] hover:to-[var(--color-accent-deep-hover)] active:scale-[.97] disabled:cursor-wait disabled:opacity-60;
   }
   /* A round button with only an icon (give it an aria-label and a title). */
   .btn-icon {
@@ -186,6 +192,13 @@ body {
     background: var(--color-surface-2);
     color: #eceef4;
   }
+  .toolbar-select {
+    field-sizing: content;
+  }
+  .toolbar-select option {
+    background: var(--color-surface-2);
+    color: #eceef4;
+  }
   .chip {
     @apply inline-flex items-center rounded-full border border-white/10 bg-white/[.06] px-2.5 py-0.5 text-xs font-medium text-neutral-300;
   }
@@ -198,7 +211,7 @@ body {
     @apply whitespace-nowrap rounded-full border border-transparent px-4 py-2 text-sm font-medium text-neutral-400 transition hover:bg-white/[.06] hover:text-white pointer-coarse:py-3;
   }
   .tab[aria-selected='true'] {
-    @apply border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white shadow-[0_0_18px_-6px_var(--glow)];
+    @apply border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white;
   }
 
   /* ---- surfaces ----------------------------------------------------------------------------- */
@@ -305,15 +318,6 @@ input[type='search']::-webkit-search-cancel-button {
   animation-delay: 0.24s;
 }
 
-/* Faint blue grid that fades out toward the edges (sign-in screen). */
-.grid-bg {
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--color-accent) 7%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 7%, transparent) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse at 50% 40%, #000 10%, transparent 70%);
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -378,23 +382,28 @@ input[type='search']::-webkit-search-cancel-button {
   opacity: 0.5;
 }
 .music-range::-webkit-slider-runnable-track {
-  height: 4px;
+  height: 3px;
   border-radius: 999px;
-  background: linear-gradient(to right, var(--color-accent) var(--pct), rgba(255, 255, 255, 0.2) var(--pct));
+  background: linear-gradient(to right, var(--color-accent) var(--pct), rgba(255, 255, 255, 0.22) var(--pct));
+  transition: height 0.15s var(--ease-out);
 }
 .music-range::-moz-range-track {
-  height: 4px;
+  height: 3px;
   border-radius: 999px;
-  background: linear-gradient(to right, var(--color-accent) var(--pct), rgba(255, 255, 255, 0.2) var(--pct));
+  background: linear-gradient(to right, var(--color-accent) var(--pct), rgba(255, 255, 255, 0.22) var(--pct));
+}
+.music-range:hover::-webkit-slider-runnable-track,
+.music-range:focus-visible::-webkit-slider-runnable-track {
+  height: 5px;
 }
 .music-range::-webkit-slider-thumb {
   appearance: none;
   width: 0.9rem;
   height: 0.9rem;
-  margin-top: -5px;
+  margin-top: -4.5px;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 0 12px var(--glow);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
   transform: scale(0);
   transition: transform 0.15s ease;
 }
@@ -404,7 +413,7 @@ input[type='search']::-webkit-search-cancel-button {
   border: 0;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 0 12px var(--glow);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
   transform: scale(0);
   transition: transform 0.15s ease;
 }

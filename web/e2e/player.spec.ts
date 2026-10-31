@@ -51,7 +51,7 @@ test('chapters: markers on the timeline, a chapter list in the settings menu, an
   await signIn(page, mock)
   await page.goto('/#/play/m0001')
   await waitPlaying(page)
-  const settings = await openSettings(page)
+  const settings = await openSettings(page, 'Chapters')
   const list = settings.getByRole('group', { name: 'Chapters' })
   await expect(list.getByRole('button')).toHaveCount(3)
   await expect(list.getByRole('button', { name: /Opening/ })).toHaveAttribute('aria-current', 'true')

@@ -51,7 +51,7 @@ export function Discover({
   return (
     <section aria-label={t('Discover')} className="space-y-3">
       <h2 className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
-        <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
+        <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)]" />
         {t('Discover something new')}
       </h2>
       <div className={`grid gap-4 ${count === 1 ? '' : count === 2 ? 'md:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-3 md:max-xl:[&>:nth-child(3)]:col-span-2'}`}>
@@ -276,7 +276,7 @@ function Tile({
         {state === 'ready' && title ? (
           <>
             <div
-              className={`w-24 shrink-0 self-start overflow-hidden rounded-lg bg-[var(--color-surface-3)] shadow-[0_10px_30px_-8px_var(--glow)] ring-1 ring-white/15 sm:w-28 ${square ? 'aspect-square' : 'aspect-[2/3]'}`}
+              className={`w-24 shrink-0 self-start overflow-hidden rounded-lg bg-[var(--color-surface-3)] shadow-[0_10px_30px_-8px_rgba(0,0,0,0.8)] ring-1 ring-white/15 sm:w-28 ${square ? 'aspect-square' : 'aspect-[2/3]'}`}
             >
               <Img
                 session={session}

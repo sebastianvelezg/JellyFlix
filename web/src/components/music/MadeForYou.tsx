@@ -62,7 +62,7 @@ function MixTile({
       <p className="mt-2.5 truncate text-xs text-neutral-500">{caption}</p>
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute right-2 top-2 flex h-9 w-9 translate-y-1 items-center justify-center rounded-full bg-[var(--color-accent-strong)] pl-0.5 text-white opacity-0 shadow-[0_0_26px_var(--glow)] ring-1 ring-white/30 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100"
+        className="pointer-events-none absolute right-2 top-2 flex h-9 w-9 translate-y-1 items-center justify-center rounded-full bg-white pl-0.5 text-black opacity-0 shadow-[0_6px_20px_-4px_rgba(0,0,0,0.6)] transition duration-200 group-hover:translate-y-0 group-hover:opacity-100"
       >
         <PlayIcon />
       </span>

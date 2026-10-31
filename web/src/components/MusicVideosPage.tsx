@@ -27,7 +27,7 @@ function Views({ tab, onTab, children }: { tab: Tab; onTab: (tab: Tab) => void; 
             onClick={() => onTab(id)}
             className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition pointer-coarse:py-3 ${
               id === tab
-                ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white shadow-[0_0_18px_-6px_var(--glow)]'
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white'
                 : 'border-white/10 bg-white/[.04] text-neutral-300 hover:border-white/25 hover:text-white'
             }`}
           >

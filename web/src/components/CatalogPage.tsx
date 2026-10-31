@@ -39,6 +39,7 @@ import { PagedGrid } from './PagedGrid'
 import { Row } from './Row'
 import { LazyMount } from './LazyMount'
 import { LetterBar } from './LetterBar'
+import { Toolbar, ToolbarSelect } from './Toolbar'
 import { useBannerLineup } from './useBannerLineup'
 import { type AsyncState } from './useAsync'
 import { swrKey, useSwr, swrScope } from './useSwr'
@@ -318,104 +319,89 @@ function LibraryView({
         )}
 
         <section aria-label={copy.all}>
-          <div className="mb-5 flex flex-wrap items-center gap-2.5">
-            <h1 className="flex w-full items-center gap-2.5 text-xl font-bold tracking-tight sm:mr-auto sm:w-auto sm:text-2xl">
-              <span
-                aria-hidden="true"
-                className="h-6 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]"
-              />
+          <div className="mb-4">
+            <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl">
+              <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)]" />
               {library.name}
             </h1>
-            <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:max-w-full sm:flex-wrap sm:items-center">
-              {libraries.length > 1 && (
-                <label className="flex items-center gap-1.5 text-xs text-neutral-400">
-                  <span className="sr-only">{t('Library')}</span>
-                  <select
-                    className="select w-full sm:w-auto"
-                    value={library.id}
-                    onChange={(e) => {
-                      setGenre('')
-                      setFromLetter('')
-                      update(setLibraryId, (v: string) => ({ libraryId: v }))(e.target.value)
-                    }}
-                  >
-                    {libraries.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <label className="flex items-center gap-1.5 text-xs text-neutral-400">
-                <span className="sr-only">{t('Show')}</span>
-                <select
-                  className="select w-full sm:w-auto"
-                  aria-label={t('Show')}
-                  value={filter}
-                  onChange={(e) =>
-                    update(setFilter, (v: WatchFilter) => ({ filter: v }))(e.target.value as WatchFilter)
-                  }
-                >
-                  {(Object.keys(FILTER_LABELS) as WatchFilter[]).map((k) => (
-                    <option key={k} value={k}>
-                      {k === 'all' ? copy.all : t(FILTER_LABELS[k])}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <GenreSelect state={genres} value={genre} onChange={setGenre} />
-              <FiltersButton filters={advanced} open={showAdvanced} onToggle={() => setShowAdvanced((v) => !v)} />
-              <label className="flex items-center gap-1.5 text-xs text-neutral-400">
-                <span className="sr-only">{t('Sort by')}</span>
-                <select
-                  className="select w-full sm:w-auto"
-                  aria-label={t('Sort by')}
-                  value={sort}
-                  onChange={(e) => update(setSort, (v: SortKey) => ({ sort: v }))(e.target.value as SortKey)}
-                >
-                  {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-                    <option key={k} value={k}>
-                      {t(SORT_LABELS[k])}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          </div>
+          <Toolbar className="mb-4">
+            {libraries.length > 1 && (
+              <ToolbarSelect
+                label={t('Library')}
+                value={library.id}
+                onChange={(id) => {
+                  setGenre('')
+                  setFromLetter('')
+                  update(setLibraryId, (v: string) => ({ libraryId: v }))(id)
+                }}
+              >
+                {libraries.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </ToolbarSelect>
+            )}
+            <ToolbarSelect
+              label={t('Show')}
+              value={filter}
+              onChange={(v) => update(setFilter, (f: WatchFilter) => ({ filter: f }))(v as WatchFilter)}
+            >
+              {(Object.keys(FILTER_LABELS) as WatchFilter[]).map((k) => (
+                <option key={k} value={k}>
+                  {k === 'all' ? copy.all : t(FILTER_LABELS[k])}
+                </option>
+              ))}
+            </ToolbarSelect>
+            <GenreSelect state={genres} value={genre} onChange={setGenre} />
+            <ToolbarSelect
+              label={t('Sort by')}
+              prefix={t('Sort')}
+              value={sort}
+              onChange={(v) => update(setSort, (k: SortKey) => ({ sort: k }))(v as SortKey)}
+            >
+              {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                <option key={k} value={k}>
+                  {t(SORT_LABELS[k])}
+                </option>
+              ))}
+            </ToolbarSelect>
+            <FiltersButton filters={advanced} open={showAdvanced} onToggle={() => setShowAdvanced((v) => !v)} />
+            {!isDefault && (
               <button
                 type="button"
-                className="btn col-span-3 whitespace-nowrap sm:col-span-1"
-                disabled={surprise === 'busy'}
+                className="btn-ghost shrink-0"
                 onClick={() => {
-                  setSurprise('busy')
-                  getRandomTitle(session, kind, library.id)
-                    .then((title) => {
-                      setSurprise(title ? 'idle' : 'none')
-                      if (title) onOpen(title)
-                    })
-                    .catch(() => setSurprise('error'))
+                  setSort('title')
+                  setFilter('all')
+                  setGenre('')
+                  setFromLetter('')
+                  setAdvanced({})
+                  writeBrowsePrefs({ sort: 'title', filter: 'all', advanced: {} }, section)
                 }}
-                title={copy.surprise}
               >
-                <ShuffleIcon /> {t('Surprise me')}
+                {t('Reset')}
               </button>
-              {!isDefault && (
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => {
-                    setSort('title')
-                    setFilter('all')
-                    setGenre('')
-                    setFromLetter('')
-                    setAdvanced({})
-                    writeBrowsePrefs({ sort: 'title', filter: 'all', advanced: {} }, section)
-                  }}
-                >
-                  {t('Reset')}
-                </button>
-              )}
-            </div>
-          </div>
+            )}
+            <button
+              type="button"
+              className="btn ml-auto shrink-0 whitespace-nowrap"
+              disabled={surprise === 'busy'}
+              onClick={() => {
+                setSurprise('busy')
+                getRandomTitle(session, kind, library.id)
+                  .then((title) => {
+                    setSurprise(title ? 'idle' : 'none')
+                    if (title) onOpen(title)
+                  })
+                  .catch(() => setSurprise('error'))
+              }}
+              title={copy.surprise}
+            >
+              <ShuffleIcon /> {t('Surprise me')}
+            </button>
+          </Toolbar>
 
           {showAdvanced && <FiltersPanel facets={facets} filters={advanced} onChange={changeAdvanced} />}
 
@@ -454,29 +440,21 @@ function GenreSelect({
   // a disabled placeholder holds its place so the toolbar does not jump (this scan is slow on big libraries).
   if (state.status === 'loading') {
     return (
-      <select className="select w-full sm:w-auto" aria-label={t('Genre')} disabled>
-        <option>{t('Genres…')}</option>
-      </select>
+      <ToolbarSelect label={t('Genre')} value="" onChange={() => undefined} disabled>
+        <option value="">{t('Genres…')}</option>
+      </ToolbarSelect>
     )
   }
   if (state.status !== 'ready' || state.data.length === 0) return null
   return (
-    <label className="flex items-center gap-1.5 text-xs text-neutral-400">
-      <span className="sr-only">{t('Genre')}</span>
-      <select
-        className="select w-full sm:w-auto"
-        aria-label={t('Genre')}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">{t('All genres')}</option>
-        {state.data.map((g) => (
-          <option key={g} value={g}>
-            {g}
-          </option>
-        ))}
-      </select>
-    </label>
+    <ToolbarSelect label={t('Genre')} value={value} onChange={onChange}>
+      <option value="">{t('All genres')}</option>
+      {state.data.map((g) => (
+        <option key={g} value={g}>
+          {g}
+        </option>
+      ))}
+    </ToolbarSelect>
   )
 }
 

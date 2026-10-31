@@ -105,8 +105,7 @@ export function ConnectForm({
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden">
-      {/* Backdrop: a faint grid and two slow blue glows on pure black. */}
-      <div aria-hidden="true" className="grid-bg absolute inset-0 -z-10" />
+      {/* Backdrop: two slow, soft blue lights on pure black. */}
       <div
         aria-hidden="true"
         className="absolute -left-40 -top-40 -z-10 h-[34rem] w-[34rem] rounded-full bg-[var(--color-accent-deep)]/25 blur-[120px]"

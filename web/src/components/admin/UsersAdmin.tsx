@@ -290,13 +290,13 @@ function PolicyForm({
       }}
     >
       <fieldset className="space-y-3">
-        <legend className="mb-1 text-sm font-semibold text-white">{t('Account')}</legend>
+        <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Account')}</legend>
         <Toggle label={t('Account disabled')} hint={t('A disabled account cannot sign in, and is signed out.')} checked={draft.isDisabled} onChange={(v) => set('isDisabled', v)} />
         <Toggle label={t('Administrator')} hint={t('Can change everything on the server, including these allowances.')} checked={draft.isAdmin} onChange={(v) => set('isAdmin', v)} />
       </fieldset>
 
       <fieldset className="space-y-2">
-        <legend className="mb-1 text-sm font-semibold text-white">{t('Libraries')}</legend>
+        <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Libraries')}</legend>
         <Toggle label={t('All libraries')} checked={draft.allFolders} onChange={(v) => set('allFolders', v)} />
         {!draft.allFolders && (
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
@@ -316,7 +316,7 @@ function PolicyForm({
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="mb-1 text-sm font-semibold text-white">{t('Playing')}</legend>
+        <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Playing')}</legend>
         <Toggle label={t('May play media')} checked={draft.mediaPlayback} onChange={(v) => set('mediaPlayback', v)} />
         <Toggle label={t('May have videos converted')} hint={t('The server converts a video that a device cannot play. It uses the server\'s processor or graphics card.')} checked={draft.videoTranscoding} onChange={(v) => set('videoTranscoding', v)} />
         <Toggle label={t('May have audio converted')} checked={draft.audioTranscoding} onChange={(v) => set('audioTranscoding', v)} />
@@ -346,7 +346,7 @@ function PolicyForm({
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="mb-1 text-sm font-semibold text-white">{t('Other')}</legend>
+        <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Other')}</legend>
         <Toggle label={t('May connect from outside the home network')} checked={draft.remoteAccess} onChange={(v) => set('remoteAccess', v)} />
         <Toggle label={t('May download files')} checked={draft.downloading} onChange={(v) => set('downloading', v)} />
         <Toggle label={t('May delete titles')} hint={t('On a real server this can delete files from the disk.')} checked={draft.contentDeletion} onChange={(v) => set('contentDeletion', v)} />
