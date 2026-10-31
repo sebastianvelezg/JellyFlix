@@ -1,0 +1,86 @@
+# Roadmap: three phases after the interface polish
+
+The interface polish is done (see the changelog). The next work is about **function and experience**: what the app can do and how well it connects, plays and remembers. Everything below works with a plain Jellyfin server, with no plugin and no extra service.
+
+How we work: one branch per phase, small commits while building, **one commit per phase** at the end (squashed if needed), then a release when the three phases are in. Each item ships with unit tests (pure logic), an end-to-end test against the mock server, Spanish texts (`web/src/i18n/es.ts`, a test fails without them) and a check with the axe accessibility spec. An item marked **TV** also gets its Android TV version.
+
+Legend: **S** a day or less, **M** a few days, **L** about a week or more.
+
+---
+
+## Phase 1: the player and the way a title starts
+
+Goal: playing a title is more flexible and more predictable.
+
+| # | Item | Size | Where | Notes |
+|---|------|------|-------|-------|
+| 1.1 | **Two subtitles at once** (a second track, for learning a language or for dubs) | M | Web, TV | A second overlay under the first; its own colour and position; the choice is remembered per language. |
+| 1.2 | **Episodes button in the player**, with a tab per season | S | Web, TV | Change episode without leaving the player; the current one is marked. |
+| 1.3 | **Chapter marks on the seek bar** (off by default) | S | Web | The chapters are already in the menu; draw their start on the bar and in the trickplay preview. |
+| 1.4 | **Choose the version and the tracks before playing** (4K or 1080p, audio, subtitle) | M | Web, TV | A small panel on the title page when a title has more than one version or track; the last choice is the default. |
+| 1.5 | **Time labels you can choose** (elapsed, remaining, total, the time it ends) for the left and right of the bar | S | Web | Separate choice for video and music. |
+| 1.6 | **Pause while scrubbing** (on or off) | S | Web | A setting in Playback. |
+| 1.7 | **Skip by kind** (intro, recap, credits, preview): ask, skip by itself, or do nothing; the button hides after a few seconds | S | Web, TV | Replaces the single switch we have on TV. |
+| 1.8 | **Convert only some audio codecs** (for example DTS) and leave the video alone | S | Web, TV | A list in Playback that feeds the device profile (`core/deviceProfile.ts`). |
+
+Done when: all eight work on the mock server and on a real one, the tests pass, and the changelog lists them.
+
+Risks: 1.1 and 1.4 touch the playback profile and the subtitle overlay (the most delicate code of the player). Do them first, with tests, and check subtitles in direct play and in HLS.
+
+---
+
+## Phase 2: home, libraries and the household
+
+Goal: the app is easier to set up, to browse and to share at home.
+
+| # | Item | Size | Where | Notes |
+|---|------|------|-------|-------|
+| 2.1 | **Search inside Settings** | S | Web | Finds a setting by its name and jumps to its tab. |
+| 2.2 | **Default action of Continue watching and Next up** (open, or start playing) and **how many days back** Next up looks | S | Web, TV | Settings in Appearance. |
+| 2.3 | **Titles under the posters** on or off, and **library order** saved in the server's display preferences | S | Web, TV | The order then follows the account on every device. |
+| 2.4 | **My rating**: like or dislike on a title, and filter the libraries by liked or disliked | M | Web, TV | Uses the server's own `Likes` value and filters, so no plugin. No star scale (Jellyfin has none). |
+| 2.5 | **Parental controls and Kids mode with a PIN** | L | Web, TV | A kids profile that hides what is above an age rating everywhere (home, search, libraries, suggestions) and leaves a minimal app; leaving it asks for a PIN. The PIN is kept on the device and guards the app, not the server: for real protection the administrator also sets the account's maximum rating in Administration. We say so in the screen. |
+| 2.6 | **Trailers inside the app**, with a picker when there are several | M | Web | Local trailers play in our player; remote ones (YouTube) open in an embedded player. Check what the server gives first. |
+| 2.7 | **First-run setup** (language, theme, the audio and subtitle languages, the home rows) with a preview | M | Web | Short, skippable, and it can be run again from Settings → About. |
+
+Done when: a kids profile cannot see a blocked title by any route (a test visits every page), and the rest work as described.
+
+Risks: 2.5 touches every list, so build one filter in `core/` and call it from everywhere. 2.6 depends on what the server returns for trailers.
+
+---
+
+## Phase 3: the bigger pieces
+
+Goal: things that make the app feel like a complete service. Each one can be shipped alone.
+
+| # | Item | Size | Where | Notes |
+|---|------|------|-------|-------|
+| 3.1 | **Live TV: faster channels**: a strip of channels to change with Up during playback, the guide opens on the last channel, and filters by category (movies, series, sports, news, kids, favourites) | M | Web, TV | Our Live TV only shows channels today. |
+| 3.2 | **DVR**: a record button for a programme or a whole series, and a page for the schedule and the recordings | L | Web, TV | Only offered when the server has a tuner and a recording path. Uses the server's timers API. |
+| 3.3 | **Watch together (SyncPlay)** | L | Web | Create or join a group, with play, pause and seek kept in step by the server's own SyncPlay. Needs clock sync and care with reconnects. Start with web; TV later. |
+| 3.4 | **Screensaver on the TV** with art from the library | S | TV | Optional, off by default; filters by library and by rating. |
+| 3.5 | **TV catch-up** with whatever of phases 1 and 2 is missing there | M | TV | One pass at the end so TV and web say the same things. |
+
+Done when: 3.1 to 3.4 are on a real server with a tuner (if there is one) and on the mock server otherwise.
+
+Risks: 3.2 and 3.3 cannot be fully tested without a tuner and a second person; the mock server will cover the calls and a manual test the rest.
+
+---
+
+## Release
+
+After the three phases: update the version (web and TV together, as always), the changelog and the README, run all the checks, and publish with the existing release workflow.
+
+## Left for after the plugin
+
+These need something running on the server, or have problems from a browser (CORS), so they wait:
+
+- **Seerr / Jellyseerr**: requests, discovery rows and request status inside the title page.
+- **Settings sync** between web and TV (theme, home rows, language).
+- **External ratings** (MDBList, TMDB, Rotten Tomatoes), which need an API key.
+- **Anime markers** (filler, recap, canon) and **messages from the administrator**.
+- Ordering and filtering by *my rating* on the server.
+
+## Not planned
+
+Retro games, achievement badges and chat, seasonal effects, many layouts for the same page, a theme store, Plex and Emby, several servers at once, Chromecast and offline downloads. They are large, and the app already covers their use cases some other way (Play on…, the TV app) or not at all for our users. They can come back if that changes.
