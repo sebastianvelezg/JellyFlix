@@ -30,7 +30,7 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - **The menu is yours:** Settings → Appearance chooses whether the buttons at the top show icons and names, only icons or only names (with both, the names give way to the icons when there is no room), their order, and which ones are shown. Home always stays.
 - Poster grids with infinite scroll, sort (title, recently added, year, rating), **filters** (watched, favorites, genre, decade, minimum rating, age rating, tag, 4K) and an **A–Z jump**. Sort and filter choices are remembered.
 - **Title pages** with backdrop, cast (click someone to see all their titles in your library), file info, audio and subtitle lists, similar titles, a line that says what **Play** will give ("1080p HEVC · English · AAC · 5.1"),
-  Play / Resume / Start over, watched and favorite toggles that change instantly and sync with the server.
+  Play / Resume / Start over, watched and favorite toggles that change instantly and sync with the server. A title with several versions, audio tracks or subtitles has three small dropdowns under Play (version, audio, subtitle), and a **Trailer** button opens the trailer on its own site in a new tab (the app itself loads nothing but your server). **My rating** (thumbs up and down) is kept on the server and can be filtered.
 - **Series pages** with seasons, an episode list (still, runtime, progress, watched toggle), "Play / Resume S2 E5" and "Mark season watched". The audio and subtitle language you pick are remembered per series.
 - **Collections** (Jellyfin box sets): a page per collection with its films oldest first, how many you have watched and Play / Resume / Play next.
 - Every poster has a **"⋯" menu** (details, mark watched, favorite, add to a playlist, Watch later, and Edit for administrators).
@@ -43,6 +43,7 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
   (converted in the browser, never uploaded). **Search online…** in the subtitle menu asks the subtitle plugin of your server (Open Subtitles and the like) in a language you choose, lists what it found
   (matches for your exact file first, machine translations last) and saves the one you pick on the server, next to the video; it needs an account that may manage subtitles. Image subtitles (PGS, VobSub) and styled `.ass` are not supported.
 - **Audio tracks** (switching keeps your position), **skip intro / recap / credits / preview** when the server has segments, **chapters**, **Next episode** with an *Up next* card (in the last 20 seconds of a long title, so you can jump to the next one during the credits) and autoplay, whose countdown (3 to 15 seconds, with a bar) is chosen in Settings.
+- **Second subtitle:** a second track shows above the first (a step smaller, in another colour) to learn a language or read a dub; it is chosen on its own page of the player's menu. **Skip by kind:** intros, recaps, credits and previews each have their own choice (a button, skip by itself, or nothing). The seek bar's labels can show the time played, left, the total, when it ends or nothing, with chapter marks you can turn off and an option to pause while dragging. An **Episodes** button lists the series' episodes by season without leaving the player, and a list of **converted sound** formats (AC-3, E-AC-3, FLAC) makes the server convert them for a receiver that stays silent.
 - **Cinema mode** (Settings → Playback, or the player's menu): the picture fades in from black and out at the very end, and the controls leave sooner, also while paused.
 - A **quality limit** and an explanation of how the video is playing and why the server converts it. Playlists and collections play through.
 - Progress is reported to Jellyfin (start, every ten seconds, pause, seek, stop); resume where you left off. Reporting failures never interrupt playback.
@@ -63,6 +64,7 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
   - **Videos flow:** the 3-2-1 runs over the last 3 seconds of a video and the next one starts the moment it ends, in full screen if the one before was.
   - **A mini player:** leaving a music video with Back keeps it playing in a bar at the bottom of the page (thumbnail, play/pause, next, timeline, full screen, close) while you look for another; picking another takes its place, and a video and the music take turns.
 - **Live TV** lists your channels with what is on each (their quality and notes in the name are shown as small tags), has a search by name or number, favorites, and a **guide** (a time grid of the next hours). Watching a channel opens the stream your server provides, with no seek bar (it is live), the arrow keys for the channel before and after, a quality choice, and the usual reports to the server. Recording and timers are not built.
+  - **By kind:** the channels can be narrowed to Movies, Series, Sports, News, Kids or Favorites (the server decides a channel's kind), a strip of channels at the bottom of the player shows what is on around the current one, and *Last watched* goes back to the channel you left.
 
 ### Music
 - Its own home (Jump back in, Recently added, Playlists, Discover, Most played, Favorite songs) and **Albums, Artists and Songs** with sort, genre, favorites and search. **Shuffle all** plays a random mix.
@@ -86,6 +88,11 @@ Settings → Appearance, all stored on this device:
 - The theme is a set of CSS variables painted from a small inline script before the app loads, so there is no flash of the wrong colour.
 
 <p align="center"><img src="../docs/screenshots/web-appearance.jpg" alt="Settings, Appearance: backgrounds and accent colours" width="70%"></p>
+
+### Watch together and the household
+- **Watch together:** the people icon in the header starts a group or joins an open one, using Jellyfin's own **SyncPlay**. A title played in the group opens for everybody, waits until every device is ready and starts at one moment by the server's clock; pause, play and seek are shared. The server's administrator decides which accounts may use it.
+- **Kids mode** (Settings → General): a highest age rating and a PIN to leave. Titles above it, and titles with no rating, disappear from every list, search and suggestion; Settings, Administration, stats and Live TV stay shut until the PIN is typed. The PIN guards the app on this device; for a limit nobody can get round, also set the highest rating for the account in Administration.
+- **Search in Settings**, **cards** that can drop the titles under the posters and choose what a Continue watching card does, and a short **first-run setup** (language, look, subtitle language) that can be run again from Settings → About.
 
 ### Devices ("Play on…")
 - **Start something on another device**: a movie page, the Home banner, an episode, a series, an album and a playlist have **Play on…**: a list of your devices that the server says can be controlled (the TV app, and this web app open on a phone, a tablet or another computer).
@@ -375,7 +382,7 @@ is unchanged; credentials stay in your shell and nothing is written to disk.
 - **Jellyfin:** developed against 12.x; the SDK targets 10.10 and newer. Plugin routes (Intro Skipper, Playback Reporting…) are only used when the server has them.
 - **Browsers:** developed and tested in Chrome. Edge, Firefox and Safari are expected to work and are not regularly tested. HLS needs MSE (hls.js) or native HLS (Safari).
 - **Media:** direct play of what the browser can decode (H.264 / AAC everywhere; HEVC where the browser supports it, and 10-bit HEVC only when it reports Main10); everything else is converted by the server. DTS and TrueHD audio and image-based subtitles are not supported.
-- **Not built:** recording and timers for live TV, a reader for Mobi and RAR comics, several saved servers or users, a version picker, an equalizer, styled `.ass` subtitles, casting (Chromecast, AirPlay), offline mode.
+- **Not built:** recording and timers for live TV, a reader for Mobi and RAR comics, several saved servers or users, an equalizer, styled `.ass` subtitles, casting (Chromecast, AirPlay), offline mode.
 - "Play on…" needs the other app to be open and cannot wake it; it lists any controllable device of your account, so an official Jellyfin web tab left open also appears.
 - On an iPhone or iPad, Safari lets a page start sound or video only after a tap, so a title sent to it may open ready and need one tap on Play.
 
