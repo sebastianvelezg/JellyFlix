@@ -37,6 +37,7 @@ import { CloseIcon, FullscreenIcon, PauseIcon, PlayIcon, SkipIcon, SkipNextIcon 
 import { SeekBar } from '../music/controls'
 import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
+import { useSyncPlay, useSyncPlayVideo } from '../syncplay/SyncPlayProvider'
 import { Controls } from './Controls'
 import { DOCK_BAR_CLASS, DOCK_BUTTON, DOCK_THUMB_CLASS } from './dock'
 import { enterFullscreen, inFullscreen, leaveFullscreen } from './fullscreen'
@@ -50,6 +51,8 @@ import { offsetLabel } from '../offsetLabel'
 const HIDE_CONTROLS_MS = 3000
 /** In cinema mode the controls get out of the way sooner. */
 const HIDE_CONTROLS_CINEMA_MS = 1800
+/** A skip button nobody pressed is taken away after this long. */
+const SKIP_BUTTON_MS = 10_000
 const PROGRESS_INTERVAL_MS = 10_000
 const STOP_TIMEOUT_MS = 2000
 const SKIP_SECONDS = 10
@@ -88,8 +91,11 @@ export function PlayerStage({
   fallback,
   speed,
   subtitleIndex,
+  secondSubtitleIndex = null,
+  onSecondSubtitle,
   next = null,
   onNext,
+  onPickEpisode,
   repeat,
   extras,
   localSubtitle,
@@ -114,10 +120,15 @@ export function PlayerStage({
   /** Speed and subtitle choice live in the parent so they survive switching audio track. */
   speed: number
   subtitleIndex: number | null
+  /** The second subtitle track (shown above the first), and how to change it. */
+  secondSubtitleIndex?: number | null
+  onSecondSubtitle?: (index: number | null) => void
   /** The episode after this one (if this is an episode and there is one). */
   /** What plays after this: the next episode, or the next title of the playlist being played. */
   next?: Movie | null
   onNext?: () => void
+  /** Another episode of the series was picked from the player's list. */
+  onPickEpisode?: (episode: Movie) => void
   /** Present when this is part of a queue: play it again from the start after the last title. */
   repeat?: { enabled: boolean; onChange: (enabled: boolean) => void }
   /** Intro/credits segments and chapters (empty when the server has none). */
@@ -144,6 +155,13 @@ export function PlayerStage({
   onPlaying?: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  // Watching together: the video follows the group (and waits at the start until everyone is ready).
+  const together = useSyncPlay()
+  const togetherRef = useRef(together)
+  useEffect(() => {
+    togetherRef.current = together
+  })
+  useSyncPlayVideo(videoRef, plan.itemId)
   const onPlayingRef = useRef(onPlaying)
   useEffect(() => {
     onPlayingRef.current = onPlaying
@@ -206,6 +224,8 @@ export function PlayerStage({
   const subtitle = useSubtitleTrack(session, plan, localSubtitle ? null : subtitleIndex)
   const subtitleUrl = localSubtitle?.url ?? subtitle.url
   const showingSubtitles = subtitleIndex !== null || !!localSubtitle
+  const secondSubtitle = useSubtitleTrack(session, plan, secondSubtitleIndex)
+  const secondUrl = showingSubtitles ? secondSubtitle.url : null
 
   const setSubtitleOffset = useCallback(
     (seconds: number) => {
@@ -267,6 +287,7 @@ export function PlayerStage({
       token: session.accessToken,
       authorization: session.api.authorizationHeader,
       startSeconds,
+      autoplay: togetherRef.current ? togetherRef.current.shouldAutoplay() : true,
       onFatal: setError,
     })
     attachedRef.current = attached
@@ -509,6 +530,16 @@ export function PlayerStage({
     onNext()
   }, [playback, device, onNext])
 
+  /** Report where this one stopped, then play the episode picked from the list. */
+  const pickEpisode = useCallback(
+    async (episode: Movie) => {
+      if (!onPickEpisode) return
+      await Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))])
+      onPickEpisode(episode)
+    },
+    [playback, device, onPickEpisode],
+  )
+
   // Other devices can drive this player ("pause", "seek", "send it to the TV"): see the remote-control provider.
   const remoteController = useMemo<PlaybackController>(
     () => ({
@@ -540,13 +571,46 @@ export function PlayerStage({
     else void video.requestPictureInPicture().catch(() => undefined)
   }, [])
 
-  // "Skip intro" / "Skip credits" while the playhead is inside such a segment.
+  // "Skip intro" / "Skip credits" while the playhead is inside such a segment. Each kind can be offered, skipped at once, or ignored.
   const segment = activeSegment(extras.segments, currentTime)
   const skipSegment = useCallback(() => {
     if (!segment) return
     if (segment.kind === 'outro' && next) void goNext()
     else seek(segment.endSeconds)
   }, [segment, next, goNext, seek])
+  const segmentKey = segment ? `${segment.kind}:${segment.startSeconds}` : null
+  const segmentAction = segment ? initialPrefs.skipActions[segment.kind] : 'ask'
+  const autoSkipped = useRef(new Set<string>())
+  // A button left alone goes away after a few seconds (it comes back with the controls).
+  const [staleSegment, setStaleSegment] = useState<string | null>(null)
+  useEffect(() => {
+    if (!segmentKey || segmentAction !== 'ask') return
+    const timer = setTimeout(() => setStaleSegment(segmentKey), SKIP_BUTTON_MS)
+    return () => clearTimeout(timer)
+  }, [segmentKey, segmentAction])
+  useEffect(() => {
+    // Once for each stretch, so going back into an intro after skipping it does not throw you out again.
+    if (!segment || !segmentKey || segmentAction !== 'auto' || mini || autoSkipped.current.has(segmentKey)) return
+    autoSkipped.current.add(segmentKey)
+    skipSegment()
+  }, [segment, segmentKey, segmentAction, mini, skipSegment])
+
+  // Dragging the seek bar can hold the picture still until it is let go.
+  const scrubResume = useRef(false)
+  const scrubbing = useCallback(
+    (on: boolean) => {
+      const video = videoRef.current
+      if (!video || !initialPrefs.pauseWhileScrubbing) return
+      if (on) {
+        scrubResume.current = !video.paused
+        video.pause()
+      } else if (scrubResume.current) {
+        scrubResume.current = false
+        void video.play().catch(() => undefined)
+      }
+    },
+    [initialPrefs.pauseWhileScrubbing],
+  )
 
   // Near the end the card shows what follows; once the title ends it counts down (when autoplay is on) and moves on.
   const phase = upNextPhase({
@@ -723,7 +787,8 @@ export function PlayerStage({
         data-play-method={plan.playMethod}
         data-protocol={plan.protocol}
       >
-        {subtitleUrl && <track key={subtitleUrl} kind="subtitles" src={subtitleUrl} label={t('Subtitles')} />}
+        {subtitleUrl && <track key={subtitleUrl} data-slot="main" kind="subtitles" src={subtitleUrl} label={t('Subtitles')} />}
+        {secondUrl && <track key={secondUrl} data-slot="second" kind="subtitles" src={secondUrl} label={t('Second subtitle')} />}
       </video>
 
       {mini && (
@@ -792,7 +857,7 @@ export function PlayerStage({
 
       {!mini && (
       <>
-      <SubtitleOverlay videoRef={videoRef} trackUrl={subtitleUrl} lifted={controlsVisible} style={subtitleStyle} offset={subtitleOffset} />
+      <SubtitleOverlay videoRef={videoRef} trackUrl={subtitleUrl} secondUrl={secondUrl} lifted={controlsVisible} style={subtitleStyle} offset={subtitleOffset} />
 
       {cinema && (
         <div
@@ -840,7 +905,7 @@ export function PlayerStage({
 
       {showSpinner && (
         <div role="status" aria-label={t('Buffering')} className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-[var(--color-accent)] shadow-[0_0_30px_-4px_var(--glow)]" />
+          <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-[var(--color-accent)]" />
         </div>
       )}
 
@@ -863,7 +928,7 @@ export function PlayerStage({
         </div>
       )}
 
-      {segment && !upNextVisible && (
+      {segment && segmentAction === 'ask' && (controlsVisible || staleSegment !== segmentKey) && !upNextVisible && (
         <button
           type="button"
           onClick={skipSegment}
@@ -900,7 +965,7 @@ export function PlayerStage({
             <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
               <div
                 data-testid="countdown-bar"
-                className={`h-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)] transition-[width] ease-linear motion-reduce:transition-none ${flow ? 'duration-300' : 'duration-1000'}`}
+                className={`h-full bg-[var(--color-accent)] transition-[width] ease-linear motion-reduce:transition-none ${flow ? 'duration-300' : 'duration-1000'}`}
                 style={{
                   width: `${
                     (flow ? flowSeconds / FLOW_COUNTDOWN_SECONDS : Math.max(0, Math.min(1, (secondsLeft - 1) / Math.max(1, countdownSeconds - 1)))) * 100
@@ -928,6 +993,8 @@ export function PlayerStage({
         audioIndex={plan.audioIndex}
         subtitleTracks={plan.subtitleTracks}
         subtitleIndex={localSubtitle ? null : subtitleIndex}
+        secondSubtitleIndex={secondSubtitleIndex}
+        onSecondSubtitle={onSecondSubtitle}
         subtitleStatus={subtitle.loading ? 'loading' : subtitle.failed ? 'failed' : 'idle'}
         subtitleStyle={subtitleStyle}
         subtitleOffset={subtitleOffset}
@@ -960,10 +1027,14 @@ export function PlayerStage({
         onSpeed={onSpeed}
         onMenuOpenChange={setMenuOpen}
         chapters={extras.chapters}
+        chapterMarks={initialPrefs.chapterMarks}
+        timeLabels={{ left: initialPrefs.timeLeft, right: initialPrefs.timeRight }}
+        onScrubbing={scrubbing}
         trickplay={trickplay}
         pictureInPicture={canPip ? { active: pip, onToggle: togglePip } : undefined}
         nextEpisode={next ? { label: `${isEpisode(next) ? episodeCode(next) : ''} ${next.name}`.trim(), onPlay: () => void goNext() } : undefined}
         repeatQueue={repeat}
+        episodes={isEpisode(movie) && onPickEpisode ? { session, current: movie, onPick: (episode) => void pickEpisode(episode) } : undefined}
         cinemaMode={{
           enabled: cinema,
           onChange: (on) => {

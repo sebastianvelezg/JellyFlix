@@ -52,6 +52,26 @@ fun splitChannelName(raw: String): ChannelName {
     return if (title.isEmpty()) ChannelName(raw.trim(), emptyList()) else ChannelName(title, tags)
 }
 
+/** The ways the channels can be narrowed: the server tells a channel's kind from what it broadcasts, favourites are the account's own. */
+enum class ChannelCategory(val key: String) {
+    All("all"),
+    Favorites("favorites"),
+    Movies("movies"),
+    Series("series"),
+    Sports("sports"),
+    News("news"),
+    Kids("kids"),
+    ;
+
+    companion object {
+        /** The category saved under [key]; "all" for anything unknown. */
+        fun of(key: String?): ChannelCategory = values().firstOrNull { it.key == key } ?: All
+    }
+}
+
+/** The channel watched last, to come back to with one press. */
+data class LastChannel(val id: UUID, val name: String)
+
 /** A live TV channel with what is on it now (as the server said when the list was read). */
 data class TvChannel(val item: MediaItem, val number: String?, val now: TvProgram?) {
     val id: UUID get() = item.id

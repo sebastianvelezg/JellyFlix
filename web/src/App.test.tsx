@@ -280,7 +280,8 @@ describe('movie page', () => {
     expect(screen.getByText('Ada Actor')).toBeInTheDocument()
     expect(screen.getByText(/1080p · H264/i)).toBeInTheDocument()
     expect(screen.getAllByText(/English · AAC Stereo/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Plays as/)).toBeInTheDocument()
+    // A title with audio tracks and subtitles to choose from offers them under Play (otherwise a line says how it plays).
+    expect(screen.getByRole('group', { name: 'Play options' })).toBeInTheDocument()
     expect(await screen.findByRole('region', { name: 'More like this' })).toBeInTheDocument()
 
     const favorite = screen.getByRole('button', { name: /Add to favorites/ })

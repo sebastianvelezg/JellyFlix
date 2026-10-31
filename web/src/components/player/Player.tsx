@@ -10,8 +10,11 @@ import {
   pickSubtitle,
   PlaybackError,
   playbackTitle,
+  takePlayChoice,
+  type PlayChoice,
   retryRequest,
   ticksToSeconds,
+  withoutAudioCodecs,
   type Movie,
   type PlaybackExtras,
   type PlaybackPlan,
@@ -43,6 +46,11 @@ type State =
  * For an episode, the audio and subtitle language you chose are remembered per series (an anime keeps its
  * Japanese audio and English subtitles in the next episode), and the next episode can follow on its own.
  */
+/** The second subtitle only counts while there is a first one, and it is never the same track. */
+function index_second(second: number | null, first: number | null): number | null {
+  return first === null || second === first ? null : second
+}
+
 export function Player({
   session,
   movie,
@@ -50,6 +58,7 @@ export function Player({
   startAt,
   next = null,
   onNext,
+  onPickEpisode,
   repeat,
   onExit,
   mini = false,
@@ -67,6 +76,8 @@ export function Player({
   /** What follows this one (the next episode, or the next title of the playlist), once known. */
   next?: Movie | null
   onNext?: () => void
+  /** Another episode of the series was picked from the player's list. */
+  onPickEpisode?: (episode: Movie) => void
   /** Present when this is part of a queue: the choice to play it again from the start after the last title. */
   repeat?: { enabled: boolean; onChange: (enabled: boolean) => void }
   onExit: () => void
@@ -83,6 +94,8 @@ export function Player({
   const [state, setState] = useState<State>({ status: 'loading' })
   const [speed, setSpeed] = useState(1)
   const [subtitleIndex, setSubtitleIndex] = useState<number | null>(null)
+  // A second subtitle track shown above the first (to learn a language, or to read a dub).
+  const [secondSubtitleIndex, setSecondSubtitleIndex] = useState<number | null>(null)
   // A subtitle file from the viewer's device lives here (not in the stage) so it survives switching audio track.
   const [localSubtitle, setLocalSubtitle] = useState<{ name: string; url: string } | null>(null)
   const [subtitleFileError, setSubtitleFileError] = useState<string | null>(null)
@@ -123,6 +136,9 @@ export function Player({
   const audioInitialised = useRef(false)
   const currentPlan = useRef<PlaybackPlan | null>(null)
   const seriesId = isEpisode(movie) ? movie.seriesId : null
+  // What was picked on the title page (the version of the file, the audio, the subtitle); read once, for the first stream.
+  const choiceRead = useRef(false)
+  const choice = useRef<PlayChoice | undefined>(undefined)
 
   // Skippable intro/credits and chapter markers, when the server has them. Read once, so they survive audio switches.
   const [extras, setExtras] = useState<PlaybackExtras>(NO_EXTRAS)
@@ -144,11 +160,17 @@ export function Player({
     ;(async () => {
       try {
         const startSeconds = request.startSeconds ?? startAt ?? (startOver ? 0 : ticksToSeconds(movie.resumeTicks))
+        if (!choiceRead.current) {
+          choiceRead.current = true
+          choice.current = takePlayChoice(movie.id)
+        }
+        const firstStream = !subtitlesInitialised.current
         const plan = await negotiatePlayback(session, movie.id, {
           audioStreamIndex: request.audioIndex,
-          mediaSourceId: request.mediaSourceId,
+          mediaSourceId: request.mediaSourceId ?? (firstStream ? choice.current?.mediaSourceId : undefined),
           forceTranscode: request.forceTranscode,
-          capabilities: detectCapabilities(),
+          // Audio codecs chosen in Settings are converted by the server even though this browser could play them.
+          capabilities: withoutAudioCodecs(detectCapabilities(), readPlayerPrefs().convertAudio),
           maxBitrate: readPlayerPrefs().maxBitrateMbps * 1_000_000,
         })
         if (cancelled) return
@@ -158,12 +180,22 @@ export function Player({
           subtitlesInitialised.current = true
           const language =
             remembered.subtitleLanguage !== undefined ? remembered.subtitleLanguage : readPlayerPrefs().subtitleLanguage
-          setSubtitleIndex(pickSubtitle(plan.subtitleTracks, language))
+          const picked = choice.current?.subtitleIndex
+          // A subtitle chosen on the title page wins; so does "none". (Only text tracks can be shown.)
+          const first =
+            picked === null ? null : picked !== undefined && plan.subtitleTracks.some((s) => s.index === picked) ? picked : pickSubtitle(plan.subtitleTracks, language)
+          setSubtitleIndex(first)
+          // ...and the second one, in the language chosen last time, when there is a first one to put it under.
+          setSecondSubtitleIndex(
+            first === null ? null : pickSubtitle(plan.subtitleTracks.filter((track) => track.index !== first), readPlayerPrefs().secondSubtitleLanguage),
+          )
         }
         // ...and the audio language of this series, which may need the server to remux or transcode.
         if (!audioInitialised.current) {
           audioInitialised.current = true
-          const wanted = pickAudio(plan.audioTracks, remembered.audioLanguage)
+          const chosenAudio = choice.current?.audioIndex
+          const wanted =
+            chosenAudio !== undefined && plan.audioTracks.some((a) => a.index === chosenAudio) ? chosenAudio : pickAudio(plan.audioTracks, remembered.audioLanguage)
           if (wanted !== undefined && wanted !== plan.audioIndex) {
             setRequest((prev) => ({
               ...audioChangeRequest(plan, wanted, { fallback: false, startSeconds }),
@@ -243,6 +275,7 @@ export function Player({
         subtitleIndex={subtitleIndex}
         next={next}
         onNext={onNext}
+        onPickEpisode={onPickEpisode}
         repeat={repeat}
         extras={extras}
         localSubtitle={localSubtitle}
@@ -251,8 +284,15 @@ export function Player({
         onClearLocalSubtitle={clearLocalSubtitle}
         onSubtitleSaved={subtitleSaved}
         onSpeed={setSpeed}
+        secondSubtitleIndex={index_second(secondSubtitleIndex, subtitleIndex)}
+        onSecondSubtitle={(index) => {
+          setSecondSubtitleIndex(index)
+          writePlayerPrefs({ secondSubtitleLanguage: index === null ? null : (state.plan.subtitleTracks.find((t) => t.index === index)?.language ?? null) })
+        }}
         onSubtitle={(index) => {
           setSubtitleIndex(index)
+          // The second line only goes under a first one, and not the same track twice.
+          if (index === null || index === secondSubtitleIndex) setSecondSubtitleIndex(null)
           const language =
             index === null ? null : (state.plan.subtitleTracks.find((t) => t.index === index)?.language ?? null)
           writePlayerPrefs({ subtitleLanguage: language })
@@ -292,7 +332,7 @@ export function Player({
       {state.status === 'loading' ? (
         <>
           <div
-            className="h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-[var(--color-accent)] shadow-[0_0_30px_-4px_var(--glow)]"
+            className="h-12 w-12 animate-spin rounded-full border-4 border-white/15 border-t-[var(--color-accent)]"
             aria-hidden="true"
           />
           <p role="status" className="text-neutral-300">

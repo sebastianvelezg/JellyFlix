@@ -97,7 +97,7 @@ export function PlayingBars({ playing }: { playing: boolean }) {
 }
 
 export const cardFrame =
-  'relative transition duration-300 ease-out group-hover:scale-[1.03] group-hover:shadow-[0_14px_44px_-10px_var(--glow)] group-hover:ring-[var(--color-accent)]/70 group-focus-within:ring-[var(--color-accent)]/70'
+  'relative transition duration-300 ease-out group-hover:scale-[1.03] group-hover:shadow-[0_18px_40px_-14px_rgba(0,0,0,0.9)] group-hover:ring-white/30 group-focus-within:ring-white/40'
 
 /** An album: click opens it, the round button plays it. */
 export function AlbumCard({
@@ -144,7 +144,7 @@ export function AlbumCard({
         onClick={() => void play(false)}
         aria-label={t('Play album {name}', { name: album.name })}
         title={t('Play')}
-        className="absolute bottom-[3.6rem] right-2 flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-[var(--color-accent-strong)] pl-0.5 text-white opacity-0 shadow-[0_0_26px_var(--glow)] ring-1 ring-white/30 transition duration-200 hover:scale-110 focus-visible:translate-y-0 focus-visible:opacity-100 group-hover:translate-y-0 group-hover:opacity-100 disabled:opacity-60"
+        className="absolute bottom-[3.6rem] right-2 flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-white pl-0.5 text-black opacity-0 shadow-[0_6px_20px_-4px_rgba(0,0,0,0.6)] transition duration-200 hover:scale-110 focus-visible:translate-y-0 focus-visible:opacity-100 group-hover:translate-y-0 group-hover:opacity-100 disabled:opacity-60"
       >
         <PlayIcon />
       </button>

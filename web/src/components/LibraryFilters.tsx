@@ -8,6 +8,7 @@ import {
   type Quality,
 } from '../core'
 import { t } from '../i18n'
+import { FilterIcon } from './icons'
 import type { AsyncState } from './useAsync'
 
 const QUALITY_LABEL: Record<Quality, string> = { uhd: '4K', hd: 'HD' }
@@ -18,11 +19,12 @@ export function FiltersButton({ filters, open, onToggle }: { filters: AdvancedFi
   return (
     <button
       type="button"
-      className={`btn whitespace-nowrap ${active > 0 ? 'border-[var(--color-accent)]/50' : ''}`}
+      className={`btn shrink-0 whitespace-nowrap ${active > 0 || open ? 'border-[var(--color-accent)]/60 bg-[var(--color-accent)]/10' : ''}`}
       aria-expanded={open}
       aria-controls="library-filters"
       onClick={onToggle}
     >
+      <FilterIcon />
       {t('More filters')}
       {active > 0 && (
         <span className="rounded-full bg-[var(--color-accent-strong)] px-1.5 text-xs font-semibold text-[var(--color-accent-ink)]" title={t('{count} filters on', { count: active })}>
@@ -61,7 +63,7 @@ export function FiltersPanel({
   }
   const active = countActiveFilters(filters)
   return (
-    <div id="library-filters" role="group" aria-label={t('More filters')} className="mb-5 rounded-2xl border border-white/10 bg-white/[.03] p-4">
+    <div id="library-filters" role="group" aria-label={t('More filters')} className="mb-4 rounded-2xl border border-white/10 bg-white/[.03] p-4">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {offered.decades.length > 0 && (
           <Field label={t('Decade')}>

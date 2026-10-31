@@ -55,7 +55,7 @@ export function AdminPage({ session, onBack }: { session: Session; onBack: () =>
       )}
       {status === 'yes' && (
         <>
-          <div role="tablist" aria-label={t('Administration')} className="-mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1">
+          <div role="tablist" aria-label={t('Administration')} className="no-scrollbar -mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1">
             {TABS.map((id) => (
               <button
                 key={id}

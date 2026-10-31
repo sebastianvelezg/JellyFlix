@@ -43,7 +43,6 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Glow
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import app.jellyflix.tv.R
@@ -158,11 +157,10 @@ fun MediaCard(
                     if (it.hasFocus) onFocused(item.id)
                 },
             shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-            scale = CardDefaults.scale(focusedScale = 1.08f),
+            scale = CardDefaults.scale(focusedScale = 1.06f),
             border = CardDefaults.border(
                 focusedBorder = Border(BorderStroke(3.dp, Palette.Accent), shape = RoundedCornerShape(12.dp)),
             ),
-            glow = CardDefaults.glow(focusedGlow = Glow(elevationColor = Palette.Accent.copy(alpha = 0.45f), elevation = 18.dp)),
         ) {
             Box(Modifier.fillMaxSize().background(if (contain) Color(0xFF34343A) else Palette.Surface)) {
                 val image = if (landscape) item.landscapeUrl else item.posterUrl
@@ -201,17 +199,20 @@ fun MediaCard(
                 }
             }
         }
-        // A long title is cut with an ellipsis, but scrolls by itself while the card has the remote so it can be read whole.
-        Text(
-            title,
-            color = Color.White,
-            maxLines = 1,
-            overflow = if (focused) TextOverflow.Clip else TextOverflow.Ellipsis,
-            fontSize = 15.sp,
-            modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 500) else Modifier,
-        )
-        subtitle?.let {
-            Text(it, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
+        // (A channel is only known by its name: its card keeps it whatever is chosen.)
+        if (Posters.titles || contain) {
+            // A long title is cut with an ellipsis, but scrolls by itself while the card has the remote so it can be read whole.
+            Text(
+                title,
+                color = Color.White,
+                maxLines = 1,
+                overflow = if (focused) TextOverflow.Clip else TextOverflow.Ellipsis,
+                fontSize = 15.sp,
+                modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 500) else Modifier,
+            )
+            subtitle?.let {
+                Text(it, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
+            }
         }
     }
 }
@@ -361,9 +362,8 @@ fun CoverCard(
                     if (it.hasFocus) onFocused(id)
                 },
             shape = CardDefaults.shape(shape),
-            scale = CardDefaults.scale(focusedScale = 1.08f),
+            scale = CardDefaults.scale(focusedScale = 1.06f),
             border = CardDefaults.border(focusedBorder = Border(BorderStroke(3.dp, Palette.Accent), shape = shape)),
-            glow = CardDefaults.glow(focusedGlow = Glow(elevationColor = Palette.Accent.copy(alpha = 0.45f), elevation = 18.dp)),
         ) {
             Box(Modifier.fillMaxSize().background(Palette.Surface)) {
                 if (imageUrl == null) {

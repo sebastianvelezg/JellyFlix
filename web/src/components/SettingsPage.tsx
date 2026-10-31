@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { authorizeQuickConnect, CLIENT_VERSION, languageName, type Session } from '../core'
 import {
   clearBrowsePrefs,
@@ -6,15 +6,23 @@ import {
   countSeriesPrefs,
   COUNTDOWN_CHOICES,
   CROSSFADE_CHOICES,
+  CONVERTIBLE_AUDIO,
   QUALITY_CHOICES,
   readPlayerPrefs,
   readUiPrefs,
   writePlayerPrefs,
   writeUiPrefs,
+  SKIP_ACTIONS,
+  SKIP_KINDS,
+  TIME_LABELS,
+  type ConvertibleAudio,
+  type SkipAction,
+  type SkipKind,
   type SubtitleSize,
+  type TimeLabel,
 } from '../platform/web/prefs'
 import { BackIcon } from './icons'
-import { LANGUAGES, t, type LanguageChoice } from '../i18n'
+import { LANGUAGES, t, tr, type LanguageChoice } from '../i18n'
 import { chooseLanguage } from './useLanguage'
 import { useInstallState } from '../platform/web/pwa'
 import { PluginsSettings } from './PluginsSettings'
@@ -23,6 +31,9 @@ import { AppearanceSettings } from './AppearanceSettings'
 import { SettingsBackup } from './SettingsBackup'
 import { openShortcuts } from './ShortcutsDialog'
 import { Card, Toggle } from './SettingsParts'
+import { KidsCard } from './KidsMode'
+import { openSetup } from './SetupWizard'
+import { SETTINGS_INDEX, searchSettings, type SettingEntry } from './settingsIndex'
 
 /** Putting the app on a phone, tablet or computer so it opens like any other app (its own window and icon, no browser bars). */
 function InstallApp() {
@@ -119,6 +130,160 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+const TIME_LABEL_TEXT: Record<TimeLabel, string> = {
+  elapsed: tr('Time played'),
+  remaining: tr('Time left'),
+  total: tr('Total length'),
+  endsAt: tr('Time it ends'),
+  none: tr('Nothing'),
+}
+const SKIP_KIND_TEXT: Record<SkipKind, string> = {
+  intro: tr('Skip intros'),
+  recap: tr('Skip recaps'),
+  outro: tr('Skip credits'),
+  preview: tr('Skip previews'),
+}
+const SKIP_ACTION_TEXT: Record<SkipAction, string> = {
+  ask: tr('Offer a button'),
+  auto: tr('Skip by itself'),
+  off: tr('Do nothing'),
+}
+const CONVERT_TEXT: Record<ConvertibleAudio, string> = {
+  ac3: tr('AC-3 (Dolby Digital)'),
+  eac3: tr('E-AC-3 (Dolby Digital Plus)'),
+  flac: tr('FLAC'),
+}
+
+type PlayerPrefsValue = ReturnType<typeof readPlayerPrefs>
+
+/** The bar of the video player, and what the player does on its own: skip buttons, scrubbing, converted sound. */
+function PlayerCard({ player, update }: { player: PlayerPrefsValue; update: (patch: Partial<PlayerPrefsValue>) => void }) {
+  const timeSelect = (id: string, label: string, value: TimeLabel, onChange: (value: TimeLabel) => void) => (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <label htmlFor={id} className="text-sm font-medium text-neutral-100">
+        {label}
+      </label>
+      <select id={id} className="select" value={value} onChange={(e) => onChange(e.target.value as TimeLabel)}>
+        {TIME_LABELS.map((kind) => (
+          <option key={kind} value={kind}>
+            {t(TIME_LABEL_TEXT[kind])}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+  return (
+    <Card title={t('Player')} description={t('The seek bar, the skip buttons and the sound.')}>
+      <Toggle
+        label={t('Chapter marks on the seek bar')}
+        hint={t('Draws where each chapter starts.')}
+        checked={player.chapterMarks}
+        onChange={(chapterMarks) => update({ chapterMarks })}
+      />
+      <Toggle
+        label={t('Pause while dragging the seek bar')}
+        hint={t('The picture waits until you let go.')}
+        checked={player.pauseWhileScrubbing}
+        onChange={(pauseWhileScrubbing) => update({ pauseWhileScrubbing })}
+      />
+      {timeSelect('time-left', t('Left of the seek bar'), player.timeLeft, (timeLeft) => update({ timeLeft }))}
+      {timeSelect('time-right', t('Right of the seek bar'), player.timeRight, (timeRight) => update({ timeRight }))}
+      {SKIP_KINDS.map((kind) => (
+        <div key={kind} className="flex flex-wrap items-center justify-between gap-3">
+          <label htmlFor={`skip-${kind}`} className="text-sm font-medium text-neutral-100">
+            {t(SKIP_KIND_TEXT[kind])}
+          </label>
+          <select
+            id={`skip-${kind}`}
+            className="select"
+            value={player.skipActions[kind]}
+            onChange={(e) => update({ skipActions: { ...player.skipActions, [kind]: e.target.value as SkipAction } })}
+          >
+            {SKIP_ACTIONS.map((action) => (
+              <option key={action} value={action}>
+                {t(SKIP_ACTION_TEXT[action])}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+      <p className="-mt-2 text-xs text-neutral-500">{t('Only titles whose server knows where the intro and the credits are get these buttons.')}</p>
+      <fieldset className="space-y-3">
+        <legend className="mb-1 text-sm font-medium text-neutral-100">{t('Have the server convert this sound')}</legend>
+        <p className="-mt-1 text-xs text-neutral-500">
+          {t('For a receiver that stays silent, or a film whose sound plays with the wrong channels. The picture is not touched.')}
+        </p>
+        {CONVERTIBLE_AUDIO.map((codec) => (
+          <Toggle
+            key={codec}
+            label={t(CONVERT_TEXT[codec])}
+            checked={player.convertAudio.includes(codec)}
+            onChange={(on) => update({ convertAudio: on ? [...player.convertAudio, codec] : player.convertAudio.filter((c) => c !== codec) })}
+          />
+        ))}
+      </fieldset>
+    </Card>
+  )
+}
+
+/** The element of the open tab that carries a setting's name, and the control next to it. */
+function findSetting(panel: HTMLElement, text: string): HTMLElement | null {
+  const named = [...panel.querySelectorAll<HTMLElement>('h2, legend, label, span, p, button')].find((n) => n.textContent?.trim() === text)
+  if (!named) return null
+  const scope = named.closest('label, fieldset') ?? named.closest('section') ?? named.parentElement
+  return scope?.querySelector<HTMLElement>('input, select, button, textarea') ?? named
+}
+
+/** A box above the tabs that finds a setting by what it is called, and takes you to it. */
+function SettingsSearch({ isAdmin, tabName, onPick }: { isAdmin: boolean; tabName: (tab: SettingEntry['tab']) => string; onPick: (entry: SettingEntry) => void }) {
+  const [query, setQuery] = useState('')
+  const listId = useId()
+  const entries = SETTINGS_INDEX.filter((e) => isAdmin || !e.admin)
+  const found = searchSettings(query, entries, (e) => t(e.label), tabName)
+  const pick = (entry: SettingEntry) => {
+    setQuery('')
+    onPick(entry)
+  }
+  return (
+    <div className="relative mb-4">
+      <label htmlFor={`${listId}-input`} className="sr-only">
+        {t('Search settings')}
+      </label>
+      <input
+        id={`${listId}-input`}
+        type="search"
+        className="field rounded-full"
+        placeholder={t('Search settings')}
+        autoComplete="off"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setQuery('')
+          if (e.key === 'Enter' && found[0]) pick(found[0])
+        }}
+      />
+      {query.trim() !== '' && (
+        <ul id={listId} aria-label={t('Matching settings')} className="mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface-2)]">
+          {found.length === 0 ? (
+            <li className="px-4 py-3 text-sm text-neutral-400" role="status">
+              {t('No setting has that name.')}
+            </li>
+          ) : (
+            found.map((entry) => (
+              <li key={`${entry.tab}:${entry.label}`}>
+                <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm text-neutral-100 transition hover:bg-white/[.08] focus-visible:bg-white/[.08] focus-visible:outline-none" onClick={() => pick(entry)}>
+                  <span>{t(entry.label)}</span>
+                  <span className="shrink-0 text-xs text-neutral-500">{tabName(entry.tab)}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 const TABS = ['general', 'appearance', 'playback', 'devices', 'plugins', 'about'] as const
 type Tab = (typeof TABS)[number]
 const TAB_LABEL: Record<Tab, string> = { general: 'General', appearance: 'Appearance', playback: 'Playback', devices: 'Devices', plugins: 'Plugins', about: 'About' }
@@ -146,6 +311,18 @@ export function SettingsPage({
   const [tab, setTab] = useState<Tab>('general')
   const isAdmin = useIsAdmin(session)
   const tabButtons = useRef<Record<string, HTMLButtonElement | null>>({})
+  // A setting found by the search: the tab it is in opens, and then the page goes to it.
+  const jump = useRef<SettingEntry | null>(null)
+  const [jumpCount, setJumpCount] = useState(0)
+  useEffect(() => {
+    const entry = jump.current
+    if (!entry) return
+    jump.current = null
+    const panel = document.getElementById('settings-panel')
+    const target = panel ? findSetting(panel, t(entry.label)) : null
+    target?.scrollIntoView({ block: 'center' })
+    target?.focus({ preventScroll: true })
+  }, [jumpCount])
   // Left and Right move between the tabs, as in any tab list.
   const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
@@ -170,7 +347,17 @@ export function SettingsPage({
       </button>
       <h1 className="mb-6 text-3xl font-bold tracking-tight sm:text-4xl">{t('Settings')}</h1>
 
-      <div role="tablist" aria-label={t('Settings')} className="-mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1">
+      <SettingsSearch
+        isAdmin={isAdmin}
+        tabName={(id) => t(TAB_LABEL[id])}
+        onPick={(entry) => {
+          setTab(entry.tab)
+          jump.current = entry
+          setJumpCount((n) => n + 1)
+        }}
+      />
+
+      <div role="tablist" aria-label={t('Settings')} className="no-scrollbar -mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1">
         {TABS.map((id) => (
           <button
             key={id}
@@ -264,6 +451,8 @@ export function SettingsPage({
           </div>
         </Card>
 
+        <KidsCard session={session} />
+
         <Card title={t('Install')} description={t('Add Jellyflix to the home screen or desktop of this device.')}>
           <InstallApp />
         </Card>
@@ -349,6 +538,8 @@ export function SettingsPage({
           </p>
         </Card>
 
+        <PlayerCard player={player} update={updatePlayer} />
+
         <Card title={t('Music')} description={t('How songs follow each other.')}>
           <Toggle
             label={t('Gapless playback')}
@@ -390,6 +581,12 @@ export function SettingsPage({
         </>)}
         {tab === 'plugins' && <PluginsSettings session={session} />}
         {tab === 'about' && (<>
+        <Card title={t('Set up again')} description={t('The first questions once more: the language, the look and the subtitles.')}>
+          <button type="button" className="btn" onClick={openSetup}>
+            {t('Run the setup again')}
+          </button>
+        </Card>
+
         <Card title={t('Saved on this device')} description={t('Small preferences that make the app feel familiar. Clearing them never touches your server.')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-neutral-100">

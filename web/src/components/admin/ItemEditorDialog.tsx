@@ -131,7 +131,7 @@ export function ItemEditorDialog({ session }: { session: Session }) {
           </div>
         )}
 
-        <div role="tablist" aria-label={t('Edit {name}', { name: target?.name ?? '' })} className="-mx-1 mt-4 flex gap-1 overflow-x-auto px-1 pb-1">
+        <div role="tablist" aria-label={t('Edit {name}', { name: target?.name ?? '' })} className="no-scrollbar -mx-1 mt-4 flex gap-1 overflow-x-auto px-1 pb-1">
           {tabs.map((id) => (
             <button
               key={id}

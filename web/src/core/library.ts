@@ -49,6 +49,8 @@ export interface Movie {
   resumeTicks: number
   played: boolean
   favorite: boolean
+  /** Your own rating: true you liked it, false you did not, not set when you have not said. */
+  liked?: boolean
   /** True for a series (its page lists seasons and episodes instead of playing directly). */
   isSeries?: boolean
   /** Series only: episodes not watched yet. */
@@ -126,6 +128,7 @@ export function toMovie(dto: BaseItemDto): Movie | null {
     resumeTicks: resume >= MIN_RESUME_TICKS ? resume : 0,
     played: dto.UserData?.Played ?? false,
     favorite: dto.UserData?.IsFavorite ?? false,
+    liked: dto.UserData?.Likes ?? undefined,
     isSeries: dto.Type === BaseItemKind.Series ? true : undefined,
     unwatchedCount: dto.Type === BaseItemKind.Series ? (dto.UserData?.UnplayedItemCount ?? undefined) : undefined,
     lastPlayedAt: toTime(dto.UserData?.LastPlayedDate),
@@ -143,7 +146,7 @@ export function toMovies(items: BaseItemDto[] | null | undefined): Movie[] {
 // ---- browsing -------------------------------------------------------------------------------
 
 export type SortKey = 'title' | 'added' | 'released' | 'rating'
-export type WatchFilter = 'all' | 'unwatched' | 'watched' | 'favorites'
+export type WatchFilter = 'all' | 'unwatched' | 'watched' | 'favorites' | 'liked' | 'disliked'
 
 export const SORT_LABELS: Record<SortKey, string> = {
   title: 'Title (A–Z)',
@@ -157,6 +160,8 @@ export const FILTER_LABELS: Record<WatchFilter, string> = {
   unwatched: 'Unwatched',
   watched: 'Watched',
   favorites: 'Favorites',
+  liked: 'Liked by me',
+  disliked: 'Disliked by me',
 }
 
 export interface BrowseOptions {
@@ -189,6 +194,8 @@ const FILTERS: Record<WatchFilter, ItemFilter[] | undefined> = {
   unwatched: [ItemFilter.IsUnplayed],
   watched: [ItemFilter.IsPlayed],
   favorites: [ItemFilter.IsFavorite],
+  liked: [ItemFilter.Likes],
+  disliked: [ItemFilter.Dislikes],
 }
 
 export async function getLibrarySections(session: Session): Promise<LibrarySections> {

@@ -23,6 +23,7 @@ import { PagedView } from './PagedView'
 import { DetailsSkeleton, TitleHero } from './TitleParts'
 import { swrKey, swrScope, useSwr } from './useSwr'
 import { t } from '../i18n'
+import { ToolbarSelect } from './Toolbar'
 
 const GRID = 'poster-grid'
 
@@ -56,7 +57,7 @@ export function CollectionsPage({
           <BackIcon /> {t('Back')}
         </button>
         <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl">
-          <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
+          <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)]" />
           {t('Collections')}
         </h1>
         <div className="ml-auto flex w-full gap-2 sm:w-auto">
@@ -66,20 +67,15 @@ export function CollectionsPage({
             placeholder={t('Search collections')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="field w-full rounded-full sm:w-64"
+            className="field w-full min-w-0 rounded-full sm:w-64"
           />
-          <select
-            className="select"
-            aria-label={t('Sort by')}
-            value={sort}
-            onChange={(e) => setSort(e.target.value as CollectionSort)}
-          >
+          <ToolbarSelect label={t('Sort by')} prefix={t('Sort')} value={sort} onChange={(v) => setSort(v as CollectionSort)}>
             {(Object.keys(COLLECTION_SORT_LABELS) as Array<keyof typeof COLLECTION_SORT_LABELS>).map((k) => (
               <option key={k} value={k}>
                 {t(COLLECTION_SORT_LABELS[k])}
               </option>
             ))}
-          </select>
+          </ToolbarSelect>
         </div>
       </div>
       <PagedView
@@ -242,7 +238,7 @@ function CollectionContent({
 
       <section aria-label={t('In this collection')} className="mt-10">
         <h2 className="mb-4 flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
-          <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
+          <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)]" />
           {t('In this collection')}
         </h2>
         {loading && (

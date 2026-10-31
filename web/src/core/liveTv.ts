@@ -123,18 +123,44 @@ export interface ChannelPage {
   total: number
 }
 
+/** The ways the channels can be narrowed: the server tells a channel's kind from what it broadcasts, favourites are the account's own. */
+export const CHANNEL_CATEGORIES = ['all', 'favorites', 'movies', 'series', 'sports', 'news', 'kids'] as const
+export type ChannelCategory = (typeof CHANNEL_CATEGORIES)[number]
+
+export const isChannelCategory = (value: unknown): value is ChannelCategory => CHANNEL_CATEGORIES.includes(value as ChannelCategory)
+
+/** The filter the server takes for a category (nothing for "all"). */
+export function categoryFilter(category: ChannelCategory): { isFavorite?: true; isMovie?: true; isSeries?: true; isSports?: true; isNews?: true; isKids?: true } {
+  switch (category) {
+    case 'favorites':
+      return { isFavorite: true }
+    case 'movies':
+      return { isMovie: true }
+    case 'series':
+      return { isSeries: true }
+    case 'sports':
+      return { isSports: true }
+    case 'news':
+      return { isNews: true }
+    case 'kids':
+      return { isKids: true }
+    default:
+      return {}
+  }
+}
+
 export const CHANNEL_PAGE_SIZE = 60
 
 /** Looking for a channel reads this many (the server cannot search them), which is more than any list has. */
 export const CHANNEL_SEARCH_LIMIT = 2000
 
 /** One page of the user's channels in the order the server keeps them, each with what is on now. */
-export async function getChannels(session: Session, opts: { startIndex?: number; limit?: number; favorites?: boolean } = {}): Promise<ChannelPage> {
+export async function getChannels(session: Session, opts: { startIndex?: number; limit?: number; category?: ChannelCategory } = {}): Promise<ChannelPage> {
   const { data } = await getLiveTvApi(session.api).getLiveTvChannels({
     userId: session.userId,
     startIndex: opts.startIndex ?? 0,
     limit: opts.limit ?? CHANNEL_PAGE_SIZE,
-    isFavorite: opts.favorites ? true : undefined,
+    ...categoryFilter(opts.category ?? 'all'),
     addCurrentProgram: true,
     enableUserData: true,
     enableImages: true,

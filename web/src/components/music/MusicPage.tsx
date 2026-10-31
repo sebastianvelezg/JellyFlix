@@ -42,6 +42,7 @@ import {
   TrackList,
 } from './parts'
 import { t, tr } from '../../i18n'
+import { Toolbar, ToolbarSelect } from '../Toolbar'
 
 const TABS: Array<[MusicTab, string]> = [
   ['home', tr('Home')],
@@ -83,7 +84,7 @@ export function MusicPage({
     <div className="pt-6">
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl">
-          <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
+          <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)]" />
           {t('Music')}
         </h1>
         <button
@@ -111,7 +112,7 @@ export function MusicPage({
             onClick={() => onTab(id)}
             className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition pointer-coarse:py-3 ${
               id === tab
-                ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white shadow-[0_0_18px_-6px_var(--glow)]'
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white'
                 : 'border-white/10 bg-white/[.04] text-neutral-300 hover:border-white/25 hover:text-white'
             }`}
           >
@@ -239,7 +240,7 @@ function SongSection({ title, children }: { title: string; children: ReactNode }
   return (
     <section aria-label={title}>
       <h2 className="mb-2 flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
-        <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
+        <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)]" />
         {title}
       </h2>
       {children}
@@ -251,26 +252,25 @@ function SongSection({ title, children }: { title: string; children: ReactNode }
 
 function Select<T extends string>({
   label,
+  prefix,
   value,
   options,
   onChange,
 }: {
   label: string
+  prefix?: string
   value: T
   options: Array<[T, string]>
   onChange: (value: T) => void
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-xs text-neutral-400">
-      <span className="sr-only">{label}</span>
-      <select className="select w-full sm:w-auto" aria-label={label} value={value} onChange={(e) => onChange(e.target.value as T)}>
-        {options.map(([v, text]) => (
-          <option key={v} value={v}>
-            {text}
-          </option>
-        ))}
-      </select>
-    </label>
+    <ToolbarSelect label={label} prefix={prefix} value={value} onChange={(v) => onChange(v as T)}>
+      {options.map(([v, text]) => (
+        <option key={v} value={v}>
+          {text}
+        </option>
+      ))}
+    </ToolbarSelect>
   )
 }
 
@@ -297,14 +297,11 @@ function SearchField({ label, value, onChange }: { label: string; value: string;
       placeholder={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="field w-full rounded-full sm:w-64"
+      className="field w-64 max-w-full shrink-0 rounded-full"
     />
   )
 }
 
-const Toolbar = ({ children }: { children: ReactNode }) => (
-  <div className="mb-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">{children}</div>
-)
 
 // ---- albums, artists, songs, playlists -------------------------------------------------------------------------------
 
@@ -319,7 +316,7 @@ function Albums({ session, libraryId, onOpenAlbum, onOpenArtist }: { session: Se
   )
   return (
     <section aria-label={t('All albums')}>
-      <Toolbar>
+      <Toolbar className="mb-5">
         <Select label={t('Show')} value={filter} options={FILTERS} onChange={setFilter} />
         {genres.status === 'ready' && genres.data.length > 0 && (
           <Select
@@ -329,7 +326,7 @@ function Albums({ session, libraryId, onOpenAlbum, onOpenArtist }: { session: Se
             onChange={setGenre}
           />
         )}
-        <Select label={t('Sort by')} value={sort} options={Object.entries(ALBUM_SORT_LABELS) as Array<[AlbumSort, string]>} onChange={setSort} />
+        <Select label={t('Sort by')} prefix={t('Sort')} value={sort} options={Object.entries(ALBUM_SORT_LABELS) as Array<[AlbumSort, string]>} onChange={setSort} />
       </Toolbar>
       <PagedView
         key={`${sort}|${filter}|${genre}`}
@@ -359,10 +356,10 @@ function Artists({ session, libraryId, onOpenArtist }: { session: Session; libra
   )
   return (
     <section aria-label={t('All artists')}>
-      <Toolbar>
+      <Toolbar className="mb-5">
         <SearchField label={t('Search artists')} value={search} onChange={setSearch} />
         <Select label={t('Show')} value={filter} options={FILTERS} onChange={setFilter} />
-        <Select label={t('Sort by')} value={sort} options={Object.entries(ARTIST_SORT_LABELS) as Array<[ArtistSort, string]>} onChange={setSort} />
+        <Select label={t('Sort by')} prefix={t('Sort')} value={sort} options={Object.entries(ARTIST_SORT_LABELS) as Array<[ArtistSort, string]>} onChange={setSort} />
       </Toolbar>
       <PagedView
         key={`${sort}|${filter}|${term}`}
@@ -391,10 +388,10 @@ function Songs({ session, libraryId, onOpenAlbum }: { session: Session; libraryI
   )
   return (
     <section aria-label={t('All songs')}>
-      <Toolbar>
+      <Toolbar className="mb-5">
         <SearchField label={t('Search songs')} value={search} onChange={setSearch} />
         <Select label={t('Show')} value={filter} options={FILTERS} onChange={setFilter} />
-        <Select label={t('Sort by')} value={sort} options={Object.entries(TRACK_SORT_LABELS) as Array<[TrackSort, string]>} onChange={setSort} />
+        <Select label={t('Sort by')} prefix={t('Sort')} value={sort} options={Object.entries(TRACK_SORT_LABELS) as Array<[TrackSort, string]>} onChange={setSort} />
       </Toolbar>
       <PagedView
         key={`${sort}|${filter}|${term}`}

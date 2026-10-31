@@ -35,6 +35,9 @@ test('the app opens before the server has confirmed the saved session, and an ex
   mock.setDelay(3000)
   await page.reload()
   await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible({ timeout: 1500 })
+  // The slow answers of this page must have arrived before the token is taken away; otherwise one of them can be refused while the page
+  // is leaving, end the session in the tab's storage, and the next page opens signed out without the notice.
+  await page.waitForLoadState('networkidle')
 
   mock.tokens.clear() // the server now refuses the saved token
   mock.setDelay(0)

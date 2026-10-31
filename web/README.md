@@ -177,7 +177,7 @@ npm run serve        # serves them on port 8080, for every device on your networ
 Run `npm ci && npm run build` and copy the **contents of `dist/`** (or the `jellyflix-web-<version>.zip` of a release) to the folder your nginx, Apache, Caddy or IIS serves. It works from the root of a site or from a sub-folder
 (the file addresses are relative and the pages live after a `#`, so no rewrite rules are needed). To pre-fill the Jellyfin address edit `config.js` in that folder:
 `window.JELLYFLIX_CONFIG = { serverUrl: 'http://192.168.x.x:8096' }`. Cache `assets/` for a long time (the file names carry a hash) but not `index.html`, `config.js` or `sw.js`.
-`docker/nginx.conf` is a complete nginx example.
+`docker/nginx.conf` is a complete nginx example. The Docker image and `npm run serve` send a strict `Content-Security-Policy` (the text is in `scripts/csp.mjs`): the app runs only its own scripts. If you serve the files some other way, send the same header (it is a good idea, not a requirement), and keep the `<script>` files next to `index.html` (`paint.js`, `config.js`) since nothing inline is allowed.
 
 ### HTTPS, CORS and reverse proxies
 

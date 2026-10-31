@@ -22,6 +22,14 @@ function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: Reac
   )
 }
 
+export const PeopleIcon = () => (
+  <Icon>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+    <path d="M16 4.9a3.2 3.2 0 0 1 0 6.2M18 14.4c1.8.8 3 2.6 3 5.6" />
+  </Icon>
+)
+
 export const PlayIcon = () => (
   <Icon fill="currentColor" stroke="none">
     <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" />
@@ -110,6 +118,21 @@ export const HeartIcon = ({ filled = false }: { filled?: boolean }) => (
     <path d="M12 20s-7-4.4-9.2-9A5.3 5.3 0 0 1 12 6a5.3 5.3 0 0 1 9.2 5c-2.2 4.6-9.2 9-9.2 9z" />
   </Icon>
 )
+export const ExternalIcon = () => (
+  <Icon width={18} height={18}>
+    <path d="M14 4h6v6M20 4 10 14" />
+    <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+  </Icon>
+)
+/** A thumb up (liked), or turned over (not liked). */
+export const ThumbIcon = ({ down = false }: { down?: boolean }) => (
+  <Icon width={20} height={20}>
+    <g transform={down ? 'rotate(180 12 12)' : undefined}>
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+    </g>
+  </Icon>
+)
 export const CheckIcon = () => (
   <Icon width={20} height={20}>
     <path d="m5 12.5 4.5 4.5L19 7.5" />
@@ -151,6 +174,12 @@ export const RestartIcon = () => (
 export const ShuffleIcon = () => (
   <Icon width={18} height={18}>
     <path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+  </Icon>
+)
+
+export const FilterIcon = () => (
+  <Icon width={16} height={16}>
+    <path d="M3 5h18M6.5 12h11M10 19h4" />
   </Icon>
 )
 

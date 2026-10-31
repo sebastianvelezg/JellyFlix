@@ -76,7 +76,7 @@ test('quality: a lower limit makes the server convert the video, says why, and i
   await signIn(page, mock, { keep: true })
   await page.goto('/#/play/m0001')
   await waitPlaying(page)
-  let dialog = await openSettings(page)
+  let dialog = await openSettings(page, 'Quality')
   await expect(dialog.getByRole('radio', { name: 'Original quality' })).toBeChecked()
   await expect(dialog.getByRole('status', { name: 'How this is playing' })).toContainText('nothing is converted')
 
@@ -85,7 +85,7 @@ test('quality: a lower limit makes the server convert the video, says why, and i
   const asked = mock.requests.filter((r) => r.method === 'POST' && r.path === '/Items/m0001/PlaybackInfo')
   expect((asked.at(-1)?.body as { MaxStreamingBitrate?: number }).MaxStreamingBitrate).toBe(8_000_000)
   expect(mock.requests.some((r) => r.path === '/videos/m0001/master.m3u8')).toBe(true) // now a transcode
-  dialog = await openSettings(page)
+  dialog = await openSettings(page, 'Quality')
   await expect(dialog.getByRole('radio', { name: 'Up to 8 Mbps' })).toBeChecked()
   await expect(dialog.getByRole('status', { name: 'How this is playing' })).toContainText('The server is converting this video.')
   await expect(dialog.getByRole('status', { name: 'How this is playing' })).toContainText('The file is above your quality limit')
@@ -97,10 +97,10 @@ test('quality: a lower limit makes the server convert the video, says why, and i
   expect((second.at(-1)?.body as { MaxStreamingBitrate?: number }).MaxStreamingBitrate).toBe(8_000_000)
 
   // Back to the original quality.
-  dialog = await openSettings(page)
+  dialog = await openSettings(page, 'Quality')
   await dialog.getByRole('radio', { name: 'Original quality' }).click({ force: true })
   await waitPlaying(page)
-  dialog = await openSettings(page)
+  dialog = await openSettings(page, 'Quality')
   await expect(dialog.getByRole('status', { name: 'How this is playing' })).toContainText('nothing is converted')
   expect(await video(page).evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0)
 })

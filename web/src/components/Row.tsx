@@ -20,7 +20,7 @@ export function Row({ title, action, children }: { title: string; /** Something 
   return (
     <section aria-label={title} className="group/row relative">
       <h2 className="mb-1 flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
-        <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
+        <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)]" />
         {title}
         {action && (
           <span className="ml-auto text-sm font-medium [&_button]:pointer-coarse:-my-3 [&_button]:pointer-coarse:px-2 [&_button]:pointer-coarse:py-3">

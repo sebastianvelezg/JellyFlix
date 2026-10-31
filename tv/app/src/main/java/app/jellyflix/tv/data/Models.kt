@@ -49,6 +49,8 @@ data class MediaItem(
     val runtimeMs: Long? = null,
     /** A music video: the folder it is in, whose other videos follow it when it is played on its own. */
     val parentId: UUID? = null,
+    /** My rating: true is a thumb up, false a thumb down, null none. */
+    val likes: Boolean? = null,
 ) {
     val isPlayable get() = kind == BaseItemKind.MOVIE || kind == BaseItemKind.EPISODE || kind == BaseItemKind.MUSIC_VIDEO || kind == BaseItemKind.TV_CHANNEL
 

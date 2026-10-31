@@ -87,4 +87,13 @@ class LiveTvTest {
         assertFalse(only.isEmpty)
         assertFalse(only.hasTitles)
     }
+
+    @Test
+    fun `a category is found by its key and anything unknown is all of them`() {
+        assertEquals(ChannelCategory.Sports, ChannelCategory.of("sports"))
+        assertEquals(ChannelCategory.Favorites, ChannelCategory.of("favorites"))
+        assertEquals(ChannelCategory.All, ChannelCategory.of("weather"))
+        assertEquals(ChannelCategory.All, ChannelCategory.of(null))
+        assertEquals(ChannelCategory.values().size, ChannelCategory.values().map { it.key }.toSet().size)
+    }
 }

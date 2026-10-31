@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { findWatchLater, getPlaylistEntries, getVideoPlaylists, isEpisode, isWatchLater, type Movie, type Session } from '../core'
 import { t } from '../i18n'
-import { ListCard } from './ListsPage'
+import { ListCard } from './ListCard'
 import { RowCard } from './MovieCard'
 import { usePlaylistsVersion } from './playlistEvents'
 import { Row } from './Row'

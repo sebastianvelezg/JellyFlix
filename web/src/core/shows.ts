@@ -140,6 +140,8 @@ export interface NextUpQuery {
   limit?: number
   /** Include episodes that are already partly watched (they are also in "Continue watching"). */
   includeInProgress?: boolean
+  /** Leave out a series whose last watched episode is older than this many days (0 or not set: as far back as the server goes). */
+  days?: number
 }
 
 /** "Next up": for each series you have started, the next episode you have not watched. */
@@ -151,6 +153,7 @@ export async function getNextUp(session: Session, query: NextUpQuery = {}): Prom
     limit: query.limit ?? 16,
     fields: EPISODE_FIELDS,
     enableResumable: query.includeInProgress ?? false,
+    nextUpDateCutoff: query.days && query.days > 0 ? new Date(Date.now() - query.days * 86_400_000).toISOString() : undefined,
     enableUserData: true,
     enableImages: true,
     imageTypeLimit: 1,

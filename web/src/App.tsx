@@ -11,19 +11,25 @@ import { AddToPlaylistDialog } from './components/AddToPlaylistDialog'
 import { AdminTools } from './components/admin/AdminTools'
 import { clearActivity } from './platform/web/adminActivity'
 import { useAppearance } from './platform/web/appearance'
+import { restoreKids, useKids } from './platform/web/kids'
+import { KidsExitDialog } from './components/KidsMode'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
+import { SetupWizard } from './components/SetupWizard'
 import { Toaster } from './components/toast'
 import { HomePage } from './components/HomePage'
 import { BottomNav, Header, type NavTab } from './components/Header'
 import { MiniPlayer } from './components/music/MiniPlayer'
 import { RemoteProvider } from './components/remote/RemoteProvider'
+import { SyncPlayProvider, useSyncPlay } from './components/syncplay/SyncPlayProvider'
+import { TogetherButton } from './components/syncplay/TogetherDialog'
 import { MusicProvider, useMusic, useMusicState } from './components/music/MusicProvider'
 import { OfflineBanner } from './components/OfflineBanner'
 import { PersonPage } from './components/PersonPage'
 import { formatRoute, useRoute, type MusicTab, type Navigate, type PlayQueueRef, type PlayRoute, type Route } from './components/route'
 import { CloseIcon } from './components/icons'
 import { DockNotice, DOCK_BUTTON } from './components/player/dock'
-import { readPlayerPrefs, writePlayerPrefs } from './platform/web/prefs'
+import { readPlayerPrefs, writePlayerPrefs, writeUiPrefs } from './platform/web/prefs'
+import { clearRecentSearches } from './platform/web/recentSearches'
 import { SearchPage } from './components/SearchPage'
 import { useLanguage } from './components/useLanguage'
 import { clearSwr, swrKey, swrScope, useSwr } from './components/useSwr'
@@ -87,6 +93,12 @@ function PageLoading() {
 
 const EXPIRED = tr('Your session expired or was signed out elsewhere. Please sign in again.')
 
+/** What this browser remembers about the person who used it (the searches, the last channel), so the next account does not see it. */
+function forgetTraces(): void {
+  clearRecentSearches()
+  writeUiPrefs({ lastChannel: null })
+}
+
 /**
  * Top-level state: restoring a saved session, signed out (connection form) or signed in
  * (header + browse / title pages, with the player layered on top). The section home pages stay
@@ -107,6 +119,7 @@ export default function App() {
     void webSessionStore.clear()
     clearSwr()
     clearActivity()
+    forgetTraces()
     setSession(null)
     setNotice(t(EXPIRED))
     setOverrides({})
@@ -187,6 +200,7 @@ export default function App() {
     setOverrides({})
     clearSwr()
     clearActivity()
+    forgetTraces()
     navigate({ page: 'home' }, { replace: true })
     await webSessionStore.clear()
     if (current) await logout(current)
@@ -224,6 +238,7 @@ export default function App() {
   return (
     <MusicProvider session={session}>
       <RemoteProvider session={session} go={go}>
+      <SyncPlayProvider session={session} go={go}>
       <Shell
         key={language}
         session={session}
@@ -235,6 +250,7 @@ export default function App() {
         playbackVersion={playbackVersion}
         onSignOut={() => void signOut()}
       />
+      </SyncPlayProvider>
       </RemoteProvider>
     </MusicProvider>
   )
@@ -262,7 +278,7 @@ function routeKeyForFocus(route: Route): string {
 function Shell({
   session,
   route,
-  go,
+  go: goNow,
   back,
   overrides,
   setOverrides,
@@ -278,10 +294,20 @@ function Shell({
   playbackVersion: number
   onSignOut: () => void
 }) {
+  // In a group of people watching together, playing a title is asking the group to (every player opens it, together).
+  const together = useSyncPlay()
+  const interceptPlay = together?.interceptPlay
+  const go = useCallback<Navigate>((to, options) => (interceptPlay?.(to) ? undefined : goNow(to, options)), [goNow, interceptPlay])
   const loadSections = useCallback(() => getLibrarySections(session), [session])
   // The list of libraries is remembered, so the page can start loading its rows without waiting for it.
   const { state: sections, retry: retrySections } = useSwr(swrKey(swrScope(session), 'sections'), loadSections, { fresh: 60_000 })
-  const available = sections.status === 'ready' ? SECTIONS.filter((x) => sections.data[x].length > 0) : []
+  // Kids mode: no Live TV (a channel has no age rating), and the settings pages are shut (see below).
+  const kids = useKids()
+  const [leavingKids, setLeavingKids] = useState(false)
+  useEffect(() => {
+    restoreKids(session)
+  }, [session])
+  const available = sections.status === 'ready' ? SECTIONS.filter((x) => sections.data[x].length > 0 && !(kids.enabled && x === 'livetv')) : []
   // The main page is only worth having when there is more than one section to mix.
   const hasHome = available.length >= 2
   const { menu } = useAppearance()
@@ -316,6 +342,13 @@ function Shell({
   const sectionRoute = (section: Section): Route =>
     section === 'movies' ? { page: 'browse' } : section === 'music' ? { page: 'music', tab: 'home' } : { page: 'section', section }
   const homeRoute: Route = hasHome || !firstSection ? { page: 'home' } : sectionRoute(firstSection)
+  // In Kids mode a link to Settings, Administration, the stats or Live TV lands on the home page instead.
+  const shutInKids =
+    kids.enabled && (route.page === 'settings' || route.page === 'admin' || route.page === 'stats' || route.page === 'live' || (route.page === 'section' && route.section === 'livetv'))
+  useEffect(() => {
+    if (shutInKids) go(homeRoute, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shutInKids])
   const noMovies = sections.status === 'ready' && sections.data.movies.length === 0
   const onBrowse = route.page === 'browse'
   const onHome = route.page === 'home'
@@ -503,9 +536,12 @@ function Shell({
             : go(homeRoute, { replace: route.page === 'search' })
         }
         onHome={() => go(homeRoute)}
-        onSettings={() => go({ page: 'settings' })}
+        onSettings={() => (kids.enabled ? setLeavingKids(true) : go({ page: 'settings' }))}
+        together={kids.enabled ? undefined : <TogetherButton userName={session.userName} />}
         onSignOut={onSignOut}
+        kids={kids.enabled}
       />
+      <KidsExitDialog open={leavingKids} onClose={() => setLeavingKids(false)} />
       <OfflineBanner />
       <main ref={mainRef} id="main" tabIndex={-1} className={`gutter-x pt-[var(--header-h)] outline-none ${queued || barShown ? 'pb-[calc(10rem+var(--nav-h))]' : 'pb-[calc(5rem+var(--nav-h))]'}`}>
         {homeSeen && hasHome && sections.status === 'ready' && (
@@ -734,6 +770,7 @@ function Shell({
         )}
       </main>
       <ShortcutsDialog />
+      <SetupWizard suppressed={kids.enabled} />
       <AddToPlaylistDialog session={session} />
       <AdminTools session={session} />
       <Toaster />
@@ -941,6 +978,7 @@ function PlayerRoute({
       startAt={startAt}
       next={next}
       onNext={() => next && onNextEpisode(next)}
+      onPickEpisode={onNextEpisode}
       repeat={titles ? { enabled: loop, onChange: (on) => { setLoop(on); writePlayerPrefs({ repeatQueue: on }) } } : undefined}
       onExit={() => onExit(item)}
       mini={mini}

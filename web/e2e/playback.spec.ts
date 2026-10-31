@@ -82,11 +82,12 @@ test.describe('direct play', () => {
     expect(saved.volume).toBeLessThan(1)
 
     // Playback speed from the settings menu.
-    let settings = await openSettings(page)
+    let settings = await openSettings(page, 'Speed')
     await settings.getByLabel('1.5×').check()
     await expect(video(page)).toHaveJSProperty('playbackRate', 1.5)
     await settings.getByLabel('Normal').check()
     await expect(video(page)).toHaveJSProperty('playbackRate', 1)
+    settings = await openSettings(page, 'Subtitles')
 
     // Subtitles: fetched with the Authorization header and drawn in our own overlay, above the controls.
     await settings.getByLabel('English', { exact: true }).check()
@@ -94,6 +95,7 @@ test.describe('direct play', () => {
     const sub = mock.requests.find((r) => r.path === '/Videos/m0001/ms-m0001/Subtitles/3/Stream.vtt')
     expect(sub).toMatchObject({ auth: 'header', status: 200 })
     // Bigger text.
+    settings = await openSettings(page, 'Subtitle look')
     await settings.getByLabel('Large').check()
     await expect(page.getByTestId('subtitles')).toHaveClass(/text-2xl/)
     // Escape closes only the menu; "c" toggles subtitles off and on.
@@ -105,7 +107,7 @@ test.describe('direct play', () => {
     await expect(page.getByTestId('subtitles')).toBeEmpty()
     await page.keyboard.press('c')
     await expect(page.getByTestId('subtitles')).toContainText('Mock subtitle line')
-    settings = await openSettings(page)
+    settings = await openSettings(page, 'Subtitles')
     await settings.getByLabel('Off').check()
     await expect(page.getByTestId('subtitles')).toBeEmpty()
 
@@ -158,7 +160,7 @@ test.describe('direct play', () => {
     await start(page)
     await playMovie(page, 1)
     await waitPlaying(page)
-    const settings = await openSettings(page)
+    const settings = await openSettings(page, 'Subtitles')
     await settings.getByLabel('English', { exact: true }).check()
     await expect(page.getByTestId('subtitles')).toContainText('Mock subtitle line')
     await page.keyboard.press('Escape') // closes the menu
@@ -243,11 +245,13 @@ test.describe('HLS (server transcode) playback', () => {
     await expect.poll(() => currentTime(page), { timeout: 15_000 }).toBeGreaterThan(19)
 
     // Choose speed + subtitles, then switch audio: the client renegotiates and keeps position and choices.
-    const settings = await openSettings(page)
+    const settings = await openSettings(page, 'Speed')
     await settings.getByLabel('1.25×').check()
+    await openSettings(page, 'Subtitles')
     await settings.getByLabel('English', { exact: true }).check()
     await expect(page.getByTestId('subtitles')).toContainText('Mock subtitle line')
     const position = await currentTime(page)
+    await openSettings(page, 'Audio')
     await settings.getByLabel('Spanish · AAC Stereo').click() // the player rebuilds, so check()'s verification can't run
     await expect
       .poll(() => mock.requests.some((r) => r.path === '/videos/m0001/master.m3u8' && r.query.AudioStreamIndex === '2'))

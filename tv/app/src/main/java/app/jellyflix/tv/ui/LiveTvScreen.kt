@@ -41,6 +41,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import app.jellyflix.tv.AppViewModel
 import app.jellyflix.tv.R
+import app.jellyflix.tv.data.ChannelCategory
 import app.jellyflix.tv.data.TvChannel
 import app.jellyflix.tv.data.TvProgram
 import kotlinx.coroutines.delay
@@ -86,15 +87,42 @@ fun LiveTvScreen(vm: AppViewModel) {
                 modifier = Modifier.focusRequester(vm.contentEntry),
             )
             Pill(stringResource(R.string.live_guide), onClick = { vm.showGuide(true) }, selected = state.guide)
-            Pill(stringResource(R.string.live_favorites), onClick = { vm.toggleLiveFavorites() }, selected = state.favoritesOnly)
+            vm.lastChannel?.let { last -> Pill(stringResource(R.string.live_last, last.name), onClick = { vm.watchLast() }) }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ChannelCategory.values().forEach { category ->
+                Pill(stringResource(categoryLabel(category)), onClick = { vm.setLiveCategory(category) }, selected = state.category == category)
+            }
         }
         when {
             !state.loaded && state.loading -> Hint(stringResource(R.string.loading))
-            state.loaded && state.channels.isEmpty() -> Hint(stringResource(if (state.favoritesOnly) R.string.live_no_favorites else R.string.live_empty))
+            state.loaded && state.channels.isEmpty() -> Hint(
+                stringResource(
+                    when (state.category) {
+                        ChannelCategory.Favorites -> R.string.live_no_favorites
+                        ChannelCategory.All -> R.string.live_empty
+                        else -> R.string.live_empty_category
+                    },
+                ),
+            )
             state.guide -> GuideList(vm, now)
             else -> ChannelGrid(vm, now)
         }
     }
+}
+
+private fun categoryLabel(category: ChannelCategory): Int = when (category) {
+    ChannelCategory.All -> R.string.live_all
+    ChannelCategory.Favorites -> R.string.live_favorites
+    ChannelCategory.Movies -> R.string.live_movies
+    ChannelCategory.Series -> R.string.live_series
+    ChannelCategory.Sports -> R.string.live_sports
+    ChannelCategory.News -> R.string.live_news
+    ChannelCategory.Kids -> R.string.live_kids
 }
 
 @Composable

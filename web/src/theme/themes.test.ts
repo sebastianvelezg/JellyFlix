@@ -51,7 +51,7 @@ describe('themes', () => {
         }
         expect(contrastRatio(t.ink, t.strong), `${a.id} ink on fill`).toBeGreaterThanOrEqual(4.5)
         expect(contrastRatio(t.ink, t.deep), `${a.id} ink on deep`).toBeGreaterThanOrEqual(4.5)
-        expect(contrastRatio(t.ink, t.top), `${a.id} ink on top`).toBeGreaterThanOrEqual(3.5)
+        expect(contrastRatio(t.ink, t.top), `${a.id} ink on top`).toBeGreaterThanOrEqual(4.5)
       }
     }
   })

@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 const browserOnlyGlobals = ['window', 'document', 'localStorage', 'sessionStorage', 'location', 'navigator', 'history']
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'test-media', 'coverage', 'playwright-report', 'test-results'] },
+  { ignores: ['dist', 'public', 'node_modules', 'test-media', 'coverage', 'playwright-report', 'test-results'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -109,6 +109,9 @@ export {
   getSimilarMovies,
   personImageUrl,
   setFavorite,
+  trailerLinks,
+  type TrailerLink,
+  setRating,
   setWatched,
   type MediaInfo,
   type MediaTrackInfo,
@@ -118,6 +121,7 @@ export {
 } from './details'
 
 export type { DeviceCapabilities } from './deviceProfile'
+export { withoutAudioCodecs } from './deviceProfile'
 export {
   describePlayback,
   closeLiveStream,
@@ -155,6 +159,22 @@ export {
   type StreamRequest,
 } from './streamRequest'
 
+export { defaultVersion, setPlayChoice, takePlayChoice, type PlayChoice, type VersionRef } from './playChoice'
+export {
+  FREE_TRIES,
+  getKidsGuard,
+  hashPin,
+  isBlocked,
+  isValidPin,
+  PIN_MAX,
+  PIN_MIN,
+  ratingValue,
+  setKidsGuard,
+  verifyPin,
+  waitAfterFailures,
+  type KidsGuard,
+} from './parental'
+export { timeLabelText, type TimeLabelKind, type TimeLabelState } from './timeLabels'
 export { formatRuntime, formatTime, secondsToTicks, ticksToSeconds, TICKS_PER_SECOND } from './ticks'
 export {
   activeSegment,
@@ -466,6 +486,45 @@ export {
 export { openComic, type ComicPage } from './comic'
 export { textOf, unpack } from './zip'
 export {
+  bestOffset,
+  createGroup,
+  currentItemId,
+  groupPause,
+  groupSeek,
+  groupStop,
+  groupUnpause,
+  joinGroup,
+  leaveGroup,
+  listGroups,
+  localToServerMs,
+  measureClock,
+  NO_GROUP,
+  offsetOf,
+  parseSyncMessage,
+  planCommand,
+  reportBuffering,
+  reportReady,
+  sendPing,
+  serverToLocalMs,
+  setGroupQueue,
+  setIgnoreWait,
+  SyncPlayDenied,
+  syncReducer,
+  type GroupState,
+  type PlayerReport,
+  type SyncAction,
+  type SyncCommandName,
+  type SyncGroup,
+  type SyncMessage,
+  type SyncQueue,
+  type SyncState,
+  type TimeSample,
+} from './syncplay'
+export {
+  categoryFilter,
+  CHANNEL_CATEGORIES,
+  isChannelCategory,
+  type ChannelCategory,
   channelLogoUrl,
   CHANNEL_PAGE_SIZE,
   getChannel,
@@ -488,3 +547,4 @@ export {
   type Program,
 } from './liveTv'
 export * from './musicVideos'
+export { checkKidsSetup, getAllowedSeries, getRatingTable, type KidsCheck } from './parentalServer'

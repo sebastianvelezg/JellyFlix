@@ -1,4 +1,5 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto'
+import type { MediaSourceInfo } from '@jellyfin/sdk/lib/generated-client/models/media-source-info'
 import type { MediaStream } from '@jellyfin/sdk/lib/generated-client/models/media-stream'
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api'
 import { getUserDataApi } from '@jellyfin/sdk/lib/utils/api/user-data-api'
@@ -21,6 +22,8 @@ export interface MediaTrackInfo {
   codec?: string
   channels?: number
   isDefault: boolean
+  /** Subtitles: written as text (the player can show it); a picture-based track cannot be shown. */
+  isText?: boolean
 }
 
 export interface MediaInfo {
@@ -38,6 +41,44 @@ export interface MediaInfo {
   subtitles: MediaTrackInfo[]
 }
 
+/** A trailer the server knows by its address (almost always a video on YouTube). */
+export interface TrailerLink {
+  /** Its name, empty when the server gives none (the page then calls it "Trailer"). */
+  name: string
+  url: string
+}
+
+/**
+ * The trailers of a title as links, in the server's order: only web addresses (never a script or a file), each once, with its
+ * name when the server has one. They open on their own site, in a new tab: the app itself loads nothing from anywhere but your server.
+ */
+export function trailerLinks(trailers: Array<{ Url?: string | null; Name?: string | null }> | null | undefined): TrailerLink[] {
+  const seen = new Set<string>()
+  const links: TrailerLink[] = []
+  for (const trailer of trailers ?? []) {
+    let url: URL
+    try {
+      url = new URL(trailer.Url ?? '')
+    } catch {
+      continue
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') continue
+    if (seen.has(url.href)) continue
+    seen.add(url.href)
+    links.push({ name: trailer.Name?.trim() || '', url: url.href })
+  }
+  return links
+}
+
+/** One version of a title (the same film as 4K and as 1080p, or another edition) with what it holds. */
+export interface MediaVersion {
+  /** The media source id, which is what the player asks the server for. */
+  id: string
+  /** How to tell it from the others: "4K HEVC HDR10 · 18.4 GB". */
+  label: string
+  media: MediaInfo
+}
+
 /** Everything the movie page shows. */
 export interface MovieDetails extends Movie {
   overview?: string
@@ -53,6 +94,10 @@ export interface MovieDetails extends Movie {
   authors: string[]
   studios: string[]
   media?: MediaInfo
+  /** The trailers the server lists, as links to open. */
+  trailers: TrailerLink[]
+  /** Every version of the file the server has, in the server's order (only more than one when there are real alternatives). */
+  versions: MediaVersion[]
   /** Series only: "Continuing" or "Ended", and how many seasons the server lists. */
   status?: string
   seasonCount?: number
@@ -77,11 +122,11 @@ function trackInfo(stream: MediaStream, kind: 'audio' | 'subtitle'): MediaTrackI
     codec: stream.Codec ?? undefined,
     channels: stream.Channels ?? undefined,
     isDefault: stream.IsDefault ?? false,
+    isText: kind === 'subtitle' ? (stream.IsTextSubtitleStream ?? false) : undefined,
   }
 }
 
-function toMediaInfo(dto: BaseItemDto): MediaInfo | undefined {
-  const source = dto.MediaSources?.[0]
+function toMediaInfo(dto: BaseItemDto, source: MediaSourceInfo | undefined = dto.MediaSources?.[0]): MediaInfo | undefined {
   if (!source) return undefined
   const streams = source.MediaStreams ?? dto.MediaStreams ?? []
   const video = streams.find((s) => s.Type === 'Video')
@@ -97,6 +142,33 @@ function toMediaInfo(dto: BaseItemDto): MediaInfo | undefined {
     audio: uniqueLabels(streams.filter((s) => s.Type === 'Audio').map((s) => trackInfo(s, 'audio'))),
     subtitles: uniqueLabels(streams.filter((s) => s.Type === 'Subtitle').map((s) => trackInfo(s, 'subtitle'))),
   }
+}
+
+const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
+function sizeText(bytes?: number): string | undefined {
+  if (!bytes || bytes <= 0) return undefined
+  const i = Math.min(SIZE_UNITS.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
+  const value = bytes / 1024 ** i
+  return `${value >= 100 || i < 2 ? Math.round(value) : value.toFixed(1)} ${SIZE_UNITS[i]}`
+}
+
+/** The versions a title has, each named by its picture and size ("1080p H264 · 4.2 GB"), or its own name when that is all there is. */
+export function toVersions(dto: BaseItemDto): MediaVersion[] {
+  const sources = (dto.MediaSources ?? []).filter((s) => s.Id)
+  const versions = sources.flatMap((source) => {
+    const media = toMediaInfo(dto, source)
+    if (!media) return []
+    const picture = [media.resolution, media.videoCodec?.toUpperCase(), media.videoRange].filter(Boolean).join(' ')
+    const label = [picture || source.Name, sizeText(media.sizeBytes)].filter(Boolean).join(' · ')
+    return [{ id: source.Id as string, label: label || (source.Name ?? source.Id) as string, media }]
+  })
+  // Two versions that read the same get their own names, so a list is never ambiguous.
+  const seen = new Map<string, number>()
+  return versions.map((v) => {
+    const n = (seen.get(v.label) ?? 0) + 1
+    seen.set(v.label, n)
+    return n === 1 ? v : { ...v, label: `${v.label} (${n})` }
+  })
 }
 
 export function toMovieDetails(dto: BaseItemDto): MovieDetails | null {
@@ -125,6 +197,8 @@ export function toMovieDetails(dto: BaseItemDto): MovieDetails | null {
     authors: people.filter((p) => p.Type === 'Author' && p.Name).map((p) => p.Name as string),
     studios: (dto.Studios ?? []).map((s) => s.Name).filter((n): n is string => !!n),
     media: toMediaInfo(dto),
+    versions: toVersions(dto),
+    trailers: trailerLinks(dto.RemoteTrailers),
     status: dto.Status ?? undefined,
     seasonCount: dto.Type === 'Series' ? (dto.ChildCount ?? undefined) : undefined,
   }
@@ -169,6 +243,16 @@ export async function setWatched(session: Session, id: string, watched: boolean)
     ? await api.markPlayedItem({ itemId: id, userId: session.userId })
     : await api.markUnplayedItem({ itemId: id, userId: session.userId })
   return { played: data.Played ?? watched, favorite: data.IsFavorite ?? false, resumeTicks: data.PlaybackPositionTicks ?? 0 }
+}
+
+/** Says you liked a title (true), did not (false), or takes it back (null). Returns what the server now has. */
+export async function setRating(session: Session, id: string, liked: boolean | null): Promise<boolean | null> {
+  const api = getUserDataApi(session.api)
+  const { data } =
+    liked === null
+      ? await api.deleteUserItemRating({ itemId: id, userId: session.userId })
+      : await api.updateUserItemRating({ itemId: id, userId: session.userId, likes: liked })
+  return data.Likes ?? null
 }
 
 export async function setFavorite(session: Session, id: string, favorite: boolean): Promise<UserState> {

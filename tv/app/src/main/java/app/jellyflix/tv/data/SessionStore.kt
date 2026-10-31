@@ -34,6 +34,8 @@ class SessionStore(context: Context) {
         remove("token")
         remove("userId")
         remove("userName")
+        remove("lastChannelId")
+        remove("lastChannelName")
     }
 
     /**
@@ -63,15 +65,29 @@ class SessionStore(context: Context) {
         get() = prefs.getBoolean("autoplayNext", true)
         set(value) = prefs.edit { putBoolean("autoplayNext", value) }
 
-    /** Intros, recaps and credits are skipped without asking. */
-    var autoSkip: Boolean
-        get() = prefs.getBoolean("autoSkip", false)
-        set(value) = prefs.edit { putBoolean("autoSkip", value) }
-
     /** The choices made in Settings (subtitle look, quality, text size...). They survive signing out. */
     var settings: TvSettings
-        get() = TvSettings.decode { prefs.getString("pref.$it", null) }
+        // (The old single "skip automatically" switch still decides intros, recaps and credits until a choice per kind is saved.)
+        get() = TvSettings.decode(legacyAutoSkip = prefs.getBoolean("autoSkip", false)) { prefs.getString("pref.$it", null) }
         set(value) = prefs.edit { value.encode().forEach { (key, text) -> putString("pref.$key", text) } }
+
+    /** Live TV: the kind of channel the list shows (it opens on the same one next time). */
+    var liveCategory: String
+        get() = prefs.getString("liveCategory", "all") ?: "all"
+        set(value) = prefs.edit { putString("liveCategory", value) }
+
+    /** Live TV: the channel watched last, as its id and name. */
+    var lastChannel: Pair<String, String>?
+        get() = prefs.getString("lastChannelId", null)?.let { id -> id to (prefs.getString("lastChannelName", "") ?: "") }
+        set(value) = prefs.edit {
+            if (value == null) {
+                remove("lastChannelId")
+                remove("lastChannelName")
+            } else {
+                putString("lastChannelId", value.first)
+                putString("lastChannelName", value.second)
+            }
+        }
 
     /** The last address typed, so signing in again does not mean typing it again. */
     var lastServer: String

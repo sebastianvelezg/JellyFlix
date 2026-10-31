@@ -117,7 +117,7 @@ export function HeroCarousel({
                     {i === index && (
                       <span
                         key={movie.id}
-                        className={`absolute inset-y-0 left-0 block rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--glow)] ${
+                        className={`absolute inset-y-0 left-0 block rounded-full bg-[var(--color-accent)] ${
                           moving ? 'hero-progress' : 'w-full'
                         }`}
                         style={moving ? { animationDuration: `${ROTATE_SECONDS}s`, animationPlayState: paused ? 'paused' : 'running' } : undefined}

@@ -12,7 +12,12 @@ const SIZE_CLASS: Record<SubtitleSize, string> = {
   large: 'text-2xl sm:text-4xl',
 }
 
+/** The second line is a step smaller, so the two are told apart at a glance. */
+const SMALLER: Record<SubtitleSize, SubtitleSize> = { small: 'small', medium: 'small', large: 'medium' }
+
 const COLOR: Record<SubtitleColor, string> = { white: '#ffffff', yellow: '#ffe14d', cyan: '#7be8ff' }
+/** The second line takes another colour than the first. */
+const OTHER_COLOR: Record<SubtitleColor, SubtitleColor> = { white: 'yellow', yellow: 'white', cyan: 'yellow' }
 
 const SHADOW = '0 0 4px #000, 0 1px 3px #000, 0 0 8px #000'
 
@@ -30,7 +35,7 @@ function bottomClass(lifted: boolean, position: SubtitlePosition): string {
 }
 
 /**
- * Draws the active subtitle cues in our own element instead of the browser's built-in renderer,
+ * Draws the active cues of one subtitle track in our own element instead of the browser's built-in renderer,
  * so they can sit above the control bar, be resized and restyled. The <track> stays in "hidden" mode
  * (cues load and fire events, but nothing is drawn natively).
  *
@@ -40,22 +45,7 @@ function bottomClass(lifted: boolean, position: SubtitlePosition): string {
  * Cue text goes through the browser's own WebVTT parser (`getCueAsHTML`), which only ever yields
  * a small safe set of nodes (<i>, <b>, <u>, <c>, <v>, <lang>, <ruby>), never scripts.
  */
-export function SubtitleOverlay({
-  videoRef,
-  trackUrl,
-  lifted,
-  style,
-  offset = 0,
-}: {
-  videoRef: RefObject<HTMLVideoElement | null>
-  /** The loaded subtitle blob URL; changes when the selection changes. */
-  trackUrl: string | null
-  /** True while the control bar is visible, so lines move up out of its way. */
-  lifted: boolean
-  style: SubtitleStyle
-  /** Seconds to show the subtitles later (negative: earlier). */
-  offset?: number
-}) {
+function useCueBox(videoRef: RefObject<HTMLVideoElement | null>, trackUrl: string | null, slot: string, offset: number) {
   const box = useRef<HTMLDivElement>(null)
   const offsetRef = useRef(offset)
   const applyRef = useRef<(() => void) | null>(null)
@@ -70,8 +60,9 @@ export function SubtitleOverlay({
     const el = box.current
     const video = videoRef.current
     if (!video || !el || !trackUrl) return
-    // The <track> element has just been rendered by the player; take the newest text track.
-    const track = video.textTracks[video.textTracks.length - 1]
+    // The <track> element has just been rendered by the player, tagged with the slot it is for.
+    const trackElement = video.querySelector<HTMLTrackElement>(`track[data-slot="${slot}"]`)
+    const track = trackElement?.track
     if (!track) return
     track.mode = 'hidden'
 
@@ -109,7 +100,6 @@ export function SubtitleOverlay({
     applyRef.current = apply
 
     // The cues arrive after the track has loaded, which can be after this effect runs.
-    const trackElement = Array.from(video.querySelectorAll('track')).at(-1)
     track.addEventListener('cuechange', render)
     trackElement?.addEventListener('load', apply)
     apply()
@@ -119,21 +109,62 @@ export function SubtitleOverlay({
       applyRef.current = null
       el.replaceChildren()
     }
-  }, [videoRef, trackUrl])
+  }, [videoRef, trackUrl, slot])
 
-  const css: CSSProperties = {
-    color: COLOR[style.color],
-    textShadow: style.background === 'shadow' ? SHADOW : 'none',
-  }
+  return box
+}
+
+/**
+ * The subtitles over the picture: one track, or two (the second one above the first, a step smaller and in another colour),
+ * both in one block that rises above the control bar while it shows.
+ */
+export function SubtitleOverlay({
+  videoRef,
+  trackUrl,
+  secondUrl = null,
+  lifted,
+  style,
+  offset = 0,
+}: {
+  videoRef: RefObject<HTMLVideoElement | null>
+  /** The loaded subtitle blob URL; changes when the selection changes. */
+  trackUrl: string | null
+  /** The second track's blob URL, when a second subtitle is on. */
+  secondUrl?: string | null
+  /** True while the control bar is visible, so lines move up out of its way. */
+  lifted: boolean
+  style: SubtitleStyle
+  /** Seconds to show the subtitles later (negative: earlier). */
+  offset?: number
+}) {
+  const main = useCueBox(videoRef, trackUrl, 'main', offset)
+  const second = useCueBox(videoRef, secondUrl, 'second', offset)
+
+  const css = (s: SubtitleStyle): CSSProperties => ({
+    color: COLOR[s.color],
+    textShadow: s.background === 'shadow' ? SHADOW : 'none',
+  })
+  const secondStyle: SubtitleStyle = { ...style, size: SMALLER[style.size], color: OTHER_COLOR[style.color] }
 
   return (
     <div
-      ref={box}
       aria-live="off"
-      data-testid="subtitles"
-      data-background={style.background}
-      className={`subtitles pointer-events-none absolute inset-x-0 flex flex-col items-center gap-1 px-6 text-center font-medium leading-snug transition-[bottom] duration-200 ${SIZE_CLASS[style.size]} ${bottomClass(lifted, style.position)}`}
-      style={css}
-    />
+      className={`pointer-events-none absolute inset-x-0 flex flex-col items-center gap-1 px-6 text-center font-medium leading-snug transition-[bottom] duration-200 ${bottomClass(lifted, style.position)}`}
+    >
+      <div
+        ref={second}
+        data-testid="subtitles-second"
+        data-background={style.background}
+        className={`subtitles flex flex-col items-center gap-1 ${SIZE_CLASS[secondStyle.size]}`}
+        style={css(secondStyle)}
+      />
+      <div
+        ref={main}
+        data-testid="subtitles"
+        data-background={style.background}
+        className={`subtitles flex flex-col items-center gap-1 ${SIZE_CLASS[style.size]}`}
+        style={css(style)}
+      />
+    </div>
   )
 }

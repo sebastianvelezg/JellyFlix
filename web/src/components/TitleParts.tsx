@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { personImageUrl, type MovieDetails, type Person, type Session } from '../core'
+import { ToolbarSelect } from './Toolbar'
 import { formatBitrate, formatBytes, formatDate } from './format'
-import { BackIcon } from './icons'
+import { BackIcon, ExternalIcon } from './icons'
 import { Img } from './Img'
 import { Subtext } from './Subtext'
 import { t } from '../i18n'
@@ -53,7 +54,7 @@ export function TitleHero({
       <div className="gutter-x relative flex w-full items-end justify-between gap-10 pb-10 pt-44">
         <div className="min-w-0 max-w-3xl flex-1">{children}</div>
         <div className={`rise rise-3 hidden w-52 shrink-0 xl:w-60 ${noPoster ? '' : 'lg:block'}`}>
-          <div className="aspect-[2/3] overflow-hidden rounded-2xl bg-[var(--color-surface-2)] shadow-[0_24px_70px_-12px_var(--glow)] ring-1 ring-white/15">
+          <div className="aspect-[2/3] overflow-hidden rounded-2xl bg-[var(--color-surface-2)] shadow-[0_24px_60px_-16px_rgba(0,0,0,0.85)] ring-1 ring-white/15">
             <Img
               session={session}
               src={poster}
@@ -107,6 +108,130 @@ export function PlaySummary({ media }: { media?: MovieDetails['media'] }) {
   )
 }
 
+/**
+ * The trailer(s) of a title. They open on their own site in a new tab (the app loads nothing from anywhere but your server):
+ * one is a button; several are a small list under the button.
+ */
+export function TrailerButton({ trailers }: { trailers: MovieDetails['trailers'] }) {
+  if (trailers.length === 0) return null
+  const link = 'btn py-3'
+  if (trailers.length === 1) {
+    const only = trailers[0]
+    return (
+      <a href={only?.url} target="_blank" rel="noopener noreferrer" className={link}>
+        {t('Trailer')} <ExternalIcon />
+        <span className="sr-only"> ({t('opens in a new tab')})</span>
+      </a>
+    )
+  }
+  return (
+    <details className="group/trailers relative">
+      <summary className={`${link} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>{t('Trailers')}</summary>
+      <ul className="absolute left-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface-2)] p-1 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)]">
+        {trailers.map((trailer, i) => (
+          <li key={trailer.url}>
+            <a
+              href={trailer.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm text-neutral-100 transition-colors hover:bg-white/[.08] focus-visible:bg-white/[.08] focus-visible:outline-none"
+            >
+              <span className="min-w-0 truncate">{trailer.name || `${t('Trailer')} ${i + 1}`}</span>
+              <ExternalIcon />
+              <span className="sr-only">({t('opens in a new tab')})</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+/** What the viewer picked on the title page; `auto` leaves the choice to the player (the language you used last, the file's default). */
+export interface PlayPick {
+  versionId?: string
+  audio: number | 'auto'
+  subtitle: number | null | 'auto'
+}
+
+/**
+ * Under the Play button: when the title has more than one version, audio track or a subtitle to choose from, three small
+ * dropdowns (version, audio, subtitles) say what Play will give you and let you change it; otherwise the plain summary line.
+ */
+export function PlayOptions({ movie, pick, onChange }: { movie: MovieDetails; pick: PlayPick; onChange: (pick: PlayPick) => void }) {
+  const version = movie.versions.find((v) => v.id === pick.versionId) ?? movie.versions[0]
+  const media = version?.media ?? movie.media
+  if (!media) return null
+  const audio = media.audio
+  const subtitles = media.subtitles.filter((s) => s.isText)
+  if (movie.versions.length < 2 && audio.length < 2 && subtitles.length === 0) return <PlaySummary media={media} />
+  return (
+    <div role="group" aria-label={t('Play options')} className="rise rise-3 mt-4 flex flex-wrap items-center gap-2">
+      {movie.versions.length > 1 && (
+        <ToolbarSelect
+          label={t('Version')}
+          prefix={t('Version')}
+          value={version?.id ?? ''}
+          // Another version has its own tracks, so what was chosen for the other one no longer applies.
+          onChange={(versionId) => onChange({ versionId, audio: 'auto', subtitle: 'auto' })}
+        >
+          {movie.versions.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.label}
+            </option>
+          ))}
+        </ToolbarSelect>
+      )}
+      {audio.length > 1 && (
+        <ToolbarSelect
+          label={t('Audio')}
+          prefix={t('Audio')}
+          value={String(pick.audio)}
+          onChange={(value) => onChange({ ...pick, audio: value === 'auto' ? 'auto' : Number(value) })}
+        >
+          <option value="auto">{t('Automatic')}</option>
+          {audio.map((a) => (
+            <option key={a.index} value={a.index}>
+              {a.label}
+            </option>
+          ))}
+        </ToolbarSelect>
+      )}
+      {subtitles.length > 0 && (
+        <ToolbarSelect
+          label={t('Subtitles')}
+          prefix={t('Subtitles')}
+          value={pick.subtitle === 'auto' ? 'auto' : pick.subtitle === null ? 'off' : String(pick.subtitle)}
+          onChange={(value) => onChange({ ...pick, subtitle: value === 'auto' ? 'auto' : value === 'off' ? null : Number(value) })}
+        >
+          <option value="auto">{t('Automatic')}</option>
+          <option value="off">{t('Off')}</option>
+          {subtitles.map((s) => (
+            <option key={s.index} value={s.index}>
+              {s.label}
+            </option>
+          ))}
+        </ToolbarSelect>
+      )}
+    </div>
+  )
+}
+
+/** A list of tracks can run to dozens (43 subtitle languages): it shows two lines, and the rest on request. */
+const LONG_FACT = 180
+
+function LongFact({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <span className={open ? '' : 'line-clamp-2'}>{text}</span>
+      <button type="button" className="mt-1 text-xs font-medium text-[var(--color-accent)] hover:underline" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {open ? t('Show less') : t('Show more')}
+      </button>
+    </>
+  )
+}
+
 export function Facts({ movie }: { movie: MovieDetails }) {
   const media = movie.media
   const rows: Array<[string, ReactNode]> = []
@@ -124,12 +249,12 @@ export function Facts({ movie }: { movie: MovieDetails }) {
   }
   if (rows.length === 0) return null
   return (
-    <section aria-label={t('Details')} className="glass mt-2 rounded-2xl p-5 sm:p-6">
+    <section aria-label={t('Details')} className="mt-2 rounded-2xl border border-white/[.08] bg-white/[.03] p-5 sm:p-6">
       <dl className="grid grid-cols-[6rem_1fr] gap-x-4 gap-y-3 text-sm sm:grid-cols-[7rem_1fr]">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
             <dt className="text-xs font-medium uppercase tracking-wider text-neutral-500">{label}</dt>
-            <dd className="min-w-0 text-neutral-200">{value}</dd>
+            <dd className="min-w-0 text-neutral-200">{typeof value === 'string' && value.length > LONG_FACT ? <LongFact text={value} /> : value}</dd>
           </div>
         ))}
       </dl>
@@ -150,7 +275,7 @@ export function CastCard({ session, person, onSelect }: { session: Session; pers
       aria-label={t('Movies with {name}', { name: person.name })}
       className="group w-24 shrink-0 snap-start text-center outline-none sm:w-28"
     >
-      <div className="mx-auto aspect-square w-20 overflow-hidden rounded-full bg-[var(--color-surface-2)] ring-1 ring-white/10 transition duration-300 group-hover:scale-105 group-hover:shadow-[0_0_28px_-6px_var(--glow)] group-hover:ring-2 group-hover:ring-[var(--color-accent)]/70 group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-accent)] sm:w-24">
+      <div className="mx-auto aspect-square w-20 overflow-hidden rounded-full bg-[var(--color-surface-2)] ring-1 ring-white/10 transition duration-300 group-hover:scale-105 group-hover:ring-2 group-hover:ring-white/40 group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-accent)] sm:w-24">
         <Img
           session={session}
           src={personImageUrl(session.serverUrl, person)}

@@ -14,7 +14,7 @@ test('searches for subtitles, saves one on the server and switches it on', async
   await page.goto('/#/play/m0001')
   await waitPlaying(page)
 
-  const settings = await openSettings(page)
+  const settings = await openSettings(page, 'Subtitles')
   const tracks = settings.getByRole('group', { name: 'Subtitles' }).getByRole('radio')
   await expect(tracks).toHaveCount(2) // Off, English
   await settings.getByRole('button', { name: 'Search online…' }).click()
@@ -36,7 +36,7 @@ test('searches for subtitles, saves one on the server and switches it on', async
   // The video starts again with the new track chosen and its words on screen.
   await waitPlaying(page)
   await expect(page.getByTestId('subtitles')).toContainText('Mock subtitle line')
-  const after = await openSettings(page)
+  const after = await openSettings(page, 'Subtitles')
   const now = after.getByRole('group', { name: 'Subtitles' }).getByRole('radio')
   await expect(now).toHaveCount(3)
   await expect(now.nth(2)).toBeChecked()
@@ -47,7 +47,7 @@ test('changing the language searches again, and closing leaves the video playing
   await signIn(page, mock)
   await page.goto('/#/play/m0001')
   await waitPlaying(page)
-  await (await openSettings(page)).getByRole('button', { name: 'Search online…' }).click()
+  await (await openSettings(page, 'Subtitles')).getByRole('button', { name: 'Search online…' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Find subtitles' })
   await expect(dialog.getByRole('listitem')).toHaveCount(3)
@@ -67,6 +67,6 @@ test('says so when the server has no subtitle plugin', async ({ page }) => {
   await signIn(page, mock)
   await page.goto('/#/play/m0001')
   await waitPlaying(page)
-  await (await openSettings(page)).getByRole('button', { name: 'Search online…' }).click()
+  await (await openSettings(page, 'Subtitles')).getByRole('button', { name: 'Search online…' }).click()
   await expect(page.getByRole('dialog', { name: 'Find subtitles' }).getByRole('alert')).toContainText('no subtitle plugin')
 })

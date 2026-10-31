@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  channelLogoUrl,
   closeLiveStream,
   getChannel,
   getChannels,
@@ -16,9 +17,10 @@ import {
 import { reportStopOnPageHide } from '../../platform/web/browser'
 import { detectCapabilities } from '../../platform/web/capabilities'
 import { attachMedia } from '../../platform/web/mediaAttach'
-import { QUALITY_CHOICES, readPlayerPrefs, writePlayerPrefs } from '../../platform/web/prefs'
+import { QUALITY_CHOICES, readPlayerPrefs, readUiPrefs, writePlayerPrefs, writeUiPrefs } from '../../platform/web/prefs'
 import { lockPageScroll } from '../../platform/web/scrollLock'
 import { BackIcon, ChevronLeftIcon, ChevronRightIcon, FullscreenIcon, ExitFullscreenIcon, MuteIcon, PauseIcon, PlayIcon, VolumeIcon } from '../icons'
+import { Img } from '../Img'
 import { ReadProgress } from '../reader/ReaderShell'
 import { formatClock } from './time'
 import { t } from '../../i18n'
@@ -60,9 +62,14 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
     }
     read()
     const timer = setInterval(read, REFRESH_PROGRAM_MS)
-    getChannels(session, { limit: 200 })
-      .then((page) => !cancelled && setOthers(page.channels))
-      .catch(() => undefined)
+    // The arrows change channel inside the category the viewer was browsing; a channel outside it (a link, the last-watched button)
+    // has the whole list around it instead.
+    void (async () => {
+      const category = readUiPrefs().liveCategory
+      let page = await getChannels(session, { limit: 200, category })
+      if (category !== 'all' && !page.channels.some((c) => c.id === id)) page = await getChannels(session, { limit: 200 })
+      if (!cancelled) setOthers(page.channels)
+    })().catch(() => undefined)
     return () => {
       cancelled = true
       clearInterval(timer)
@@ -70,6 +77,12 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
   }, [session, id])
 
   useEffect(() => lockPageScroll(), [])
+
+  // Once it plays, this is the channel to come back to.
+  const playing = state.status === 'playing'
+  useEffect(() => {
+    if (playing && channel?.id === id) writeUiPrefs({ lastChannel: { id, name: channel.name } })
+  }, [playing, channel, id])
 
   // The stream: asked for, attached to the picture, and reported to the server like any other playback.
   useEffect(() => {
@@ -251,6 +264,7 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
           ))}
         </div>
         <div className="absolute inset-x-0 bottom-0 space-y-3 bg-gradient-to-t from-black/85 to-transparent px-4 pb-[max(1rem,var(--safe-bottom))] pt-16">
+          {others.length > 1 && <ChannelStrip session={session} channels={others} currentId={id} now={now} onPick={onChannel} />}
           {program ? (
             <div className="max-w-3xl space-y-1.5">
               <p className="text-lg font-semibold text-white">
@@ -310,5 +324,43 @@ export function LivePlayer({ session, id, onChannel, onExit }: { session: Sessio
         </div>
       </div>
     </div>
+  )
+}
+
+/** The channels around the one on screen, to jump to with a click or a tap. The current one is marked and kept in the middle. */
+function ChannelStrip({ session, channels, currentId, now, onPick }: { session: Session; channels: Channel[]; currentId: string; now: number; onPick: (id: string) => void }) {
+  const list = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    const el = list.current?.querySelector<HTMLElement>('[aria-current="true"]')
+    if (list.current && el) list.current.scrollLeft = el.offsetLeft - list.current.clientWidth / 2 + el.clientWidth / 2
+  }, [currentId, channels])
+  return (
+    <ul ref={list} aria-label={t('Change channel')} className="relative flex gap-2 overflow-x-auto pb-1">
+      {channels.map((channel) => {
+        const current = channel.id === currentId
+        const { title } = splitChannelName(channel.name)
+        const label = [channel.number, title].filter(Boolean).join(' · ')
+        const program = channel.now && channel.now.endMs > now ? channel.now : undefined
+        return (
+          <li key={channel.id} className="shrink-0">
+            <button
+              type="button"
+              aria-current={current ? 'true' : undefined}
+              aria-label={t('Watch {channel}', { channel: label })}
+              className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-xs ring-1 transition focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] ${current ? 'bg-[var(--color-accent)]/25 text-white ring-[var(--color-accent)]' : 'bg-white/[.07] text-neutral-200 ring-white/10 hover:bg-white/15'}`}
+              onClick={() => !current && onPick(channel.id)}
+            >
+              <span className="flex h-7 w-11 shrink-0 items-center justify-center overflow-hidden rounded bg-white/20">
+                <Img session={session} src={channelLogoUrl(session.serverUrl, channel, 96)} className="h-full w-full object-contain p-0.5" fallback={<span className="text-[10px] text-neutral-400">{channel.number ?? ''}</span>} />
+              </span>
+              <span className="block w-32">
+                <span className="block truncate font-medium">{label}</span>
+                {program && <span className="block truncate text-neutral-400">{program.name}</span>}
+              </span>
+            </button>
+          </li>
+        )
+      })}
+    </ul>
   )
 }

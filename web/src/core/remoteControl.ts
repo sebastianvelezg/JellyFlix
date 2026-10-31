@@ -4,6 +4,7 @@ import { MediaType } from '@jellyfin/sdk/lib/generated-client/models/media-type'
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api'
 import { getSessionApi } from '@jellyfin/sdk/lib/utils/api/session-api'
 import type { Session } from './jellyfin'
+import { parseSyncMessage, type SyncMessage } from './syncplay'
 import { toTrack, type Track } from './music'
 import { ticksToSeconds } from './ticks'
 
@@ -20,6 +21,8 @@ export type RemoteMessage =
   | { kind: 'mute'; mute: boolean | 'toggle' }
   | { kind: 'message'; header: string; text: string }
   | { kind: 'keepAlive'; seconds: number }
+  /** Something about the group this device watches with (see `syncplay.ts`). */
+  | { kind: 'sync'; message: SyncMessage }
 
 const PLAYSTATE: Record<string, Extract<RemoteMessage, { kind: 'playstate' }>['command']> = {
   Pause: 'pause',
@@ -118,6 +121,11 @@ export function parseRemoteMessage(raw: string): RemoteMessage | null {
     }
     case 'ForceKeepAlive':
       return { kind: 'keepAlive', seconds: asNumber(message.Data) ?? 60 }
+    case 'SyncPlayCommand':
+    case 'SyncPlayGroupUpdate': {
+      const sync = parseSyncMessage(message.MessageType, message.Data)
+      return sync ? { kind: 'sync', message: sync } : null
+    }
     default:
       return null
   }

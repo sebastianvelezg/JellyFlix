@@ -16,7 +16,7 @@ const lines = (page: Page) => page.getByTestId('subtitles')
 async function playWithSubtitles(page: Page) {
   await page.goto('/#/play/m0001')
   await waitPlaying(page)
-  const settings = await openSettings(page)
+  const settings = await openSettings(page, 'Subtitles')
   await settings.getByLabel('English', { exact: true }).check()
   await expect(lines(page)).toContainText('Mock subtitle line')
   return settings
@@ -47,7 +47,7 @@ test('sync: moving the subtitles later hides them until their new time, earlier 
   // The saved value is per movie, and the menu shows it.
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.subsync') ?? '{}'))
   expect(saved).toEqual({ m0001: 10 })
-  await openSettings(page)
+  await openSettings(page, 'Subtitles')
   await expect(page.getByRole('dialog', { name: 'Playback settings' }).getByLabel('Subtitle sync', { exact: true })).toHaveText('+10.0 s')
 
   // Reset puts it back, and forgets it.
@@ -83,7 +83,7 @@ test('sync: the buttons in the menu move the subtitles, and a new viewing starts
 
   await page.reload()
   await waitPlaying(page)
-  const again = await openSettings(page)
+  const again = await openSettings(page, 'Subtitles')
   await again.getByLabel('English', { exact: true }).check()
   await expect(again.getByLabel('Subtitle sync', { exact: true })).toHaveText('+1.4 s')
 })
@@ -91,14 +91,16 @@ test('sync: the buttons in the menu move the subtitles, and a new viewing starts
 test('look: colour, background and position are applied and remembered', async ({ page }) => {
   mock = await startMock({ movieCount: 3 })
   await signIn(page, mock)
-  const settings = await playWithSubtitles(page)
+  await playWithSubtitles(page)
+  const settings = await openSettings(page, 'Subtitle look')
   await settings.getByLabel('Yellow').check()
   await settings.getByLabel('Dark box').check()
   await settings.getByLabel('Higher').check()
   await expect(lines(page)).toHaveCSS('color', 'rgb(255, 225, 77)')
   await expect(lines(page)).toHaveAttribute('data-background', 'box')
   await expect(lines(page).locator('.subtitle-line')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.72)')
-  await expect(lines(page)).toHaveClass(/bottom-(24|40)/)
+  // (The position is a class of the block that holds the lines, so that two lines of subtitles stack.)
+  await expect(lines(page).locator('xpath=..')).toHaveClass(/bottom-(24|40)/)
   const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.player') ?? '{}'))
   expect(prefs).toMatchObject({ subtitleColor: 'yellow', subtitleBackground: 'box', subtitlePosition: 'high' })
 })
@@ -108,7 +110,7 @@ test('file: a .srt from your device is shown, can be synced, and a server track 
   await signIn(page, mock)
   await page.goto('/#/play/m0001')
   await waitPlaying(page)
-  const settings = await openSettings(page)
+  const settings = await openSettings(page, 'Subtitles')
 
   await settings.getByLabel('Subtitle file').setInputFiles({
     name: 'my movie.srt',
@@ -134,7 +136,7 @@ test('file: formats that cannot be read are refused with a message', async ({ pa
   await signIn(page, mock)
   await page.goto('/#/play/m0001')
   await waitPlaying(page)
-  const settings = await openSettings(page)
+  const settings = await openSettings(page, 'Subtitles')
   await settings.getByLabel('Subtitle file').setInputFiles({ name: 'styled.ass', mimeType: 'text/plain', buffer: Buffer.from('[Script Info]') })
   await expect(settings.getByRole('alert')).toContainText('Only .srt and .vtt')
   await settings.getByLabel('Subtitle file').setInputFiles({ name: 'empty.srt', mimeType: 'text/plain', buffer: Buffer.from('nothing here') })

@@ -317,11 +317,11 @@ function Episodes({
     <section aria-label={t('Episodes')} className="mt-8">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h2 className="mr-3 flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
-          <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)] shadow-[0_0_14px_var(--glow)]" />
+          <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)]" />
           {t('Episodes')}
         </h2>
         {list.length > 1 && (
-          <div role="tablist" aria-label={t('Seasons')} className="flex flex-wrap gap-1.5">
+          <div role="tablist" aria-label={t('Seasons')} className="no-scrollbar flex min-w-0 max-w-full gap-1.5 overflow-x-auto">
             {list.map((s) => (
               <button
                 key={s.id}
@@ -329,9 +329,9 @@ function Episodes({
                 role="tab"
                 aria-selected={s.id === season.id}
                 onClick={() => setChosen(s.id)}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition pointer-coarse:py-3 ${
+                className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition pointer-coarse:py-3 ${
                   s.id === season.id
-                    ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white shadow-[0_0_18px_-6px_var(--glow)]'
+                    ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white'
                     : 'border-white/10 bg-white/[.04] text-neutral-300 hover:border-white/25 hover:text-white'
                 }`}
               >
@@ -517,7 +517,7 @@ export function EpisodeRow({
           }
         />
         <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover/still:bg-black/40 group-hover/still:opacity-100 group-focus-visible/still:opacity-100">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-accent-strong)] pl-0.5 text-white shadow-[0_0_24px_var(--glow)]">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white pl-0.5 text-black shadow-[0_6px_20px_-4px_rgba(0,0,0,0.6)]">
             <PlayIcon />
           </span>
         </span>
@@ -549,8 +549,11 @@ export function EpisodeRow({
         )}
       </div>
 
-      <PlayOnButton itemId={episode.id} compact />
-      <EditButton session={session} target={{ id: episode.id, name: label, type: 'Episode' }} compact />
+      {/* The less used buttons appear when the row is pointed at (always on a touchscreen). */}
+      <span className="flex shrink-0 items-start gap-1 self-start transition-opacity duration-150 lg:opacity-0 lg:focus-within:opacity-100 lg:group-hover:opacity-100 pointer-coarse:opacity-100">
+        <PlayOnButton itemId={episode.id} compact />
+        <EditButton session={session} target={{ id: episode.id, name: label, type: 'Episode' }} compact />
+      </span>
       <button
         type="button"
         onClick={toggleWatched}

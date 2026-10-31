@@ -19,6 +19,7 @@ import {
   BANNER_SIZES,
   DENSITIES,
   NAV_STYLES,
+  NEXT_UP_DAYS,
   POSTER_SIZES,
   UI_SIZES,
   applyAppearance,
@@ -27,6 +28,7 @@ import {
   writeAppearance,
   type AppearancePrefs,
   type BannerSize,
+  type CardAction,
   type Density,
   type NavStyle,
   type PosterSize,
@@ -304,6 +306,42 @@ export function AppearanceSettings() {
             {t('Restore the menu')}
           </button>
         </div>
+      </Card>
+
+      <Card title={t('Cards')} description={t('What the posters and the cards of Continue watching show and do.')}>
+        <Toggle
+          label={t('Titles under the posters')}
+          hint={t('Turn it off to show only the pictures.')}
+          checked={prefs.titles}
+          onChange={(titles) => save({ titles })}
+        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label htmlFor="continue-action" className="text-sm font-medium text-neutral-100">
+            {t('Pressing a card of Continue watching and Next up')}
+          </label>
+          <select
+            id="continue-action"
+            className="select"
+            value={prefs.continueAction}
+            onChange={(e) => save({ continueAction: e.target.value as CardAction })}
+          >
+            <option value="play">{t('Starts playing')}</option>
+            <option value="open">{t('Opens the page of the title')}</option>
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label htmlFor="next-up-days" className="text-sm font-medium text-neutral-100">
+            {t('Next up looks back')}
+          </label>
+          <select id="next-up-days" className="select" value={prefs.nextUpDays} onChange={(e) => save({ nextUpDays: Number(e.target.value) })}>
+            {NEXT_UP_DAYS.map((days) => (
+              <option key={days} value={days}>
+                {days === 0 ? t('As far as the server goes') : t('{days} days', { days })}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="-mt-2 text-xs text-neutral-500">{t('A series you have not watched for longer than that leaves Next up.')}</p>
       </Card>
 
       <Card title={t('Home page')} description={t('Show, hide and reorder what the home page is made of. Rows for a kind of library you do not have are left out anyway.')}>

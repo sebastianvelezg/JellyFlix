@@ -175,7 +175,7 @@ function AlbumContent({
         <BackIcon /> {t('Back')}
       </button>
       <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-8">
-        <Cover session={session} item={album} width={500} eager className="w-56 shrink-0 shadow-[0_24px_70px_-12px_var(--glow)] sm:w-64" />
+        <Cover session={session} item={album} width={500} eager className="w-56 shrink-0 shadow-[0_24px_60px_-16px_rgba(0,0,0,0.85)] sm:w-64" />
         <Heading kind={tr('Album')} title={album.name}>
           <p className="mt-3 text-neutral-300">
             {album.artistId ? (
@@ -290,7 +290,7 @@ function ArtistContent({
         <BackIcon /> {t('Back')}
       </button>
       <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-8">
-        <Cover session={session} item={artist} width={500} round eager className="w-44 shrink-0 shadow-[0_24px_70px_-12px_var(--glow)] sm:w-56" />
+        <Cover session={session} item={artist} width={500} round eager className="w-44 shrink-0 shadow-[0_24px_60px_-16px_rgba(0,0,0,0.85)] sm:w-56" />
         <Heading kind={tr('Artist')} title={artist.name}>
           {artist.genres.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-1.5" aria-label={t('Genres')}>
@@ -355,7 +355,7 @@ export function PlaylistPage({ session, id, onBack, onOpenAlbum }: Nav & { id: s
         <BackIcon /> {t('Back')}
       </button>
       <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-8">
-        <Cover session={session} item={{ id: p.id, imageTag: p.imageTag, albumId: songs[0]?.albumId, albumImageTag: songs[0]?.albumImageTag }} width={500} eager className="w-56 shrink-0 shadow-[0_24px_70px_-12px_var(--glow)] sm:w-64" />
+        <Cover session={session} item={{ id: p.id, imageTag: p.imageTag, albumId: songs[0]?.albumId, albumImageTag: songs[0]?.albumImageTag }} width={500} eager className="w-56 shrink-0 shadow-[0_24px_60px_-16px_rgba(0,0,0,0.85)] sm:w-64" />
         <Heading kind={tr('Playlist')} title={p.name}>
           <p className="mt-3 text-neutral-300">
             {songs.length} {songs.length === 1 ? t('song') : t('songs')}

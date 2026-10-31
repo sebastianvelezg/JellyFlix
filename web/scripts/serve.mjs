@@ -10,6 +10,7 @@ import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CSP } from './csp.mjs'
 
 try {
   process.loadEnvFile(new URL('../.env', import.meta.url))
@@ -40,7 +41,12 @@ const types = {
 const configJs = `window.JELLYFLIX_CONFIG = ${JSON.stringify({ serverUrl })}\n`
 
 const server = createServer(async (req, res) => {
-  const headers = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' }
+  const headers = {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': CSP,
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  }
   try {
     const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
     if (path === '/config.js') {

@@ -5,6 +5,53 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+A visual polish of the whole web app, without changing its identity (calmer, simpler and more consistent), and the first three phases of the roadmap: the player and the way a title starts, the household, and the bigger pieces.
+
+### Audit before the release: security and performance
+- **A strict Content-Security-Policy (web):** the app is now served (Docker image, `npm run serve`) with a policy that runs only its own scripts: no inline script and no `eval`, no script from another site, no plug-ins except the browser's PDF viewer, no `<base>` or form sent elsewhere, and it cannot be put in a frame of another site. The pre-paint look script moved to its own file (`paint.js`) for that. A test keeps the policy of nginx and of the Node server identical. Also a `Permissions-Policy` that turns the camera, microphone, location, payment and USB off.
+- **Dependencies:** `follow-redirects` (a high-severity advisory inside axios) is updated; no known vulnerability remains in what ships to users (`npm audit --omit=dev`). The ones left are in the lint tools, which are not part of the app.
+- **Signing out forgets more (web):** the recent searches and the *Last watched* channel are cleared when you sign out, so the next account on the same browser does not see them.
+- **Signing out forgets more (TV):** the screensaver pictures of the account that left are dropped, so the next account does not see another account's backdrops. The session is also excluded from Android's cloud backup and from device-to-device transfer.
+- **Kids mode:** a title chosen by a watch-together group is ignored on a device in Kids mode.
+- **Performance (web):** the page of playlists is no longer pulled into the first download by the rows that show a playlist card.
+
+### The bigger pieces: Live TV, watching together, the TV screensaver (phase 3 of the roadmap)
+- **Live TV by kind:** the channels can be narrowed to *Movies*, *Series*, *Sports*, *News*, *Kids* or *Favorites* (the server decides a channel's kind from what it broadcasts). The choice is kept, and the arrows of the player change channel inside it. (TV too.)
+- **Strip of channels in the player:** a row at the bottom of the live player shows the channels around the current one, with what is on each; one click changes channel. On the TV the controls say which channel up and down lead to.
+- **Back to the last channel:** a *Last watched* button on the Live TV page, and the guide lists that channel first. (TV too.)
+- **Watch together:** the people icon in the header (not shown in Kids mode) starts a group or joins an open one, using Jellyfin's own SyncPlay. Press Play on a title and it opens for everyone in the group, waits until every device is ready and starts at one moment by the server's clock; pause, play and seek are shared; leaving the player does not hold the others back. The server's administrator decides which accounts may use SyncPlay; an account that may not is told so. Web only for now.
+- **Screensaver on the TV:** off by default. Settings → Display chooses after how long (2 to 15 minutes), pictures from movies, series or both, and a highest age rating. It shows backdrops from the library, drifting slowly, and any key brings the app back. It does not start while a video plays.
+- **TV catch-up:** *Titles under posters* can be turned off, *Next up* can look back only so far, and the title page has *I like it* and *Not for me*.
+
+### Household: settings, cards, my rating, Kids mode (phase 2 of the roadmap)
+- **Search in Settings:** a box above the tabs finds a setting by its name (or by words like "skip", "colour", "pin") and takes you to it, opening its tab.
+- **Cards:** Settings → Appearance → *Cards* turns off the titles under the posters, chooses what pressing a card of *Continue watching* and *Next up* does (play, or open the page; the little button in its corner does the other), and how far back *Next up* looks.
+- **My rating:** a thumb up and a thumb down on the title page, kept on your server, and two new choices in the library filter: *Liked by me* and *Disliked by me*.
+- **Kids mode:** Settings → General. Choose the highest age rating to show and a PIN to leave. Titles above it, and titles with no rating, disappear from every list, search and suggestion, and opening one by its link says it cannot be loaded. Settings, Administration, the stats and Live TV are shut until the PIN is typed (wrong tries make the next one wait, up to 15 minutes). It checks first that the server tells the age rating of its titles. The PIN guards this app on this device; for a limit nobody can get round, also set the highest rating for the account in Administration.
+- **Trailers:** a *Trailer* button (or a list, with several) on the title page. It opens the trailer on its own site in a new tab: the app itself still loads nothing but your server.
+- **First-run setup:** the first time the app is opened on a device it asks the language, the look (background and accent) and the subtitle language, in three short steps, each applied as you choose. It can be skipped, and it comes back from Settings → About → *Run the setup again*.
+
+### Player and the way a title starts (phase 1 of the roadmap)
+- **Second subtitle:** a second track shows above the first (a step smaller, in another colour) to learn a language or to read a dub. It is chosen on a page of the player's menu, only while a first subtitle is on, and the language is remembered.
+- **Episodes in the player:** a button with a tab per season lists the episodes of the series; picking one plays it without leaving the player. (TV too.)
+- **Choose before you play:** under Play, a title with more than one version of the file (4K and 1080p), more than one audio track or subtitles to choose from gets three small dropdowns: version, audio and subtitle. The version you choose is offered first next time. (The TV app already chose the version.)
+- **Skip by kind:** intros, recaps, credits and previews each get their own choice in Settings: show a button, skip by itself, or do nothing. A button nobody pressed goes away after ten seconds on the web. (TV too; the old single switch still decides intros, recaps and credits until you choose.)
+- **The seek bar:** the labels on each side can show the time played, the time left, the total length, the time it ends, or nothing; the chapter marks can be turned off; and dragging the bar can pause the picture until you let go.
+- **Converted sound:** a list in Settings of sound formats (AC-3, E-AC-3, FLAC; DTS and TrueHD on the TV) that the server converts although the device could play them, for a receiver that stays silent. The picture is not touched.
+
+### Interface polish (web)
+- **Player settings menu in pages:** the long list became a short menu (Audio, Subtitles, Quality, Speed, Subtitle look, Chapters) that opens one page at a time, with the switches (autoplay, repeat the list, cinema mode) at the bottom. Escape closes it.
+- **Cleaner player bar:** the times sit on either side of the seek bar, the volume slider appears on hover, and the seek bar is a solid accent line.
+- **One toolbar for every library:** Movies, Series, Anime, Books, Music videos, Music and Collections share a single row of pill filters (library, genre, sort, more filters, Surprise me) that scrolls on a phone instead of wrapping. Selected letters and filters are white pills.
+- **Details and series pages:** very long audio and subtitle lists fold into two lines with *Show more*; seasons are one scrolling row; an episode's *Play on…* and *Edit* appear when the row is pointed at (always on a touchscreen).
+- **Cards, header and bars:** a calmer hover (small zoom, dark shadow, white ring), white round play buttons, a thinner progress bar, and no decorative glows anywhere (heading stripes, tabs, header indicators, covers, spinners).
+- **Settings and Administration:** real switches instead of check boxes, flat cards, small-caps group names in an account's permissions, and no scroll bar under the tabs on a phone.
+- **Sign-in:** the grid in the background is gone. The primary button now reaches the 4.5:1 text contrast in every theme.
+
+### TV app
+- The focused card no longer draws a blue glow; the blue frame and a slightly smaller zoom remain.
+- Settings → Playback has a choice per kind of skippable stretch and a list of sound formats the server should convert; the player has an *Episodes* button for episodes.
+
 ## [1.2.0] - 2026-10-27
 
 A better video player, music that flows from one song to the next, mixes made for you, music videos you can browse by folder, play from their card and keep playing in a mini bar, and more varied suggestions. The TV app gets subtitle search, mixes and radio, and play-through.

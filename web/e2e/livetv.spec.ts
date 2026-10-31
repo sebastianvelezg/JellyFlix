@@ -47,11 +47,11 @@ test('live tv: a channel can be found by a part of its name or number, and nothi
   const finder = page.getByRole('searchbox', { name: 'Find a channel' })
   await finder.fill('channel 07')
   await expect(page.getByRole('button', { name: 'Watch 7 · Test Channel 07' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Watch/ })).toHaveCount(1)
+  await expect(page.getByRole('button', { name: /^Watch \d+ ·/ })).toHaveCount(1)
   await finder.fill('zzz')
   await expect(page.getByText('No channel matches "zzz".')).toBeVisible()
   await finder.fill('')
-  await expect(page.getByRole('button', { name: /^Watch/ }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Watch \d+ ·/ }).first()).toBeVisible()
 })
 
 test('live tv: the guide shows the programmes of each channel and what is chosen can be watched', async ({ page }) => {
@@ -82,7 +82,7 @@ test('live tv: watching a channel opens the stream, cannot be sought, changes ch
   await waitPlaying(page)
   await expect(shell.getByText('Live', { exact: true })).toBeVisible()
   await expect(shell.getByRole('slider', { name: 'Seek' })).toHaveCount(0)
-  await expect(shell.getByText(/Show 1-\d+/)).toBeVisible()
+  await expect(shell.locator('p').getByText(/Show 1-\d+/)).toBeVisible()
 
   // The server was asked to open the stream and the reports say it is live.
   const ask = mock.requests.find((r) => r.path === '/Items/ch0001/PlaybackInfo')
@@ -96,6 +96,9 @@ test('live tv: watching a channel opens the stream, cannot be sought, changes ch
   await waitPlaying(page)
   await page.keyboard.press('ArrowUp')
   await expect(page).toHaveURL(/#\/live\/ch0001$/)
+  // The keys are bound to the channel on screen: let the player show it before pressing again (a person cannot press within a frame).
+  await expect(watching(page, '1 · Test Channel 01')).toBeVisible()
+  await waitPlaying(page)
   await page.keyboard.press('ArrowUp')
   await expect(page).toHaveURL(/#\/live\/ch0003$/)
   await waitPlaying(page)

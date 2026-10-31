@@ -15,16 +15,7 @@
     <meta name="apple-mobile-web-app-title" content="Jellyflix" />
     <title>Jellyflix</title>
     <!-- The look you chose (theme colours, poster size), put on the page before anything is drawn so it never flashes the default. -->
-    <script>
-      try {
-        var saved = JSON.parse(localStorage.getItem('jellyflix.appearance.css') || 'null')
-        if (saved && saved.vars) {
-          for (var name in saved.vars) document.documentElement.style.setProperty(name, saved.vars[name])
-          for (var attr in saved.attrs) document.documentElement.dataset[attr] = saved.attrs[attr]
-          if (saved.bg) document.querySelector('meta[name="theme-color"]').setAttribute('content', saved.bg)
-        }
-      } catch (e) {}
-    </script>
+    <script src="./paint.js"></script>
     <!-- Settings of whoever hosts the app (the default server address). Written when the server starts, not at build time. -->
     <script src="/config.js"></script>
   </head>
