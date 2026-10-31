@@ -54,6 +54,15 @@ Goal: the app is easier to set up, to browse and to share at home.
 
 Done when: a kids profile cannot see a blocked title by any route (a test visits every page), and the rest work as described.
 
+**Status: built on the web** (see the changelog). How it ended up differs a little from the table:
+
+- 2.3: the titles under the posters have a switch; the library order saved on the server was left out (the top menu can already be ordered on each device, and writing the order to the account's configuration is a change to the server we did not want to make unasked).
+- 2.4: like and dislike on the title page (the SDK has no stars); the filters *Liked by me* and *Disliked by me* use the server's own `Likes` and `Dislikes`.
+- 2.5: one feature, *Kids mode*: a highest age rating and a PIN, for the whole device. The request layer asks the server to leave out what is above the rating (where the list is made of titles that carry a rating) and checks every answer again; a title with no rating is hidden. Before turning it on, the app checks the server says the rating of its titles. Not checked on a real server (only on the mock): that the lists of a real Jellyfin carry `OfficialRating`.
+- 2.6: the trailer opens on YouTube in a new tab, not inside the app: an embedded player would load Google's scripts, and the app promises to load nothing but your server. Local trailer files were left out.
+- 2.7: three questions (language, look, subtitles), asked only on a device that has never saved a preference.
+- 2.2, 2.3, 2.4, 2.5 and 2.7 are web only for now; the TV catch-up of phase 3 picks up what is missing.
+
 Risks: 2.5 touches every list, so build one filter in `core/` and call it from everywhere. 2.6 depends on what the server returns for trailers.
 
 ---

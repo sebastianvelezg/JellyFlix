@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { personImageUrl, type MovieDetails, type Person, type Session } from '../core'
 import { ToolbarSelect } from './Toolbar'
 import { formatBitrate, formatBytes, formatDate } from './format'
-import { BackIcon } from './icons'
+import { BackIcon, ExternalIcon } from './icons'
 import { Img } from './Img'
 import { Subtext } from './Subtext'
 import { t } from '../i18n'
@@ -105,6 +105,45 @@ export function PlaySummary({ media }: { media?: MovieDetails['media'] }) {
     <p className="rise rise-3 mt-4 max-w-2xl text-sm text-neutral-400">
       <span className="font-medium text-neutral-300">{t('Plays as')}</span> {parts.join(' · ')}
     </p>
+  )
+}
+
+/**
+ * The trailer(s) of a title. They open on their own site in a new tab (the app loads nothing from anywhere but your server):
+ * one is a button; several are a small list under the button.
+ */
+export function TrailerButton({ trailers }: { trailers: MovieDetails['trailers'] }) {
+  if (trailers.length === 0) return null
+  const link = 'btn py-3'
+  if (trailers.length === 1) {
+    const only = trailers[0]
+    return (
+      <a href={only?.url} target="_blank" rel="noopener noreferrer" className={link}>
+        {t('Trailer')} <ExternalIcon />
+        <span className="sr-only"> ({t('opens in a new tab')})</span>
+      </a>
+    )
+  }
+  return (
+    <details className="group/trailers relative">
+      <summary className={`${link} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>{t('Trailers')}</summary>
+      <ul className="absolute left-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface-2)] p-1 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)]">
+        {trailers.map((trailer, i) => (
+          <li key={trailer.url}>
+            <a
+              href={trailer.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm text-neutral-100 transition-colors hover:bg-white/[.08] focus-visible:bg-white/[.08] focus-visible:outline-none"
+            >
+              <span className="min-w-0 truncate">{trailer.name || `${t('Trailer')} ${i + 1}`}</span>
+              <ExternalIcon />
+              <span className="sr-only">({t('opens in a new tab')})</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 }
 

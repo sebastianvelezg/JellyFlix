@@ -375,6 +375,7 @@ export function Header({
   onHome,
   onSettings,
   onSignOut,
+  kids = false,
 }: {
   session: Session
   query: string
@@ -387,6 +388,8 @@ export function Header({
   onHome: () => void
   onSettings: () => void
   onSignOut: () => void
+  /** Kids mode is on: the round button leaves it (with the PIN) instead of opening Settings, and there is no Sign out. */
+  kids?: boolean
 }) {
   // Transparent over the hero at the top of the page, frosted black once you scroll.
   const [scrolled, setScrolled] = useState(() => window.scrollY > 12)
@@ -430,16 +433,18 @@ export function Header({
           <button
             type="button"
             onClick={onSettings}
-            aria-label={t('Settings')}
-            title={t('Settings')}
+            aria-label={kids ? t('Leave Kids mode') : t('Settings')}
+            title={kids ? t('Leave Kids mode') : t('Settings')}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent-deep)] text-sm font-semibold text-[var(--color-accent-ink)] ring-1 ring-white/20 transition hover:scale-105 pointer-coarse:h-11 pointer-coarse:w-11"
           >
             <span aria-hidden="true">{initial}</span>
           </button>
           {/* On a phone the search box needs the room; signing out is in Settings (the round button). */}
-          <button type="button" className="btn-ghost max-lg:hidden" onClick={onSignOut}>
-            {t('Sign out')}
-          </button>
+          {!kids && (
+            <button type="button" className="btn-ghost max-lg:hidden" onClick={onSignOut}>
+              {t('Sign out')}
+            </button>
+          )}
         </div>
       </div>
     </header>

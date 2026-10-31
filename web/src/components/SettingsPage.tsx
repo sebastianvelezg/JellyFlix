@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { authorizeQuickConnect, CLIENT_VERSION, languageName, type Session } from '../core'
 import {
   clearBrowsePrefs,
@@ -31,6 +31,9 @@ import { AppearanceSettings } from './AppearanceSettings'
 import { SettingsBackup } from './SettingsBackup'
 import { openShortcuts } from './ShortcutsDialog'
 import { Card, Toggle } from './SettingsParts'
+import { KidsCard } from './KidsMode'
+import { openSetup } from './SetupWizard'
+import { SETTINGS_INDEX, searchSettings, type SettingEntry } from './settingsIndex'
 
 /** Putting the app on a phone, tablet or computer so it opens like any other app (its own window and icon, no browser bars). */
 function InstallApp() {
@@ -223,6 +226,64 @@ function PlayerCard({ player, update }: { player: PlayerPrefsValue; update: (pat
   )
 }
 
+/** The element of the open tab that carries a setting's name, and the control next to it. */
+function findSetting(panel: HTMLElement, text: string): HTMLElement | null {
+  const named = [...panel.querySelectorAll<HTMLElement>('h2, legend, label, span, p, button')].find((n) => n.textContent?.trim() === text)
+  if (!named) return null
+  const scope = named.closest('label, fieldset') ?? named.closest('section') ?? named.parentElement
+  return scope?.querySelector<HTMLElement>('input, select, button, textarea') ?? named
+}
+
+/** A box above the tabs that finds a setting by what it is called, and takes you to it. */
+function SettingsSearch({ isAdmin, tabName, onPick }: { isAdmin: boolean; tabName: (tab: SettingEntry['tab']) => string; onPick: (entry: SettingEntry) => void }) {
+  const [query, setQuery] = useState('')
+  const listId = useId()
+  const entries = SETTINGS_INDEX.filter((e) => isAdmin || !e.admin)
+  const found = searchSettings(query, entries, (e) => t(e.label), tabName)
+  const pick = (entry: SettingEntry) => {
+    setQuery('')
+    onPick(entry)
+  }
+  return (
+    <div className="relative mb-4">
+      <label htmlFor={`${listId}-input`} className="sr-only">
+        {t('Search settings')}
+      </label>
+      <input
+        id={`${listId}-input`}
+        type="search"
+        className="field rounded-full"
+        placeholder={t('Search settings')}
+        autoComplete="off"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setQuery('')
+          if (e.key === 'Enter' && found[0]) pick(found[0])
+        }}
+      />
+      {query.trim() !== '' && (
+        <ul id={listId} aria-label={t('Matching settings')} className="mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface-2)]">
+          {found.length === 0 ? (
+            <li className="px-4 py-3 text-sm text-neutral-400" role="status">
+              {t('No setting has that name.')}
+            </li>
+          ) : (
+            found.map((entry) => (
+              <li key={`${entry.tab}:${entry.label}`}>
+                <button type="button" className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm text-neutral-100 transition hover:bg-white/[.08] focus-visible:bg-white/[.08] focus-visible:outline-none" onClick={() => pick(entry)}>
+                  <span>{t(entry.label)}</span>
+                  <span className="shrink-0 text-xs text-neutral-500">{tabName(entry.tab)}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 const TABS = ['general', 'appearance', 'playback', 'devices', 'plugins', 'about'] as const
 type Tab = (typeof TABS)[number]
 const TAB_LABEL: Record<Tab, string> = { general: 'General', appearance: 'Appearance', playback: 'Playback', devices: 'Devices', plugins: 'Plugins', about: 'About' }
@@ -250,6 +311,18 @@ export function SettingsPage({
   const [tab, setTab] = useState<Tab>('general')
   const isAdmin = useIsAdmin(session)
   const tabButtons = useRef<Record<string, HTMLButtonElement | null>>({})
+  // A setting found by the search: the tab it is in opens, and then the page goes to it.
+  const jump = useRef<SettingEntry | null>(null)
+  const [jumpCount, setJumpCount] = useState(0)
+  useEffect(() => {
+    const entry = jump.current
+    if (!entry) return
+    jump.current = null
+    const panel = document.getElementById('settings-panel')
+    const target = panel ? findSetting(panel, t(entry.label)) : null
+    target?.scrollIntoView({ block: 'center' })
+    target?.focus({ preventScroll: true })
+  }, [jumpCount])
   // Left and Right move between the tabs, as in any tab list.
   const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
@@ -273,6 +346,16 @@ export function SettingsPage({
         <BackIcon /> {t('Back')}
       </button>
       <h1 className="mb-6 text-3xl font-bold tracking-tight sm:text-4xl">{t('Settings')}</h1>
+
+      <SettingsSearch
+        isAdmin={isAdmin}
+        tabName={(id) => t(TAB_LABEL[id])}
+        onPick={(entry) => {
+          setTab(entry.tab)
+          jump.current = entry
+          setJumpCount((n) => n + 1)
+        }}
+      />
 
       <div role="tablist" aria-label={t('Settings')} className="no-scrollbar -mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1">
         {TABS.map((id) => (
@@ -367,6 +450,8 @@ export function SettingsPage({
             </select>
           </div>
         </Card>
+
+        <KidsCard session={session} />
 
         <Card title={t('Install')} description={t('Add Jellyflix to the home screen or desktop of this device.')}>
           <InstallApp />
@@ -496,6 +581,12 @@ export function SettingsPage({
         </>)}
         {tab === 'plugins' && <PluginsSettings session={session} />}
         {tab === 'about' && (<>
+        <Card title={t('Set up again')} description={t('The first questions once more: the language, the look and the subtitles.')}>
+          <button type="button" className="btn" onClick={openSetup}>
+            {t('Run the setup again')}
+          </button>
+        </Card>
+
         <Card title={t('Saved on this device')} description={t('Small preferences that make the app feel familiar. Clearing them never touches your server.')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-neutral-100">

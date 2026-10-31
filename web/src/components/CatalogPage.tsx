@@ -1,5 +1,6 @@
 import { StateMessage } from './StateMessage'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { readAppearance } from '../platform/web/appearance'
 import {
   FILTER_LABELS,
   getContinueEpisodes,
@@ -587,7 +588,7 @@ function EpisodeRows({
 }: Pick<CatalogCommon, 'session' | 'playbackVersion' | 'overrides' | 'onPlay' | 'onOpenSeries'> & { libraryId: string }) {
   const load = useCallback(
     () =>
-      Promise.all([getContinueEpisodes(session, { libraryId }), getNextUp(session, { libraryId })]).then(
+      Promise.all([getContinueEpisodes(session, { libraryId }), getNextUp(session, { libraryId, days: readAppearance().nextUpDays })]).then(
         ([resume, next]) => ({ resume, next, playbackVersion }),
       ),
     [session, libraryId, playbackVersion],

@@ -352,8 +352,9 @@ function NextUpRow({
   onPlay: (item: Movie) => void
   onOpenSeries: (seriesId: string) => void
 }) {
-  const load = useCallback(() => getNextUp(session).then((rows) => ({ rows, playbackVersion })), [session, playbackVersion])
-  const { state } = useSwr(swrKey(swrScope(session), 'home', 'next-up'), load, { fresh: 0 })
+  const { nextUpDays } = useAppearance()
+  const load = useCallback(() => getNextUp(session, { days: nextUpDays }).then((rows) => ({ rows, playbackVersion })), [session, playbackVersion, nextUpDays])
+  const { state } = useSwr(swrKey(swrScope(session), 'home', 'next-up', String(nextUpDays)), load, { fresh: 0 })
   if (state.status !== 'ready') return null
   // An episode you finished since this list was read is no longer "up next".
   const next = state.data.rows.map((e) => overrides[e.id] ?? e).filter((e) => !e.played && e.resumeTicks === 0)

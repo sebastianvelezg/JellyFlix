@@ -7,6 +7,14 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 A visual polish of the whole web app, without changing its identity (calmer, simpler and more consistent), and the first phase of the roadmap: the player and the way a title starts.
 
+### Household: settings, cards, my rating, Kids mode (phase 2 of the roadmap)
+- **Search in Settings:** a box above the tabs finds a setting by its name (or by words like "skip", "colour", "pin") and takes you to it, opening its tab.
+- **Cards:** Settings → Appearance → *Cards* turns off the titles under the posters, chooses what pressing a card of *Continue watching* and *Next up* does (play, or open the page; the little button in its corner does the other), and how far back *Next up* looks.
+- **My rating:** a thumb up and a thumb down on the title page, kept on your server, and two new choices in the library filter: *Liked by me* and *Disliked by me*.
+- **Kids mode:** Settings → General. Choose the highest age rating to show and a PIN to leave. Titles above it, and titles with no rating, disappear from every list, search and suggestion, and opening one by its link says it cannot be loaded. Settings, Administration, the stats and Live TV are shut until the PIN is typed (wrong tries make the next one wait, up to 15 minutes). It checks first that the server tells the age rating of its titles. The PIN guards this app on this device; for a limit nobody can get round, also set the highest rating for the account in Administration.
+- **Trailers:** a *Trailer* button (or a list, with several) on the title page. It opens the trailer on its own site in a new tab: the app itself still loads nothing but your server.
+- **First-run setup:** the first time the app is opened on a device it asks the language, the look (background and accent) and the subtitle language, in three short steps, each applied as you choose. It can be skipped, and it comes back from Settings → About → *Run the setup again*.
+
 ### Player and the way a title starts (phase 1 of the roadmap)
 - **Second subtitle:** a second track shows above the first (a step smaller, in another colour) to learn a language or to read a dub. It is chosen on a page of the player's menu, only while a first subtitle is on, and the language is remembered.
 - **Episodes in the player:** a button with a tab per season lists the episodes of the series; picking one plays it without leaving the player. (TV too.)

@@ -9,7 +9,9 @@ export async function startMock(options: MockOptions = {}): Promise<MockServer> 
 }
 
 /** Signs in. Starts on the movies page (the main page is `start: '/'`), since most tests are about movies. */
-export async function signIn(page: Page, mock: MockServer, opts: { keep?: boolean; start?: string } = {}) {
+export async function signIn(page: Page, mock: MockServer, opts: { keep?: boolean; start?: string; setup?: boolean } = {}) {
+  // The questions of the first run are for the test that is about them: the others find the app already set up.
+  if (!opts.setup) await page.addInitScript(() => localStorage.setItem('jellyflix.setup', '1'))
   await page.goto(opts.start ?? '/#/movies')
   await page.getByLabel('Server URL').fill(mock.url)
   await page.getByLabel('Username').fill('tester')

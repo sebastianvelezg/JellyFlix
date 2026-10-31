@@ -109,6 +109,9 @@ export {
   getSimilarMovies,
   personImageUrl,
   setFavorite,
+  trailerLinks,
+  type TrailerLink,
+  setRating,
   setWatched,
   type MediaInfo,
   type MediaTrackInfo,
@@ -157,6 +160,20 @@ export {
 } from './streamRequest'
 
 export { defaultVersion, setPlayChoice, takePlayChoice, type PlayChoice, type VersionRef } from './playChoice'
+export {
+  FREE_TRIES,
+  getKidsGuard,
+  hashPin,
+  isBlocked,
+  isValidPin,
+  PIN_MAX,
+  PIN_MIN,
+  ratingValue,
+  setKidsGuard,
+  verifyPin,
+  waitAfterFailures,
+  type KidsGuard,
+} from './parental'
 export { timeLabelText, type TimeLabelKind, type TimeLabelState } from './timeLabels'
 export { formatRuntime, formatTime, secondsToTicks, ticksToSeconds, TICKS_PER_SECOND } from './ticks'
 export {
@@ -491,3 +508,4 @@ export {
   type Program,
 } from './liveTv'
 export * from './musicVideos'
+export { checkKidsSetup, getAllowedSeries, getRatingTable, type KidsCheck } from './parentalServer'

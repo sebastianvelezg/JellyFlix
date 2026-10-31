@@ -1,6 +1,7 @@
 import { Jellyfin } from '@jellyfin/sdk'
 import type { Api } from '@jellyfin/sdk'
 import axios, { type AxiosError, type AxiosRequestConfig } from 'axios'
+import { BlockedTitle, getKidsGuard, guardResponse, guardUrl } from './parental'
 import { createGate, priorityOf } from './requestGate'
 
 export const CLIENT_NAME = 'Jellyflix Web'
@@ -87,11 +88,24 @@ export function createApi(serverUrl: string, deviceId: string, accessToken?: str
     const gate = createGate(MAX_READS_AT_ONCE)
     http.interceptors.request.use(async (config) => {
       if ((config.method ?? 'get').toLowerCase() !== 'get') return config
-      const url = withoutTotals(`${config.url ?? ''}`)
+      // Kids mode: the server is asked to leave out what is above the chosen rating (see `parental.ts`).
+      const url = guardUrl(withoutTotals(`${config.url ?? ''}`), getKidsGuard())
       config.url = url
       await gate.acquire(priorityOf(url), config.signal as AbortSignal | undefined)
       ;(config as Queued).holdsPlace = true
       return config
+    })
+    // Kids mode: whatever got through is checked again, and a title that may not be shown answers as if it did not exist.
+    http.interceptors.response.use((response) => {
+      const guard = getKidsGuard()
+      if (!guard || (response.config.method ?? 'get').toLowerCase() !== 'get') return response
+      try {
+        response.data = guardResponse(response.data, guard)
+      } catch (e) {
+        if (!(e instanceof BlockedTitle)) throw e
+        throw new axios.AxiosError('Not found', 'ERR_BAD_REQUEST', response.config, response.request, { ...response, status: 404, statusText: 'Not Found', data: undefined })
+      }
+      return response
     })
     // Registered before the retry below, so the place is given back before a failed read waits to try again.
     const giveBack = (config: Queued | undefined) => {

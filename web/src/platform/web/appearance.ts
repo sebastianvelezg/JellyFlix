@@ -26,6 +26,13 @@ export const BANNER_SIZES: readonly BannerSize[] = ['large', 'compact']
 export type NavStyle = 'full' | 'icons' | 'text'
 export const NAV_STYLES: readonly NavStyle[] = ['full', 'icons', 'text']
 
+/** What pressing a card of "Continue watching" or "Next up" does: start playing, or open the title's page. */
+export type CardAction = 'play' | 'open'
+export const CARD_ACTIONS: readonly CardAction[] = ['play', 'open']
+
+/** How far back "Next up" looks for a series you have been watching, in days (0 = as far as the server goes). */
+export const NEXT_UP_DAYS: readonly number[] = [0, 30, 90, 180, 365]
+
 export interface AppearancePrefs {
   theme: ThemeChoice
   posterSize: PosterSize
@@ -36,6 +43,10 @@ export interface AppearancePrefs {
   nav: NavStyle
   /** Which buttons the top menu has, and in what order. */
   menu: MenuLayout
+  /** The name and the year under each poster. */
+  titles: boolean
+  continueAction: CardAction
+  nextUpDays: number
 }
 
 export const APPEARANCE_DEFAULTS: AppearancePrefs = {
@@ -47,6 +58,9 @@ export const APPEARANCE_DEFAULTS: AppearancePrefs = {
   banner: 'large',
   nav: 'full',
   menu: DEFAULT_MENU_LAYOUT,
+  titles: true,
+  continueAction: 'play',
+  nextUpDays: 0,
 }
 
 export const KEY = 'jellyflix.appearance'
@@ -65,6 +79,9 @@ export function sanitizeAppearance(value: unknown): AppearancePrefs {
     banner: BANNER_SIZES.includes(p.banner as BannerSize) ? (p.banner as BannerSize) : 'large',
     nav: NAV_STYLES.includes(p.nav as NavStyle) ? (p.nav as NavStyle) : 'full',
     menu: sanitizeMenuLayout(p.menu),
+    titles: p.titles !== false,
+    continueAction: CARD_ACTIONS.includes(p.continueAction as CardAction) ? (p.continueAction as CardAction) : 'play',
+    nextUpDays: NEXT_UP_DAYS.includes(p.nextUpDays as number) ? (p.nextUpDays as number) : 0,
   }
 }
 
@@ -134,12 +151,13 @@ export function useAppearance(): AppearancePrefs {
 export function applyAppearance(prefs: AppearancePrefs = readAppearance(), root: HTMLElement = document.documentElement): void {
   const vars = themeVariables(prefs.theme)
   for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value)
-  const attrs = { posters: prefs.posterSize, density: prefs.density, size: prefs.uiSize, banner: prefs.banner, nav: prefs.nav }
+  const attrs = { posters: prefs.posterSize, density: prefs.density, size: prefs.uiSize, banner: prefs.banner, nav: prefs.nav, titles: prefs.titles ? 'on' : 'off' }
   root.dataset.posters = attrs.posters
   root.dataset.density = attrs.density
   root.dataset.size = attrs.size
   root.dataset.banner = attrs.banner
   root.dataset.nav = attrs.nav
+  root.dataset.titles = attrs.titles
   // The browser's own bars (Android address bar, the iPhone status area) follow the page.
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', canvasOf(prefs.theme.canvas).bg)
   try {

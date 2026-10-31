@@ -80,6 +80,10 @@ export interface MockOptions {
   remoteDevices?: Array<{ id: string; name: string; client?: string }>
   /** Titles come with trickplay pictures for the seek bar (default: none). */
   trickplay?: boolean
+  /** Every movie lists a trailer (YouTube); "Test Movie 002" lists two. */
+  trailers?: boolean
+  /** Movies and series carry an age rating (G, PG, PG-13 or R by their number) and the server can limit lists by it. */
+  ratings?: boolean
   /** Every video also has a second text subtitle (Spanish, stream 9, saying "Segunda linea de prueba"). */
   secondSubtitle?: boolean
   /** "Test Movie 002" also exists as a 4K version (a second media source, `ms-m0002-4k`). */
@@ -268,6 +272,8 @@ interface UserState {
   resume: Map<string, number>
   played: Set<string>
   favorites: Set<string>
+  /** Titles rated with a thumb: true for a like, false for a dislike. */
+  likes: Map<string, boolean>
   /** How many times each track was played to (near) its end. */
   plays: Map<string, number>
   /** Order of last playback, newest last (for Continue Watching). */
@@ -314,6 +320,7 @@ function userData(id: string, user: UserState, extra: Record<string, unknown> = 
     Played: user.played.has(id),
     PlayCount: user.plays.get(id) ?? (user.played.has(id) ? 1 : 0),
     IsFavorite: user.favorites.has(id),
+    ...(user.likes.has(id) ? { Likes: user.likes.get(id) } : {}),
     ...extra,
   }
 }
@@ -329,6 +336,7 @@ function showDto(show: string, user: UserState) {
     SortName: showName(prefix, n).toLowerCase(),
     ProductionYear: 2010 + (n % 10),
     Type: 'Series',
+    ...(withRatings ? { OfficialRating: ratingOfShow(n) } : {}),
     CommunityRating: ((n * 3) % 10) + 0.5,
     DateCreated: new Date(Date.UTC(2024, 6, 1) + n * 86_400_000).toISOString(),
     Genres: [GENRES[n % 3]],
@@ -345,7 +353,7 @@ function fullShowDto(show: string, user: UserState) {
   return {
     ...dto,
     Overview: `Overview of ${dto.Name}. A synthetic series used only by the mock server.`,
-    OfficialRating: 'TV-14',
+    OfficialRating: withRatings ? ratingOfShow(Number(show.slice(1))) : 'TV-14',
     Studios: [{ Name: 'Mock Network' }],
     People: [{ Id: 'p1', Name: 'Ada Actor', Role: 'Lead', Type: 'Actor', PrimaryImageTag: 'ptag' }],
   }
@@ -625,10 +633,19 @@ function channelDto(n: number, user: UserState, nowMs = Date.now()) {
   }
 }
 
+/** Set by `ratings`: the ratings are for the one mock server that is running (a test runs one at a time). */
+let withRatings = false
+let withTrailers = false
+const RATINGS = ['G', 'PG', 'PG-13', 'R']
+const ratingOfMovie = (n: number) => RATINGS[n % 4] as string
+const ratingOfShow = (n: number) => (n % 2 === 1 ? 'PG' : 'R')
+const RATING_VALUE: Record<string, number> = { g: 1, pg: 5, 'pg-13': 7, r: 9, 'tv-ma': 9 }
+
 function movieDto(n: number, user: UserState) {
   const id = movieId(n)
   return {
     Id: id,
+    ...(withRatings ? { OfficialRating: ratingOfMovie(n) } : {}),
     Name: `Test Movie ${String(n).padStart(3, '0')}`,
     SortName: `test movie ${String(n).padStart(3, '0')}`,
     ProductionYear: 2000 + (n % 25),
@@ -649,6 +666,7 @@ function movieDto(n: number, user: UserState) {
       Played: user.played.has(id),
       PlayCount: user.plays.get(id) ?? (user.played.has(id) ? 1 : 0),
       IsFavorite: user.favorites.has(id),
+      ...(user.likes.has(id) ? { Likes: user.likes.get(id) } : {}),
       LastPlayedDate: lastPlayedDate(id, user),
     },
   }
@@ -661,7 +679,15 @@ function fullDto(n: number, user: UserState, trickplay = false, versions = false
     ...(trickplay ? { Trickplay: { [`ms-${movieId(n)}`]: { '160': { Width: 160, Height: 90, TileWidth: 5, TileHeight: 2, ThumbnailCount: 10, Interval: 3000, Bandwidth: 100000 } } } } : {}),
     Overview: `Overview of test movie ${n}. A short synthetic story used only by the mock server.`,
     Taglines: [`Tagline ${n}`],
-    OfficialRating: 'PG-13',
+    OfficialRating: withRatings ? ratingOfMovie(n) : 'PG-13',
+    ...(withTrailers
+      ? {
+          RemoteTrailers: [
+            { Url: `https://www.youtube.com/watch?v=trailer${n}a`, Name: `Test Movie ${String(n).padStart(3, '0')} (Official Trailer)` },
+            ...(n === 2 ? [{ Url: `https://www.youtube.com/watch?v=trailer${n}b`, Name: 'Teaser' }] : []),
+          ],
+        }
+      : {}),
     CriticRating: 80,
     PremiereDate: '2005-06-01T00:00:00.0000000Z',
     Studios: [{ Name: 'Mock Studios' }],
@@ -715,6 +741,8 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
     Pick<MockOptions, 'username' | 'password' | 'movieCount' | 'playMode' | 'seriesCount' | 'animeCount' | 'musicVideos' | 'musicVideoFolders' | 'books' | 'audiobooks' | 'liveTv' | 'musicArtists' | 'collections'>
   > &
     MockOptions
+  withRatings = opts.ratings === true
+  withTrailers = opts.trailers === true
   const requests: RecordedRequest[] = []
   const tokens = new Set<string>()
   const displayPrefs = new Map<string, Record<string, string>>()
@@ -820,7 +848,7 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
     return infos
   }
   const resume = new Map<string, number>()
-  const user: UserState = { resume, played: new Set(), favorites: new Set(), plays: new Map(), lastPlayed: [] }
+  const user: UserState = { resume, played: new Set(), favorites: new Set(), likes: new Map(), plays: new Map(), lastPlayed: [] }
   let tokenCounter = 0
   let flakyHits = 0
   let playSessionCounter = 0
@@ -1518,6 +1546,16 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       if (filters.includes('IsUnplayed')) selected = selected.filter((r) => !isPlayed(r))
       if (filters.includes('IsPlayed')) selected = selected.filter((r) => isPlayed(r))
       if (filters.includes('IsFavorite')) selected = selected.filter((r) => user.favorites.has(r.id))
+      if (query.maxOfficialRating) {
+        const limit = RATING_VALUE[query.maxOfficialRating.toLowerCase()] ?? 0
+        const ratingOfRow = (r: Row) => (/^m\d{4}$/.test(r.id) ? ratingOfMovie(Number(r.id.slice(1))) : SHOW_ID.test(r.id) ? ratingOfShow(Number(r.id.slice(1))) : undefined)
+        selected = selected.filter((r) => {
+          const rating = ratingOfRow(r)
+          return rating !== undefined && (RATING_VALUE[rating.toLowerCase()] ?? 99) <= limit
+        })
+      }
+      if (filters.includes('Likes')) selected = selected.filter((r) => user.likes.get(r.id) === true)
+      if (filters.includes('Dislikes')) selected = selected.filter((r) => user.likes.get(r.id) === false)
       const sortKey = list('sortBy')?.[0]
       const sortValue = (r: Row) =>
         sortKey === 'DateCreated'
@@ -1898,6 +1936,14 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       } else if (on) user.favorites.add(id)
       else user.favorites.delete(id)
       return json(res, 200, dtoFor(id, user, opts)?.UserData)
+    }
+    const rating = /^\/UserItems\/([^/]+)\/Rating$/.exec(path)
+    if (rating && (req.method === 'POST' || req.method === 'DELETE')) {
+      if (!needAuth()) return
+      const id = rating[1] as string
+      if (req.method === 'POST') user.likes.set(id, query.likes === 'true')
+      else user.likes.delete(id)
+      return json(res, 200, { ...dtoFor(id, user, opts)?.UserData, Likes: user.likes.get(id) })
     }
     const playbackInfo = /^\/Items\/([^/]+)\/PlaybackInfo$/.exec(path)
     if (playbackInfo && req.method === 'POST') {

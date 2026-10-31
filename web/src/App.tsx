@@ -11,7 +11,10 @@ import { AddToPlaylistDialog } from './components/AddToPlaylistDialog'
 import { AdminTools } from './components/admin/AdminTools'
 import { clearActivity } from './platform/web/adminActivity'
 import { useAppearance } from './platform/web/appearance'
+import { restoreKids, useKids } from './platform/web/kids'
+import { KidsExitDialog } from './components/KidsMode'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
+import { SetupWizard } from './components/SetupWizard'
 import { Toaster } from './components/toast'
 import { HomePage } from './components/HomePage'
 import { BottomNav, Header, type NavTab } from './components/Header'
@@ -281,7 +284,13 @@ function Shell({
   const loadSections = useCallback(() => getLibrarySections(session), [session])
   // The list of libraries is remembered, so the page can start loading its rows without waiting for it.
   const { state: sections, retry: retrySections } = useSwr(swrKey(swrScope(session), 'sections'), loadSections, { fresh: 60_000 })
-  const available = sections.status === 'ready' ? SECTIONS.filter((x) => sections.data[x].length > 0) : []
+  // Kids mode: no Live TV (a channel has no age rating), and the settings pages are shut (see below).
+  const kids = useKids()
+  const [leavingKids, setLeavingKids] = useState(false)
+  useEffect(() => {
+    restoreKids(session)
+  }, [session])
+  const available = sections.status === 'ready' ? SECTIONS.filter((x) => sections.data[x].length > 0 && !(kids.enabled && x === 'livetv')) : []
   // The main page is only worth having when there is more than one section to mix.
   const hasHome = available.length >= 2
   const { menu } = useAppearance()
@@ -316,6 +325,13 @@ function Shell({
   const sectionRoute = (section: Section): Route =>
     section === 'movies' ? { page: 'browse' } : section === 'music' ? { page: 'music', tab: 'home' } : { page: 'section', section }
   const homeRoute: Route = hasHome || !firstSection ? { page: 'home' } : sectionRoute(firstSection)
+  // In Kids mode a link to Settings, Administration, the stats or Live TV lands on the home page instead.
+  const shutInKids =
+    kids.enabled && (route.page === 'settings' || route.page === 'admin' || route.page === 'stats' || route.page === 'live' || (route.page === 'section' && route.section === 'livetv'))
+  useEffect(() => {
+    if (shutInKids) go(homeRoute, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shutInKids])
   const noMovies = sections.status === 'ready' && sections.data.movies.length === 0
   const onBrowse = route.page === 'browse'
   const onHome = route.page === 'home'
@@ -503,9 +519,11 @@ function Shell({
             : go(homeRoute, { replace: route.page === 'search' })
         }
         onHome={() => go(homeRoute)}
-        onSettings={() => go({ page: 'settings' })}
+        onSettings={() => (kids.enabled ? setLeavingKids(true) : go({ page: 'settings' }))}
         onSignOut={onSignOut}
+        kids={kids.enabled}
       />
+      <KidsExitDialog open={leavingKids} onClose={() => setLeavingKids(false)} />
       <OfflineBanner />
       <main ref={mainRef} id="main" tabIndex={-1} className={`gutter-x pt-[var(--header-h)] outline-none ${queued || barShown ? 'pb-[calc(10rem+var(--nav-h))]' : 'pb-[calc(5rem+var(--nav-h))]'}`}>
         {homeSeen && hasHome && sections.status === 'ready' && (
@@ -734,6 +752,7 @@ function Shell({
         )}
       </main>
       <ShortcutsDialog />
+      <SetupWizard suppressed={kids.enabled} />
       <AddToPlaylistDialog session={session} />
       <AdminTools session={session} />
       <Toaster />

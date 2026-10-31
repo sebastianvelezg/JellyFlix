@@ -16,6 +16,7 @@ import { useCardActions, usePlayVideo } from './cardActions'
 import type { PlayQueueRef } from './route'
 import { CheckIcon, HeartIcon, InfoIcon, PlayIcon } from './icons'
 import { Img } from './Img'
+import { useAppearance } from '../platform/web/appearance'
 import { Subtext } from './Subtext'
 import { detailsKey, prefetchSwr } from './useSwr'
 import { t } from '../i18n'
@@ -173,8 +174,8 @@ export function MovieCard({
         )}
         {progress > 0 && <ProgressBar percent={progress} />}
       </div>
-      <p className="mt-2.5 truncate text-sm font-medium text-neutral-100 transition group-hover:text-white">{movie.name}</p>
-      <Subtext as="p" className="block min-h-4 truncate text-xs text-neutral-500" text={subtext} />
+      <p className="card-text mt-2.5 truncate text-sm font-medium text-neutral-100 transition group-hover:text-white">{movie.name}</p>
+      <Subtext as="p" className="card-text block min-h-4 truncate text-xs text-neutral-500" text={subtext} />
     </button>
     {canPlay && (
       // Over the middle of the picture (not of the whole card, which has its title under it). The card around it opens the title.
@@ -223,14 +224,18 @@ export function ContinueCard({
   const heading = isEpisode(movie) ? movie.seriesName : movie.name
   const detail = isEpisode(movie) ? [episodeCode(movie), movie.name].filter(Boolean).join(' · ') : null
   const status = resuming ? (left > 0 ? t('{time} left', { time: formatTime(left) }) : t('Resume')) : t('Up next')
+  // The card does what Settings → Appearance says; the little button in its corner does the other thing.
+  const { continueAction } = useAppearance()
+  const opens = continueAction === 'open'
+  const label = isEpisode(movie) ? `${movie.seriesName} ${episodeCode(movie)}` : movie.name
 
   return (
     <div className="group relative w-64 shrink-0 snap-start sm:w-72 lg:w-80">
       <button
         type="button"
-        onClick={() => onPlay(movie)}
+        onClick={() => (opens ? onOpen(movie) : onPlay(movie))}
         className="group block w-full text-left outline-none"
-        aria-label={t(resuming ? 'Resume {title}' : 'Play {title}', { title: isEpisode(movie) ? `${movie.seriesName} ${episodeCode(movie)}` : movie.name })}
+        aria-label={opens ? t('Open {title}', { title: label }) : t(resuming ? 'Resume {title}' : 'Play {title}', { title: label })}
       >
         <div className={`aspect-video ${frame}`}>
           <Img
@@ -243,19 +248,19 @@ export function ContinueCard({
           <HoverPlay />
           {progress > 0 && <ProgressBar percent={progress} />}
         </div>
-        <p className="mt-2.5 truncate text-sm font-medium text-neutral-100 group-hover:text-white">{heading}</p>
-        <p className="truncate text-xs text-neutral-500">
+        <p className="card-text mt-2.5 truncate text-sm font-medium text-neutral-100 group-hover:text-white">{heading}</p>
+        <p className="card-text truncate text-xs text-neutral-500">
           {detail ? `${detail} · ${status}` : status}
         </p>
       </button>
       <button
         type="button"
-        onClick={() => onOpen(movie)}
+        onClick={() => (opens ? onPlay(movie) : onOpen(movie))}
         className="absolute right-2 top-2 z-20 rounded-full bg-black/60 p-1.5 text-neutral-200 opacity-0 backdrop-blur transition hover:bg-black/85 hover:text-white focus-visible:opacity-100 group-hover:opacity-100"
-        aria-label={t('Details for {name}', { name: movie.name })}
-        title={t('Details')}
+        aria-label={opens ? t('Play {title}', { title: label }) : t('Details for {name}', { name: movie.name })}
+        title={opens ? t('Play') : t('Details')}
       >
-        <InfoIcon />
+        {opens ? <PlayIcon /> : <InfoIcon />}
       </button>
     </div>
   )

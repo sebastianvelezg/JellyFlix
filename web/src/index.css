@@ -75,6 +75,10 @@
     --hero-min: 74vh;
   }
 }
+/* "Titles under posters" turned off: the picture stands alone (the name stays for a screen reader and in the tooltip). */
+html[data-titles='off'] .card-text {
+  display: none;
+}
 html[data-density='compact'] {
   --section-gap: 1.5rem;
 }

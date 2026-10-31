@@ -41,6 +41,35 @@ export interface MediaInfo {
   subtitles: MediaTrackInfo[]
 }
 
+/** A trailer the server knows by its address (almost always a video on YouTube). */
+export interface TrailerLink {
+  /** Its name, empty when the server gives none (the page then calls it "Trailer"). */
+  name: string
+  url: string
+}
+
+/**
+ * The trailers of a title as links, in the server's order: only web addresses (never a script or a file), each once, with its
+ * name when the server has one. They open on their own site, in a new tab: the app itself loads nothing from anywhere but your server.
+ */
+export function trailerLinks(trailers: Array<{ Url?: string | null; Name?: string | null }> | null | undefined): TrailerLink[] {
+  const seen = new Set<string>()
+  const links: TrailerLink[] = []
+  for (const trailer of trailers ?? []) {
+    let url: URL
+    try {
+      url = new URL(trailer.Url ?? '')
+    } catch {
+      continue
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') continue
+    if (seen.has(url.href)) continue
+    seen.add(url.href)
+    links.push({ name: trailer.Name?.trim() || '', url: url.href })
+  }
+  return links
+}
+
 /** One version of a title (the same film as 4K and as 1080p, or another edition) with what it holds. */
 export interface MediaVersion {
   /** The media source id, which is what the player asks the server for. */
@@ -65,6 +94,8 @@ export interface MovieDetails extends Movie {
   authors: string[]
   studios: string[]
   media?: MediaInfo
+  /** The trailers the server lists, as links to open. */
+  trailers: TrailerLink[]
   /** Every version of the file the server has, in the server's order (only more than one when there are real alternatives). */
   versions: MediaVersion[]
   /** Series only: "Continuing" or "Ended", and how many seasons the server lists. */
@@ -167,6 +198,7 @@ export function toMovieDetails(dto: BaseItemDto): MovieDetails | null {
     studios: (dto.Studios ?? []).map((s) => s.Name).filter((n): n is string => !!n),
     media: toMediaInfo(dto),
     versions: toVersions(dto),
+    trailers: trailerLinks(dto.RemoteTrailers),
     status: dto.Status ?? undefined,
     seasonCount: dto.Type === 'Series' ? (dto.ChildCount ?? undefined) : undefined,
   }
@@ -211,6 +243,16 @@ export async function setWatched(session: Session, id: string, watched: boolean)
     ? await api.markPlayedItem({ itemId: id, userId: session.userId })
     : await api.markUnplayedItem({ itemId: id, userId: session.userId })
   return { played: data.Played ?? watched, favorite: data.IsFavorite ?? false, resumeTicks: data.PlaybackPositionTicks ?? 0 }
+}
+
+/** Says you liked a title (true), did not (false), or takes it back (null). Returns what the server now has. */
+export async function setRating(session: Session, id: string, liked: boolean | null): Promise<boolean | null> {
+  const api = getUserDataApi(session.api)
+  const { data } =
+    liked === null
+      ? await api.deleteUserItemRating({ itemId: id, userId: session.userId })
+      : await api.updateUserItemRating({ itemId: id, userId: session.userId, likes: liked })
+  return data.Likes ?? null
 }
 
 export async function setFavorite(session: Session, id: string, favorite: boolean): Promise<UserState> {

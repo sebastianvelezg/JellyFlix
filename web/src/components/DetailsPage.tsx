@@ -9,6 +9,7 @@ import {
   getSimilarMovies,
   posterUrl,
   setPlayChoice,
+  setRating,
   ticksToSeconds,
   type Movie,
   type MovieDetails,
@@ -19,10 +20,10 @@ import {
 import { EditButton } from './admin/EditButton'
 import { useReloadOnEdit } from './admin/editorEvents'
 import { PlayOnButton } from './remote/PlayOnButton'
-import { CheckIcon, HeartIcon, PlayIcon, RestartIcon, StarIcon } from './icons'
+import { CheckIcon, HeartIcon, PlayIcon, RestartIcon, StarIcon, ThumbIcon } from './icons'
 import { RowCard } from './MovieCard'
 import { Row } from './Row'
-import { CastCard, DetailsSkeleton, Facts, PlayOptions, TitleHero, type PlayPick } from './TitleParts'
+import { CastCard, DetailsSkeleton, Facts, PlayOptions, TitleHero, TrailerButton, type PlayPick } from './TitleParts'
 import { readVersionPref, writeVersionPref } from '../platform/web/prefs'
 import { detailsKey, swrKey, swrScope, useSwr } from './useSwr'
 import { useToggles } from './useToggles'
@@ -117,6 +118,21 @@ function DetailsContent({
     setPick(next)
     if (next.versionId !== pick.versionId) writeVersionPref(movie.versions.find((v) => v.id === next.versionId)?.media.resolution ?? null)
   }
+  // Your own rating: a thumb up or down; pressing the one that is on takes it back.
+  const [ratingError, setRatingError] = useState(false)
+  const rate = async (wanted: boolean) => {
+    const before = movie.liked
+    const next = before === wanted ? null : wanted
+    setRatingError(false)
+    onChange({ ...movie, liked: next ?? undefined })
+    try {
+      const saved = await setRating(session, movie.id, next)
+      onChange({ ...movie, liked: saved ?? undefined })
+    } catch {
+      onChange({ ...movie, liked: before })
+      setRatingError(true)
+    }
+  }
   const play = (startOver: boolean) => {
     const choice: PlayChoice = {}
     if (movie.versions.length > 1 && pick.versionId) choice.mediaSourceId = pick.versionId
@@ -192,6 +208,7 @@ function DetailsContent({
               </button>
             )}
             <PlayOnButton itemId={movie.id} />
+            <TrailerButton trailers={movie.trailers} />
             <button
               type="button"
               className={`btn py-3 ${movie.played ? 'border-[var(--color-accent)]/50 text-[var(--color-accent)]' : ''}`}
@@ -210,8 +227,33 @@ function DetailsContent({
             >
               <HeartIcon filled={movie.favorite} /> {movie.favorite ? t('Favorite') : t('Add to favorites')}
             </button>
+            <span className="inline-flex" role="group" aria-label={t('My rating')}>
+              <button
+                type="button"
+                className={`btn rounded-r-none py-3 ${movie.liked === true ? 'border-[var(--color-accent)]/50 text-[var(--color-accent)]' : ''}`}
+                aria-pressed={movie.liked === true}
+                onClick={() => void rate(true)}
+                title={movie.liked === true ? t('Take back my like') : t('I like it')}
+              >
+                <ThumbIcon /> <span className="sr-only">{t('I like it')}</span>
+              </button>
+              <button
+                type="button"
+                className={`btn -ml-px rounded-l-none py-3 ${movie.liked === false ? 'border-[var(--color-accent)]/50 text-[var(--color-accent)]' : ''}`}
+                aria-pressed={movie.liked === false}
+                onClick={() => void rate(false)}
+                title={movie.liked === false ? t('Take back my dislike') : t('I do not like it')}
+              >
+                <ThumbIcon down /> <span className="sr-only">{t('I do not like it')}</span>
+              </button>
+            </span>
             <EditButton session={session} target={{ id: movie.id, name: movie.name, type: 'Movie' }} />
           </div>
+          {ratingError && (
+            <p role="alert" className="alert-error mt-3 max-w-xl">
+              {t('Could not save your rating. Check your connection and try again.')}
+            </p>
+          )}
           <PlayOptions movie={movie} pick={pick} onChange={choose} />
           {actionError && (
             <p role="alert" className="alert-error mt-3 max-w-xl">
