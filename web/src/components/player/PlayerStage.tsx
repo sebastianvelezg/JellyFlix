@@ -37,6 +37,7 @@ import { CloseIcon, FullscreenIcon, PauseIcon, PlayIcon, SkipIcon, SkipNextIcon 
 import { SeekBar } from '../music/controls'
 import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
+import { useSyncPlay, useSyncPlayVideo } from '../syncplay/SyncPlayProvider'
 import { Controls } from './Controls'
 import { DOCK_BAR_CLASS, DOCK_BUTTON, DOCK_THUMB_CLASS } from './dock'
 import { enterFullscreen, inFullscreen, leaveFullscreen } from './fullscreen'
@@ -154,6 +155,13 @@ export function PlayerStage({
   onPlaying?: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  // Watching together: the video follows the group (and waits at the start until everyone is ready).
+  const together = useSyncPlay()
+  const togetherRef = useRef(together)
+  useEffect(() => {
+    togetherRef.current = together
+  })
+  useSyncPlayVideo(videoRef, plan.itemId)
   const onPlayingRef = useRef(onPlaying)
   useEffect(() => {
     onPlayingRef.current = onPlaying
@@ -279,6 +287,7 @@ export function PlayerStage({
       token: session.accessToken,
       authorization: session.api.authorizationHeader,
       startSeconds,
+      autoplay: togetherRef.current ? togetherRef.current.shouldAutoplay() : true,
       onFatal: setError,
     })
     attachedRef.current = attached

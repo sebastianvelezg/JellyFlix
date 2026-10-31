@@ -15,6 +15,8 @@ test.describe('a browser set to Spanish', () => {
 
   test('opens in Spanish, from the sign-in form to the pages, and can be switched to English and back', async ({ page }) => {
     mock = await startMock(everything)
+    // (The questions of the first run are for the test that is about them.)
+    await page.addInitScript(() => localStorage.setItem('jellyflix.setup', '1'))
     await page.goto('/#/')
     await expect(page.locator('html')).toHaveAttribute('lang', 'es')
     await expect(page.getByRole('button', { name: 'Conectar' })).toBeVisible()
@@ -56,6 +58,7 @@ test.describe('a browser set to Spanish', () => {
 
   test('the player and its menu speak Spanish, and subtitle sync is announced in Spanish', async ({ page }) => {
     mock = await startMock(everything)
+    await page.addInitScript(() => localStorage.setItem('jellyflix.setup', '1'))
     await page.goto('/#/play/m0001')
     await page.getByLabel('Dirección del servidor').fill(mock.url)
     await page.getByLabel('Usuario').fill('tester')
@@ -78,6 +81,7 @@ test.describe('a browser set to Spanish', () => {
 
 test('a browser set to English shows English, and Settings can switch it to Spanish', async ({ page }) => {
   mock = await startMock(everything)
+  await page.addInitScript(() => localStorage.setItem('jellyflix.setup', '1'))
   await page.goto('/#/settings')
   await page.getByLabel('Server URL').fill(mock.url)
   await page.getByLabel('Username').fill('tester')

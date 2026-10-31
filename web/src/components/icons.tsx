@@ -22,6 +22,14 @@ function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: Reac
   )
 }
 
+export const PeopleIcon = () => (
+  <Icon>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+    <path d="M16 4.9a3.2 3.2 0 0 1 0 6.2M18 14.4c1.8.8 3 2.6 3 5.6" />
+  </Icon>
+)
+
 export const PlayIcon = () => (
   <Icon fill="currentColor" stroke="none">
     <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" />

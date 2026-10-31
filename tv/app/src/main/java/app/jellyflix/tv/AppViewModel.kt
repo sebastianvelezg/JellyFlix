@@ -51,9 +51,12 @@ import app.jellyflix.tv.data.Libraries
 import app.jellyflix.tv.data.MenuItem
 import app.jellyflix.tv.data.MenuLayout
 import app.jellyflix.tv.data.NavStyle
+import app.jellyflix.tv.data.ChannelCategory
+import app.jellyflix.tv.data.LastChannel
 import app.jellyflix.tv.data.TvChannel
 import app.jellyflix.tv.data.TvProgram
 import app.jellyflix.tv.data.neighbourChannel
+import app.jellyflix.tv.data.splitChannelName
 import app.jellyflix.tv.data.nextProgram
 import app.jellyflix.tv.data.Lyrics
 import app.jellyflix.tv.data.MediaItem
@@ -64,6 +67,8 @@ import app.jellyflix.tv.data.Playlist
 import app.jellyflix.tv.data.PluginsReport
 import app.jellyflix.tv.data.Recommendation
 import app.jellyflix.tv.data.Section
+import app.jellyflix.tv.data.ScreensaverRating
+import app.jellyflix.tv.data.ScreensaverSource
 import app.jellyflix.tv.data.TvSettings
 import app.jellyflix.tv.data.Segment
 import app.jellyflix.tv.data.Session
@@ -79,6 +84,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import android.os.SystemClock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -217,7 +223,7 @@ class LiveTvState {
     /** The programme after the one on now, by channel (read for the channels on screen, to show "Next"). */
     var upNext by mutableStateOf<Map<UUID, TvProgram>>(emptyMap())
     var guide by mutableStateOf(false)
-    var favoritesOnly by mutableStateOf(false)
+    var category by mutableStateOf(ChannelCategory.All)
     val grid = LazyGridState()
     val list = LazyListState()
 
@@ -353,6 +359,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun showLook(look: Appearance) {
         Palette.apply(resolveTheme(look.theme))
         Posters.size = look.posters
+        Posters.titles = look.cardTitles
     }
 
     /** Whether the remote is on the top bar: the Music overview then scrolls back to its first card. */
@@ -396,6 +403,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun chooseCanvas(id: String) = updateAppearance { it.copy(theme = it.theme.copy(canvas = id)) }
     fun chooseAccent(id: String) = updateAppearance { it.copy(theme = ThemeChoice(it.theme.canvas, id)) }
     fun choosePosters(size: PosterSize) = updateAppearance { it.copy(posters = size) }
+    fun chooseCardTitles(on: Boolean) = updateAppearance { it.copy(cardTitles = on) }
     fun chooseNav(style: NavStyle) = updateAppearance { it.copy(nav = style) }
     fun updateMenu(change: (MenuLayout) -> MenuLayout) = updateAppearance { it.copy(menu = change(it.menu)) }
     fun updateHome(change: (HomeLayout) -> HomeLayout) = updateAppearance { it.copy(home = change(it.home)) }
@@ -469,7 +477,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val anime = LibraryState(Section.Anime)
     val musicVideos = LibraryState(Section.MusicVideos)
     val books = LibraryState(Section.Books)
-    val liveTv = LiveTvState()
+    val liveTv = LiveTvState().also { it.category = ChannelCategory.of(store.liveCategory) }
+
+    /** The channel watched last, kept across visits (and forgotten on signing out). */
+    var lastChannel by mutableStateOf(store.lastChannel?.let { (id, name) -> runCatching { LastChannel(UUID.fromString(id), name) }.getOrNull() })
+        private set
     val collectionList = LibraryState(Section.Collections)
 
     // Music
@@ -588,6 +600,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         launchSafe { capabilities = runCatching { io { repo.capabilitySummary() } }.getOrDefault(emptyList()) }
+        startScreensaverWatch()
         session?.let { s ->
             // What the main page showed last time goes up at once; the server's answer replaces it a moment later.
             HomeCache.load(getApplication(), s)?.let { cached ->
@@ -607,6 +620,48 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             loadHome()
             startRemote()
         }
+    }
+
+    // ---- Screensaver --------------------------------------------------------------------------------------------
+
+    /** True while the screensaver covers the screen; any key takes it away. */
+    var screensaverShown by mutableStateOf(false)
+        private set
+    var screensaverPictures by mutableStateOf<List<MediaItem>>(emptyList())
+        private set
+    private var lastInput = SystemClock.elapsedRealtime()
+    private var screensaverFor: Pair<ScreensaverSource, ScreensaverRating>? = null
+
+    /** A key was pressed: the idle time starts again and a screensaver that was showing goes. */
+    fun userActivity() {
+        lastInput = SystemClock.elapsedRealtime()
+        screensaverShown = false
+    }
+
+    private fun startScreensaverWatch() {
+        launchSafe {
+            while (true) {
+                delay(SCREENSAVER_CHECK_MS)
+                showScreensaverIfIdle()
+            }
+        }
+    }
+
+    /** Shows the screensaver when it is on, nothing has been pressed for as long as chosen, and nothing is playing or being started. */
+    private suspend fun showScreensaverIfIdle() {
+        val s = session ?: return
+        val minutes = settings.screensaver.minutes
+        if (minutes <= 0 || screensaverShown || busy) return
+        if (SystemClock.elapsedRealtime() - lastInput < minutes * 60_000L) return
+        val top = pages.lastOrNull()
+        if (top is Page.Player || top is Page.NowPlaying) return
+        val wanted = settings.screensaverSource to settings.screensaverRating
+        if (screensaverFor != wanted || screensaverPictures.isEmpty()) {
+            screensaverPictures = runCatching { io { repo.screensaverPictures(s, wanted.first, wanted.second) } }.getOrDefault(emptyList())
+            screensaverFor = wanted
+        }
+        // Nothing to show (no backdrops, or none within the rating): wait the whole time again before looking once more.
+        if (screensaverPictures.isEmpty()) lastInput = SystemClock.elapsedRealtime() else screensaverShown = true
     }
 
     // ---- Session ----------------------------------------------------------------------------------------------
@@ -771,11 +826,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (restart) liveTv.reset()
         if (liveTv.loading || (liveTv.loaded && liveTv.channels.size >= liveTv.total)) return
         liveTv.loading = true
-        val favorites = liveTv.favoritesOnly
+        val category = liveTv.category
         val generation = liveTv.generation
         launchSafe {
             try {
-                val page = io { repo.channels(s, liveTv.channels.size, LIVE_PAGE, favorites) }
+                val page = io { repo.channels(s, liveTv.channels.size, LIVE_PAGE, category) }
                 if (generation != liveTv.generation) return@launchSafe
                 liveTv.channels.addAll(page.items)
                 page.total?.let { liveTv.total = it }
@@ -803,13 +858,43 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         liveTv.guide = guide
     }
 
-    fun toggleLiveFavorites() {
-        liveTv.favoritesOnly = !liveTv.favoritesOnly
+    /** Narrows the channels to one kind (the arrows of the player then change channel inside it). It is remembered. */
+    fun setLiveCategory(category: ChannelCategory) {
+        if (liveTv.category == category) return
+        liveTv.category = category
+        store.liveCategory = category.key
         loadLiveTv(restart = true)
     }
 
     /** Watches a channel. */
     fun watch(channel: TvChannel) = play(channel.item, startMs = 0)
+
+    /** Goes back to the channel watched last. */
+    fun watchLast() {
+        val s = session ?: return
+        val last = lastChannel ?: return
+        liveTv.channels.firstOrNull { it.id == last.id }?.let { return watch(it) }
+        launchSafe {
+            try {
+                play(io { repo.details(s, last.id) }, startMs = 0)
+            } catch (e: Exception) {
+                fail(e)
+            }
+        }
+    }
+
+    /** The names of the channels before and after this one in the list being browsed, for the hint in the player. */
+    fun liveNeighbours(plan: PlaybackPlan): Pair<String, String>? {
+        val before = neighbourChannel(liveTv.channels, plan.item.id, -1) ?: return null
+        val after = neighbourChannel(liveTv.channels, plan.item.id, 1) ?: return null
+        return before.label to after.label
+    }
+
+    private fun rememberChannel(item: MediaItem) {
+        val last = LastChannel(item.id, splitChannelName(item.title).title)
+        lastChannel = last
+        store.lastChannel = last.id.toString() to last.name
+    }
 
     /** Changes channel from the player: the one [step] places on in the list (the list is read first when it has not been). */
     fun stepChannel(plan: PlaybackPlan, step: Int) {
@@ -842,6 +927,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val LIVE_PAGE = 60
+        const val SCREENSAVER_CHECK_MS = 10_000L
     }
 
     fun libraryOf(tab: Tab): LibraryState? = when (tab) {
@@ -957,7 +1043,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             kotlinx.coroutines.coroutineScope {
                 val withVideos = libs?.musicVideos?.isNotEmpty() == true
                 val resuming = async { runCatching { io { repo.continueAll(s, withVideos) } }.getOrNull() }
-                val upNext = async { runCatching { io { repo.nextUp(s) } }.getOrNull() }
+                val upNext = async { runCatching { io { repo.nextUp(s, settings.nextUp) } }.getOrNull() }
                 resuming.await()?.let { home.continueRow = it }
                 upNext.await()?.let { home.nextUp = it }
             }
@@ -1778,6 +1864,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         launchSafe { runCatching { io { repo.setFavorite(s, item.id, favorite) } } }
     }
 
+    /** A thumb up or down; pressing the one already chosen takes it back. */
+    fun rate(state: DetailState, likes: Boolean) {
+        val s = session ?: return
+        val item = state.full
+        val next = if (item.likes == likes) null else likes
+        state.full = item.copy(likes = next)
+        launchSafe { runCatching { io { repo.setRating(s, item.id, next) } } }
+    }
+
     // ---- Playback ---------------------------------------------------------------------------------------------
 
     /** Plays [first] and then the titles after it in [items] (a collection): when one ends the next starts. */
@@ -1812,6 +1907,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     val resume = if (target === item) startMs else target.resumeMs
                     val plan = io { repo.plan(s, target, null, null, resume, mediaSourceId = mediaSourceId.takeIf { target === item }, limits = settings.limits) }
+                    if (target.isChannel) rememberChannel(target)
                     val top = pages.lastIndex
                     if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(plan) else pages.add(Page.Player(plan))
                     if (target.kind == BaseItemKind.MUSIC_VIDEO && playContext == null) queueFolderOf(s, target)

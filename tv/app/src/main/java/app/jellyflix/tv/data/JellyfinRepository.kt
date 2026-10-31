@@ -95,6 +95,9 @@ const val MAX_READS_AT_ONCE = 4
 /** How many of the newest titles of a kind are read (the banner shows 16 of them, the row 20). */
 private const val RECENT_LIMIT = 20
 
+/** How many pictures the screensaver loads at a time. */
+private const val SCREENSAVER_PICTURES = 40
+
 /** The most collections listed to find which one holds a title (one request; a big library has a few hundred). */
 private const val MAX_COLLECTIONS_INDEXED = 1000
 
@@ -341,11 +344,35 @@ class JellyfinRepository(context: Context) {
         newestFirst(movies.await() + episodes.await() + videos?.await().orEmpty()).filter { it.resumeMs >= MIN_RESUME_MS }.take(16)
     }
 
-    suspend fun nextUp(session: Session): List<MediaItem> {
+    suspend fun nextUp(session: Session, window: NextUpWindow = NextUpWindow.Always): List<MediaItem> {
         val api = api(session)
+        // A series left alone for longer than the window is not offered again (0 days: no limit).
+        val cutoff = window.days.takeIf { it > 0 }?.let { java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).minusDays(it.toLong()) }
         return runCatching {
-            api.showApi.getNextUp(userId = userId(session), limit = 20, enableTotalRecordCount = false).content.items.map { toItem(api, it) }
+            api.showApi.getNextUp(userId = userId(session), limit = 20, nextUpDateCutoff = cutoff, enableTotalRecordCount = false).content.items.map { toItem(api, it) }
         }.onFailure { Log.w(TAG, "Could not load next up", it) }.getOrDefault(emptyList())
+    }
+
+    /** Pictures for the screensaver: titles that have a backdrop, in random order, and none above the age rating when one is set. */
+    suspend fun screensaverPictures(session: Session, source: ScreensaverSource, rating: ScreensaverRating): List<MediaItem> {
+        val api = api(session)
+        val kinds = when (source) {
+            ScreensaverSource.All -> listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES)
+            ScreensaverSource.Movies -> listOf(BaseItemKind.MOVIE)
+            ScreensaverSource.Series -> listOf(BaseItemKind.SERIES)
+        }
+        return api.libraryApi.getItems(
+            userId = userId(session),
+            includeItemTypes = kinds,
+            recursive = true,
+            sortBy = listOf(ItemSortBy.RANDOM),
+            imageTypes = listOf(ImageType.BACKDROP),
+            maxOfficialRating = rating.rating,
+            // A title with no rating at all is not known to be fine for a limit.
+            hasParentalRating = if (rating.rating != null) true else null,
+            limit = SCREENSAVER_PICTURES,
+            enableTotalRecordCount = false,
+        ).content.items.map { toItem(api, it) }.filter { it.backdropUrl != null }
     }
 
     /** A random movie, unwatched if there is one, from any movie library. */
@@ -1024,6 +1051,13 @@ class JellyfinRepository(context: Context) {
         else api.userDataApi.markUnplayedItem(itemId = id, userId = userId(session))
     }
 
+    /** My rating of a title: a thumb up (true), a thumb down (false), or none (null, which takes the rating away). */
+    suspend fun setRating(session: Session, id: UUID, likes: Boolean?) {
+        val api = api(session)
+        if (likes == null) api.userDataApi.deleteUserItemRating(itemId = id, userId = userId(session))
+        else api.userDataApi.updateUserItemRating(itemId = id, userId = userId(session), likes = likes)
+    }
+
     suspend fun setFavorite(session: Session, id: UUID, favorite: Boolean) {
         val api = api(session)
         if (favorite) api.userDataApi.markFavoriteItem(itemId = id, userId = userId(session))
@@ -1428,13 +1462,18 @@ class JellyfinRepository(context: Context) {
     }
 
     /** One page of the user's channels, each with what is on now. */
-    suspend fun channels(session: Session, startIndex: Int, limit: Int, favoritesOnly: Boolean = false): Page<TvChannel> {
+    suspend fun channels(session: Session, startIndex: Int, limit: Int, category: ChannelCategory = ChannelCategory.All): Page<TvChannel> {
         val api = api(session)
         val result = api.liveTvApi.getLiveTvChannels(
             userId = userId(session),
             startIndex = startIndex,
             limit = limit,
-            isFavorite = if (favoritesOnly) true else null,
+            isFavorite = if (category == ChannelCategory.Favorites) true else null,
+            isMovie = if (category == ChannelCategory.Movies) true else null,
+            isSeries = if (category == ChannelCategory.Series) true else null,
+            isSports = if (category == ChannelCategory.Sports) true else null,
+            isNews = if (category == ChannelCategory.News) true else null,
+            isKids = if (category == ChannelCategory.Kids) true else null,
             addCurrentProgram = true,
             enableUserData = true,
             sortBy = listOf(ItemSortBy.SORT_NAME),
@@ -1717,6 +1756,7 @@ class JellyfinRepository(context: Context) {
             resumeMs = (data?.playbackPositionTicks ?: 0L) / 10_000,
             played = data?.played ?: false,
             favorite = data?.isFavorite ?: false,
+            likes = data?.likes,
             seriesId = dto.seriesId,
             seasonId = dto.seasonId,
             episodeNumber = dto.indexNumber,

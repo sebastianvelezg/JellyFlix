@@ -77,6 +77,40 @@ enum class AudioFormat(val codec: String, @StringRes val label: Int) {
     TrueHd("truehd", R.string.audio_truehd),
 }
 
+/** How far back "Next up" looks for a series you were watching. */
+enum class NextUpWindow(val days: Int, @StringRes val label: Int) {
+    Always(0, R.string.nextup_always),
+    Days30(30, R.string.nextup_30),
+    Days90(90, R.string.nextup_90),
+    Days180(180, R.string.nextup_180),
+    Days365(365, R.string.nextup_365),
+}
+
+/** After how long without a key press the screensaver starts. */
+enum class ScreensaverDelay(val minutes: Int, @StringRes val label: Int) {
+    Off(0, R.string.screensaver_off),
+    Minutes2(2, R.string.screensaver_2),
+    Minutes5(5, R.string.screensaver_5),
+    Minutes10(10, R.string.screensaver_10),
+    Minutes15(15, R.string.screensaver_15),
+}
+
+/** Which titles' pictures the screensaver shows. */
+enum class ScreensaverSource(@StringRes val label: Int) {
+    All(R.string.screensaver_all),
+    Movies(R.string.screensaver_movies),
+    Series(R.string.screensaver_series),
+}
+
+/** The highest age rating a picture may have (the server's names for them); [rating] is null for no limit. */
+enum class ScreensaverRating(val rating: String?, @StringRes val label: Int) {
+    NoLimit(null, R.string.screensaver_any_rating),
+    G("G", R.string.screensaver_rating_g),
+    Pg("PG", R.string.screensaver_rating_pg),
+    Pg13("PG-13", R.string.screensaver_rating_pg13),
+    Restricted("R", R.string.screensaver_rating_r),
+}
+
 /** What the player asks of the server beyond what the TV can decode. */
 data class PlayLimits(
     val maxBitrate: Int = DEFAULT_MAX_BITRATE,
@@ -106,6 +140,10 @@ data class TvSettings(
     val skipOutro: SkipAction = SkipAction.Ask,
     val skipPreview: SkipAction = SkipAction.Ask,
     val convertAudio: Set<AudioFormat> = emptySet(),
+    val nextUp: NextUpWindow = NextUpWindow.Always,
+    val screensaver: ScreensaverDelay = ScreensaverDelay.Off,
+    val screensaverSource: ScreensaverSource = ScreensaverSource.All,
+    val screensaverRating: ScreensaverRating = ScreensaverRating.NoLimit,
 ) {
     val limits: PlayLimits
         get() = PlayLimits(
@@ -138,6 +176,10 @@ data class TvSettings(
         "skipOutro" to skipOutro.name,
         "skipPreview" to skipPreview.name,
         "convertAudio" to convertAudio.joinToString(",") { it.name },
+        "nextUp" to nextUp.name,
+        "screensaver" to screensaver.name,
+        "screensaverSource" to screensaverSource.name,
+        "screensaverRating" to screensaverRating.name,
     )
 
     companion object {
@@ -163,6 +205,10 @@ data class TvSettings(
                 skipOutro = pick(read("skipOutro"), migrated ?: d.skipOutro),
                 skipPreview = pick(read("skipPreview"), d.skipPreview),
                 convertAudio = read("convertAudio")?.split(',')?.mapNotNull { name -> AudioFormat.entries.firstOrNull { it.name == name } }?.toSet() ?: emptySet(),
+                nextUp = pick(read("nextUp"), d.nextUp),
+                screensaver = pick(read("screensaver"), d.screensaver),
+                screensaverSource = pick(read("screensaverSource"), d.screensaverSource),
+                screensaverRating = pick(read("screensaverRating"), d.screensaverRating),
             )
         }
 

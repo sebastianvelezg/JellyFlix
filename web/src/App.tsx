@@ -20,6 +20,8 @@ import { HomePage } from './components/HomePage'
 import { BottomNav, Header, type NavTab } from './components/Header'
 import { MiniPlayer } from './components/music/MiniPlayer'
 import { RemoteProvider } from './components/remote/RemoteProvider'
+import { SyncPlayProvider, useSyncPlay } from './components/syncplay/SyncPlayProvider'
+import { TogetherButton } from './components/syncplay/TogetherDialog'
 import { MusicProvider, useMusic, useMusicState } from './components/music/MusicProvider'
 import { OfflineBanner } from './components/OfflineBanner'
 import { PersonPage } from './components/PersonPage'
@@ -227,6 +229,7 @@ export default function App() {
   return (
     <MusicProvider session={session}>
       <RemoteProvider session={session} go={go}>
+      <SyncPlayProvider session={session} go={go}>
       <Shell
         key={language}
         session={session}
@@ -238,6 +241,7 @@ export default function App() {
         playbackVersion={playbackVersion}
         onSignOut={() => void signOut()}
       />
+      </SyncPlayProvider>
       </RemoteProvider>
     </MusicProvider>
   )
@@ -265,7 +269,7 @@ function routeKeyForFocus(route: Route): string {
 function Shell({
   session,
   route,
-  go,
+  go: goNow,
   back,
   overrides,
   setOverrides,
@@ -281,6 +285,10 @@ function Shell({
   playbackVersion: number
   onSignOut: () => void
 }) {
+  // In a group of people watching together, playing a title is asking the group to (every player opens it, together).
+  const together = useSyncPlay()
+  const interceptPlay = together?.interceptPlay
+  const go = useCallback<Navigate>((to, options) => (interceptPlay?.(to) ? undefined : goNow(to, options)), [goNow, interceptPlay])
   const loadSections = useCallback(() => getLibrarySections(session), [session])
   // The list of libraries is remembered, so the page can start loading its rows without waiting for it.
   const { state: sections, retry: retrySections } = useSwr(swrKey(swrScope(session), 'sections'), loadSections, { fresh: 60_000 })
@@ -520,6 +528,7 @@ function Shell({
         }
         onHome={() => go(homeRoute)}
         onSettings={() => (kids.enabled ? setLeavingKids(true) : go({ page: 'settings' }))}
+        together={kids.enabled ? undefined : <TogetherButton userName={session.userName} />}
         onSignOut={onSignOut}
         kids={kids.enabled}
       />

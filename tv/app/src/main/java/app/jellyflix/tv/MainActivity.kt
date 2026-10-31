@@ -43,6 +43,7 @@ import app.jellyflix.tv.ui.PersonScreen
 import app.jellyflix.tv.ui.PlayerActions
 import app.jellyflix.tv.ui.PlayerScreen
 import app.jellyflix.tv.ui.PlaylistScreen
+import app.jellyflix.tv.ui.Screensaver
 import app.jellyflix.tv.ui.SignInScreen
 
 class MainActivity : ComponentActivity() {
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
                         ErrorBanner()
                         NoticeBanner()
                         DialogHost(vm)
+                        if (vm.screensaverShown) Screensaver(vm.screensaverPictures)
                     }
                 }
             }
@@ -92,6 +94,13 @@ class MainActivity : ComponentActivity() {
         val id = runCatching { java.util.UUID.fromString(data.lastPathSegment) }.getOrNull() ?: return
         intent.data = null
         vm.playFromLink(id)
+    }
+
+    /** Any key puts the idle time back to zero; while the screensaver shows, the key that wakes it does nothing else. */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        val covered = vm.screensaverShown
+        if (event.action == android.view.KeyEvent.ACTION_DOWN || covered) vm.userActivity()
+        return if (covered) true else super.dispatchKeyEvent(event)
     }
 
     /** The remote's media keys drive the music, except while a video is playing (it handles them itself). */
@@ -161,6 +170,7 @@ class MainActivity : ComponentActivity() {
                         onNextEpisode = { vm.playNext(page.plan) },
                         onExit = { vm.back() },
                         onChannelStep = { vm.stepChannel(page.plan, it) },
+                        liveNeighbours = { vm.liveNeighbours(page.plan) },
                         onSearchSubtitles = { vm.searchSubtitles(page.plan, it) },
                         loadSeasons = { vm.seasonsOf(page.plan.item) },
                         loadEpisodes = { seasonId -> vm.episodesOf(page.plan.item, seasonId) },

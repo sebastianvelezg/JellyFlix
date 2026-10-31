@@ -54,6 +54,10 @@ export interface MockOptions {
   audiobooks?: number
   /** Answer the download of a book's file with "not allowed" (an account that may not download). */
   noDownload?: boolean
+  /** Watch together: how far the server's clock is ahead of this machine's (ms), to prove the client uses the server's time. */
+  syncSkewMs?: number
+  /** Watch together: the account is not allowed to use it (every call answers 403). */
+  syncPlayDenied?: boolean
   /** Live TV channels: ch0001... each with a programme every half hour from two hours ago to ten hours ahead. 0 = no Live TV. */
   liveTv?: number
   /** Make /Sessions/Playing* fail, to prove reporting errors do not break playback. */
@@ -160,6 +164,27 @@ interface MockSession {
 interface Peer {
   send: (text: string) => void
   close: () => void
+}
+
+/** A watch-together group as the server keeps it. */
+interface MockGroup {
+  id: string
+  name: string
+  state: 'Idle' | 'Waiting' | 'Paused' | 'Playing'
+  /** Access tokens of the members. */
+  members: Set<string>
+  /** Members the group does not wait for (a player that is not on screen). */
+  ignoring: Set<string>
+  /** Members that have not said they are ready since the group last had to wait. */
+  notReady: Set<string>
+  itemIds: string[]
+  playlistItemIds: string[]
+  index: number
+  positionTicks: number
+  /** When (server ms) the title was at `positionTicks` while playing. */
+  positionAt: number
+  /** What the group goes back to once everyone is ready. */
+  wantPlaying: boolean
 }
 
 /** Reads the unmasked text of the frames a browser sends (text, ping and close are all a test needs). */
@@ -596,6 +621,10 @@ const CHANNEL_ID = /^ch\d{4}$/
 const channelId = (n: number) => `ch${String(n).padStart(4, '0')}`
 const channelName = (n: number) => `Test Channel ${String(n).padStart(2, '0')}`
 const SLOT_MS = 30 * 60_000
+const CHANNEL_KINDS = ['movies', 'series', 'sports', 'news', 'kids'] as const
+/** Channel 1 shows movies, 2 series, 3 sports, 4 news, 5 kids, 6 movies again, and so on. */
+const channelKind = (n: number) => CHANNEL_KINDS[(n - 1) % CHANNEL_KINDS.length]
+const CHANNEL_KIND_PARAM: Record<string, (typeof CHANNEL_KINDS)[number]> = { isMovie: 'movies', isSeries: 'series', isSports: 'sports', isNews: 'news', isKids: 'kids' }
 
 /** The programme of a channel that starts at a half hour (ms since the epoch). */
 function programDto(n: number, startMs: number) {
@@ -897,6 +926,71 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
       SeriesName: dto?.SeriesName,
       RunTimeTicks: dto?.RunTimeTicks ?? DURATION_SECONDS * TICKS,
       MediaType: TRACK_ID.test(id) || AUDIOBOOK_ID.test(id) ? 'Audio' : 'Video',
+    }
+  }
+
+  // ---- watch together: the groups the server keeps ---------------------------------------------------------------
+  const serverNow = () => Date.now() + (opts.syncSkewMs ?? 0)
+  const groups = new Map<string, MockGroup>()
+  let groupCount = 0
+  let playlistCount = 0
+  const groupOf = (token: string) => [...groups.values()].find((g) => g.members.has(token))
+  const groupInfo = (g: MockGroup) => ({ GroupId: g.id, GroupName: g.name, State: g.state, Participants: [...g.members].map(() => opts.username), LastUpdatedAt: new Date(serverNow()).toISOString() })
+  const tell = (tokens: Iterable<string>, type: string, data: unknown) => {
+    for (const member of tokens) sessions.get(member)?.peer?.send(JSON.stringify({ MessageType: type, Data: data }))
+  }
+  const sendUpdate = (g: MockGroup, tokens: Iterable<string>, type: string, data: unknown) => tell(tokens, 'SyncPlayGroupUpdate', { GroupId: g.id, Type: type, Data: data })
+  const sendState = (g: MockGroup, state: string, reason: string) => sendUpdate(g, g.members, 'StateUpdate', { State: state, Reason: reason, PositionTicks: g.positionTicks })
+  const sendQueue = (g: MockGroup, tokens: Iterable<string>, reason: string, startTicks: number) =>
+    sendUpdate(g, tokens, 'PlayQueue', {
+      Reason: reason,
+      LastUpdate: new Date(serverNow()).toISOString(),
+      Playlist: g.itemIds.map((ItemId, i) => ({ ItemId, PlaylistItemId: g.playlistItemIds[i] })),
+      PlayingItemIndex: g.index,
+      StartPositionTicks: startTicks,
+      IsPlaying: false,
+      ShuffleMode: 'Sorted',
+      RepeatMode: 'RepeatNone',
+    })
+  const broadcast = (g: MockGroup, command: string, whenMs: number, positionTicks: number) =>
+    tell(g.members, 'SyncPlayCommand', {
+      GroupId: g.id,
+      PlaylistItemId: g.playlistItemIds[g.index] ?? '',
+      When: new Date(whenMs).toISOString(),
+      PositionTicks: positionTicks,
+      Command: command,
+      EmittedAt: new Date(serverNow()).toISOString(),
+    })
+  /** Where the title is by now, in ticks: it moves on from where it started while the group plays. */
+  const positionNow = (g: MockGroup) => (g.state === 'Playing' ? g.positionTicks + Math.max(0, serverNow() - g.positionAt) * 10_000 : g.positionTicks)
+  /** Everyone starts at one moment a little ahead (so that every device has the command before it). */
+  const startPlaying = (g: MockGroup) => {
+    const when = serverNow() + 400
+    g.state = 'Playing'
+    g.wantPlaying = true
+    g.positionAt = when
+    sendState(g, 'Playing', 'Unpause')
+    broadcast(g, 'Unpause', when, g.positionTicks)
+  }
+  const resumeIfReady = (g: MockGroup) => {
+    if (g.state !== 'Waiting') return
+    if ([...g.notReady].some((member) => g.members.has(member) && !g.ignoring.has(member))) return
+    if (g.wantPlaying) return startPlaying(g)
+    g.state = 'Paused'
+    sendState(g, 'Paused', 'Ready')
+    broadcast(g, 'Pause', serverNow(), g.positionTicks)
+  }
+  const leaveSync = (member: string) => {
+    const g = groupOf(member)
+    if (!g) return
+    g.members.delete(member)
+    g.notReady.delete(member)
+    g.ignoring.delete(member)
+    sendUpdate(g, [member], 'GroupLeft', g.id)
+    if (g.members.size === 0) groups.delete(g.id)
+    else {
+      sendUpdate(g, g.members, 'UserLeft', opts.username)
+      resumeIfReady(g)
     }
   }
 
@@ -2110,11 +2204,140 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
         return void res.writeHead(204).end()
       }
     }
+    // Watch together (SyncPlay): groups, a queue, and commands pushed over the sockets, as the real server does them in outline. The
+    // server waits for every member to say it is ready before it starts anything (a seek or a buffering member holds everyone).
+    if (path === '/GetUtcTime' && req.method === 'GET') {
+      const received = new Date(serverNow()).toISOString()
+      return json(res, 200, { RequestReceptionTime: received, ResponseTransmissionTime: new Date(serverNow()).toISOString() })
+    }
+    if (path.startsWith('/SyncPlay/')) {
+      if (!needAuth() || !token) return
+      if (opts.syncPlayDenied) return void res.writeHead(403).end()
+      const name = path.slice('/SyncPlay/'.length)
+      const b = (body ?? {}) as Record<string, unknown>
+      const own = groupOf(token)
+      if (name === 'List' && req.method === 'GET') return json(res, 200, [...groups.values()].map(groupInfo))
+      if (name === 'New') {
+        if (own) leaveSync(token)
+        const made: MockGroup = {
+          id: `group-${++groupCount}`,
+          name: String(b.GroupName ?? 'Group'),
+          state: 'Idle',
+          members: new Set([token]),
+          ignoring: new Set(),
+          notReady: new Set(),
+          itemIds: [],
+          playlistItemIds: [],
+          index: 0,
+          positionTicks: 0,
+          positionAt: 0,
+          wantPlaying: false,
+        }
+        groups.set(made.id, made)
+        sendUpdate(made, [token], 'GroupJoined', groupInfo(made))
+        return json(res, 200, groupInfo(made))
+      }
+      if (name === 'Join') {
+        const found = groups.get(String(b.GroupId))
+        if (!found) return void res.writeHead(404).end()
+        if (own) leaveSync(token)
+        found.members.add(token)
+        sendUpdate(found, [token], 'GroupJoined', groupInfo(found))
+        sendUpdate(found, [...found.members].filter((m) => m !== token), 'UserJoined', opts.username)
+        if (found.itemIds.length > 0) {
+          // Someone arrives while a title is on: everyone waits at the place it has reached, and the newcomer loads it.
+          const at = positionNow(found)
+          found.positionTicks = at
+          found.wantPlaying = found.state === 'Playing' || found.wantPlaying
+          found.state = 'Waiting'
+          found.notReady.add(token)
+          sendQueue(found, [token], 'NewPlaylist', at)
+          sendState(found, 'Waiting', 'Join')
+          broadcast(found, 'Pause', serverNow(), at)
+        }
+        return void res.writeHead(204).end()
+      }
+      if (!own) {
+        res.writeHead(400).end()
+        return
+      }
+      const ticksOf = (value: unknown) => (typeof value === 'number' ? value : 0)
+      switch (name) {
+        case 'Leave':
+          leaveSync(token)
+          break
+        case 'SetNewQueue': {
+          const ids = Array.isArray(b.PlayingQueue) ? (b.PlayingQueue as string[]) : []
+          own.itemIds = ids
+          own.playlistItemIds = ids.map((_, i) => `pl-${own.id}-${++playlistCount}-${i}`)
+          own.index = Math.min(Number(b.PlayingItemPosition ?? 0), Math.max(0, ids.length - 1))
+          own.positionTicks = ticksOf(b.StartPositionTicks)
+          own.state = 'Waiting'
+          own.wantPlaying = true
+          own.notReady = new Set([...own.members])
+          sendQueue(own, [...own.members], 'NewPlaylist', own.positionTicks)
+          sendState(own, 'Waiting', 'NewPlaylist')
+          break
+        }
+        case 'Pause':
+          own.positionTicks = positionNow(own)
+          own.state = 'Paused'
+          own.wantPlaying = false
+          sendState(own, 'Paused', 'Pause')
+          broadcast(own, 'Pause', serverNow(), own.positionTicks)
+          break
+        case 'Unpause':
+          if (own.state === 'Paused') startPlaying(own)
+          break
+        case 'Stop':
+          own.state = 'Idle'
+          own.wantPlaying = false
+          sendState(own, 'Idle', 'Stop')
+          broadcast(own, 'Stop', serverNow(), 0)
+          break
+        case 'Seek':
+          own.positionTicks = ticksOf(b.PositionTicks)
+          own.state = 'Waiting'
+          own.notReady = new Set([...own.members])
+          sendState(own, 'Waiting', 'Seek')
+          broadcast(own, 'Seek', serverNow(), own.positionTicks)
+          break
+        case 'Buffering':
+          own.positionTicks = ticksOf(b.PositionTicks)
+          own.wantPlaying = b.IsPlaying === true
+          own.state = 'Waiting'
+          own.notReady.add(token)
+          sendState(own, 'Waiting', 'Buffer')
+          broadcast(own, 'Pause', serverNow(), own.positionTicks)
+          break
+        case 'Ready':
+          own.notReady.delete(token)
+          if (own.state === 'Waiting') {
+            own.positionTicks = ticksOf(b.PositionTicks)
+            resumeIfReady(own)
+          }
+          break
+        case 'SetIgnoreWait':
+          if (b.IgnoreWait === true) own.ignoring.add(token)
+          else own.ignoring.delete(token)
+          resumeIfReady(own)
+          break
+        case 'Ping':
+          break
+        default:
+          return void res.writeHead(404).end()
+      }
+      return void res.writeHead(204).end()
+    }
     // Live TV: the channels (with what is on now), one channel, and the guide.
     if (path === '/LiveTv/Channels' && req.method === 'GET') {
       if (!needAuth()) return
       let numbers = Array.from({ length: opts.liveTv }, (_, i) => i + 1)
       if (query.isFavorite === 'true') numbers = numbers.filter((n) => user.favorites.has(channelId(n)))
+      // The kind of a channel follows its number: movies, series, sports, news and kids in turn.
+      for (const [param, kind] of Object.entries(CHANNEL_KIND_PARAM)) {
+        if (query[param] === 'true') numbers = numbers.filter((n) => channelKind(n) === kind)
+      }
       const start = Number(query.startIndex ?? 0)
       const limit = Number(query.limit ?? numbers.length)
       const items = numbers.slice(start, start + limit).map((n) => channelDto(n, user))
@@ -2209,7 +2432,11 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
     session.peer = peer
     const drop = () => {
       peers.delete(socket)
-      if (session.peer === peer) session.peer = undefined
+      if (session.peer === peer) {
+        session.peer = undefined
+        // A device whose socket is gone is no longer in its group.
+        leaveSync(accessToken)
+      }
     }
     socket.on(
       'data',

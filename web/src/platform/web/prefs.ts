@@ -1,4 +1,4 @@
-import { sanitizeFilters, type AdvancedFilters, type Section, type SortKey, type WatchFilter } from '../../core'
+import { isChannelCategory, sanitizeFilters, type AdvancedFilters, type ChannelCategory, type Section, type SortKey, type WatchFilter } from '../../core'
 import type { LanguageChoice } from '../../i18n'
 
 /** Per-device preferences. Harmless to lose; every read falls back to a default. */
@@ -338,14 +338,24 @@ export interface UiPrefs {
   autoRotateBanner: boolean
   /** The language of the interface: `auto` follows the browser. */
   language: LanguageChoice
+  /** Live TV: the kind of channel the lists show, and which channels the arrows change between. */
+  liveCategory: ChannelCategory
+  /** Live TV: the channel watched last (its name is kept to show on a button without asking the server). */
+  lastChannel: { id: string; name: string } | null
 }
 
 const UI_KEY = 'jellyflix.ui'
-const UI_DEFAULTS: UiPrefs = { autoRotateBanner: true, language: 'auto' }
+const UI_DEFAULTS: UiPrefs = { autoRotateBanner: true, language: 'auto', liveCategory: 'all', lastChannel: null }
 
 export function readUiPrefs(): UiPrefs {
   const p = read(UI_KEY, UI_DEFAULTS)
-  return { autoRotateBanner: p.autoRotateBanner !== false, language: p.language === 'en' || p.language === 'es' ? p.language : 'auto' }
+  const last = p.lastChannel as { id?: unknown; name?: unknown } | null | undefined
+  return {
+    autoRotateBanner: p.autoRotateBanner !== false,
+    language: p.language === 'en' || p.language === 'es' ? p.language : 'auto',
+    liveCategory: isChannelCategory(p.liveCategory) ? p.liveCategory : 'all',
+    lastChannel: last && typeof last.id === 'string' && typeof last.name === 'string' && last.id ? { id: last.id, name: last.name } : null,
+  }
 }
 
 export function writeUiPrefs(patch: Partial<UiPrefs>): void {

@@ -5,7 +5,15 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
-A visual polish of the whole web app, without changing its identity (calmer, simpler and more consistent), and the first phase of the roadmap: the player and the way a title starts.
+A visual polish of the whole web app, without changing its identity (calmer, simpler and more consistent), and the first three phases of the roadmap: the player and the way a title starts, the household, and the bigger pieces.
+
+### The bigger pieces: Live TV, watching together, the TV screensaver (phase 3 of the roadmap)
+- **Live TV by kind:** the channels can be narrowed to *Movies*, *Series*, *Sports*, *News*, *Kids* or *Favorites* (the server decides a channel's kind from what it broadcasts). The choice is kept, and the arrows of the player change channel inside it. (TV too.)
+- **Strip of channels in the player:** a row at the bottom of the live player shows the channels around the current one, with what is on each; one click changes channel. On the TV the controls say which channel up and down lead to.
+- **Back to the last channel:** a *Last watched* button on the Live TV page, and the guide lists that channel first. (TV too.)
+- **Watch together:** the people icon in the header (not shown in Kids mode) starts a group or joins an open one, using Jellyfin's own SyncPlay. Press Play on a title and it opens for everyone in the group, waits until every device is ready and starts at one moment by the server's clock; pause, play and seek are shared; leaving the player does not hold the others back. The server's administrator decides which accounts may use SyncPlay; an account that may not is told so. Web only for now.
+- **Screensaver on the TV:** off by default. Settings → Display chooses after how long (2 to 15 minutes), pictures from movies, series or both, and a highest age rating. It shows backdrops from the library, drifting slowly, and any key brings the app back. It does not start while a video plays.
+- **TV catch-up:** *Titles under posters* can be turned off, *Next up* can look back only so far, and the title page has *I like it* and *Not for me*.
 
 ### Household: settings, cards, my rating, Kids mode (phase 2 of the roadmap)
 - **Search in Settings:** a box above the tabs finds a setting by its name (or by words like "skip", "colour", "pin") and takes you to it, opening its tab.

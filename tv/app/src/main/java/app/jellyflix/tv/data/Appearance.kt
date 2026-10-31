@@ -374,6 +374,8 @@ data class Appearance(
     val home: HomeLayout = HomeLayout(),
     val nav: NavStyle = NavStyle.Full,
     val menu: MenuLayout = MenuLayout(),
+    /** The title (and the line under it) beneath each poster. Off leaves the pictures alone. */
+    val cardTitles: Boolean = true,
 ) {
     /** The values as text, to be stored; [decode] reads them back and ignores anything it does not know. */
     fun encode(): Map<String, String> = mapOf(
@@ -386,6 +388,7 @@ data class Appearance(
         "nav" to nav.id,
         "menu" to menu.order.joinToString(",") { it.id },
         "menuHidden" to menu.hidden.joinToString(",") { it.id },
+        "cardTitles" to cardTitles.toString(),
     )
 
     companion object {
@@ -397,6 +400,7 @@ data class Appearance(
                 home = HomeLayout.sanitized(read("banner")?.let { it == "true" }, list("rows"), list("hidden")),
                 nav = NavStyle.of(read("nav")),
                 menu = MenuLayout.sanitized(list("menu"), list("menuHidden")),
+                cardTitles = read("cardTitles") != "false",
             )
         }
     }

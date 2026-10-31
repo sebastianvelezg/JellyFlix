@@ -17,6 +17,7 @@ const ROUTES = ['#/', '#/movies', '#/books', '#/musicvideos', '#/livetv', '#/set
 
 /** The sign-in of the other tests, with the words of either language. */
 async function signInAnyLanguage(page: Page, mock: MockServer) {
+  await page.addInitScript(() => localStorage.setItem('jellyflix.setup', '1'))
   await page.goto('/')
   await page.getByLabel(/^(Server URL|Dirección del servidor)/).fill(mock.url)
   await page.getByLabel(/^(Username|Usuario)/).fill('tester')

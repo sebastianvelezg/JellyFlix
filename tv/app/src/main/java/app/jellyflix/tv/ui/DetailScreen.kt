@@ -157,6 +157,8 @@ private fun Actions(vm: AppViewModel, state: DetailState, playButton: FocusReque
             stringResource(if (item.favorite) R.string.remove_favorite else R.string.add_favorite),
             onClick = { vm.toggleFavorite(state) },
         )
+        Pill(stringResource(R.string.rate_like), onClick = { vm.rate(state, true) }, selected = item.likes == true)
+        Pill(stringResource(R.string.rate_dislike), onClick = { vm.rate(state, false) }, selected = item.likes == false)
     }
     if (versions.size > 1) {
         Row(

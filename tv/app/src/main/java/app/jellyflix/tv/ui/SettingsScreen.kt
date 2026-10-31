@@ -65,7 +65,11 @@ import app.jellyflix.tv.data.PosterSize
 import app.jellyflix.tv.data.accentColor
 import app.jellyflix.tv.data.PluginCard
 import app.jellyflix.tv.data.QualityLimit
+import app.jellyflix.tv.data.NextUpWindow
 import app.jellyflix.tv.data.ScreenMargin
+import app.jellyflix.tv.data.ScreensaverDelay
+import app.jellyflix.tv.data.ScreensaverRating
+import app.jellyflix.tv.data.ScreensaverSource
 import app.jellyflix.tv.data.ServerTask
 import app.jellyflix.tv.data.SubtitleBackground
 import app.jellyflix.tv.data.SubtitleColor
@@ -142,6 +146,13 @@ private fun PlaybackTab(vm: AppViewModel, first: FocusRequester) {
         SkipChoice(R.string.settings_skip_credits, s.skipOutro) { v -> vm.updateSettings { it.copy(skipOutro = v) } }
         SkipChoice(R.string.settings_skip_preview, s.skipPreview) { v -> vm.updateSettings { it.copy(skipPreview = v) } }
         Note(stringResource(R.string.settings_skip_note))
+        Choice(
+            title = stringResource(R.string.settings_next_up),
+            options = NextUpWindow.entries.map { stringResource(it.label) },
+            selected = s.nextUp.ordinal,
+            onSelect = { i -> vm.updateSettings { it.copy(nextUp = NextUpWindow.entries[i]) } },
+            note = stringResource(R.string.settings_next_up_note),
+        )
 
         Choice(
             title = stringResource(R.string.settings_quality),
@@ -265,6 +276,28 @@ private fun DisplayTab(vm: AppViewModel, first: FocusRequester) {
             onSelect = { i -> vm.updateSettings { it.copy(margin = ScreenMargin.entries[i]) } },
             note = stringResource(R.string.settings_margin_note),
         )
+        Choice(
+            title = stringResource(R.string.settings_screensaver),
+            options = ScreensaverDelay.entries.map { stringResource(it.label) },
+            selected = s.screensaver.ordinal,
+            onSelect = { i -> vm.updateSettings { it.copy(screensaver = ScreensaverDelay.entries[i]) } },
+            note = stringResource(R.string.settings_screensaver_note),
+        )
+        if (s.screensaver != ScreensaverDelay.Off) {
+            Choice(
+                title = stringResource(R.string.settings_screensaver_source),
+                options = ScreensaverSource.entries.map { stringResource(it.label) },
+                selected = s.screensaverSource.ordinal,
+                onSelect = { i -> vm.updateSettings { it.copy(screensaverSource = ScreensaverSource.entries[i]) } },
+            )
+            Choice(
+                title = stringResource(R.string.settings_screensaver_rating),
+                options = ScreensaverRating.entries.map { stringResource(it.label) },
+                selected = s.screensaverRating.ordinal,
+                onSelect = { i -> vm.updateSettings { it.copy(screensaverRating = ScreensaverRating.entries[i]) } },
+                note = stringResource(R.string.settings_screensaver_rating_note),
+            )
+        }
         if (vm.capabilities.isNotEmpty()) {
             SectionTitle(stringResource(R.string.settings_this_tv), Modifier.padding(top = 12.dp), inset = false)
             vm.capabilities.forEach { Text(it, fontSize = 14.sp, color = Palette.TextDim) }
@@ -314,6 +347,8 @@ private fun AppearanceTab(vm: AppViewModel, first: FocusRequester) {
             { vm.choosePosters(PosterSize.entries[it]) },
             note = stringResource(R.string.appearance_posters_note),
         )
+        Toggle(stringResource(R.string.appearance_card_titles), look.cardTitles) { vm.chooseCardTitles(!look.cardTitles) }
+        Note(stringResource(R.string.appearance_card_titles_note))
         Choice(
             stringResource(R.string.appearance_menu),
             NavStyle.entries.map { stringResource(it.label) },

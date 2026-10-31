@@ -199,17 +199,20 @@ fun MediaCard(
                 }
             }
         }
-        // A long title is cut with an ellipsis, but scrolls by itself while the card has the remote so it can be read whole.
-        Text(
-            title,
-            color = Color.White,
-            maxLines = 1,
-            overflow = if (focused) TextOverflow.Clip else TextOverflow.Ellipsis,
-            fontSize = 15.sp,
-            modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 500) else Modifier,
-        )
-        subtitle?.let {
-            Text(it, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
+        // (A channel is only known by its name: its card keeps it whatever is chosen.)
+        if (Posters.titles || contain) {
+            // A long title is cut with an ellipsis, but scrolls by itself while the card has the remote so it can be read whole.
+            Text(
+                title,
+                color = Color.White,
+                maxLines = 1,
+                overflow = if (focused) TextOverflow.Clip else TextOverflow.Ellipsis,
+                fontSize = 15.sp,
+                modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 500) else Modifier,
+            )
+            subtitle?.let {
+                Text(it, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
+            }
         }
     }
 }

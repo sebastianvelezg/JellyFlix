@@ -83,6 +83,13 @@ Done when: 3.1 to 3.4 are on a real server with a tuner (if there is one) and on
 
 Risks: 3.2 and 3.3 cannot be fully tested without a tuner and a second person; the mock server will cover the calls and a manual test the rest.
 
+**Status: built, except 3.2** (the DVR was left out on purpose; it is not planned yet). How it ended up differs a little from the table:
+
+- 3.1: web and TV have the categories (the server's own `isMovie`, `isSports`...), the last channel and the neighbours in the player. On the web the strip of channels is a row under the picture; on the TV, where up and down already change channel, the controls say what each leads to instead of drawing a strip.
+- 3.3: web only. The mock server keeps groups, a queue and the commands, and waits for every member to be ready before it starts, as the real one does in outline; two browsers are used in the tests. Not seen with a real server and two people. Left out: correcting drift while playing (a device that falls behind is only brought back at the next pause, seek or buffering), the queue of several titles (each title is its own queue) and the TV.
+- 3.4: an idle screensaver inside the app (not Android's system screensaver, which a TV lists under its own settings). It filters by movies or series and by a highest age rating; "by library" is by kind, not by each library.
+- 3.5: the TV got *Titles under posters*, the days of *Next up* and the thumbs of my rating. Still missing on the TV from phases 1 and 2: the second subtitle line (the TV player shows one text track at a time), Kids mode (the TV client has no single request layer to put the filter in), trailers (a TV has no browser), the first-run setup and the settings search. None of the TV changes was run on a device; they build and their pure parts have unit tests.
+
 ---
 
 ## Release

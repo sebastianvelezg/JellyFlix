@@ -10,6 +10,7 @@ import {
   type RemoteDevice,
   type RemoteMessage,
   type Session,
+  type SyncMessage,
 } from '../../core'
 import { RemoteSocket } from '../../platform/web/remoteSocket'
 import { useMusicIfAny } from '../music/MusicProvider'
@@ -33,6 +34,8 @@ export interface RemoteApi {
   sendCurrent: (device: RemoteDevice) => Promise<void>
   /** Lets a player offer itself to be driven by commands from other devices. Pass null when it goes away. */
   register: (kind: PlaybackKind, controller: PlaybackController | null) => void
+  /** Hears what the server says about the group this device watches with (see the SyncPlay provider). Returns what stops listening. */
+  subscribeSync: (listener: (message: SyncMessage) => void) => () => void
 }
 
 const RemoteContext = createContext<RemoteApi | null>(null)
@@ -72,6 +75,12 @@ export function RemoteProvider({ session, go, children }: { session: Session; go
   }, [])
 
   // ---- the players that can be driven from other devices ------------------------------------------------------------
+
+  const syncListeners = useRef(new Set<(message: SyncMessage) => void>())
+  const subscribeSync = useCallback((listener: (message: SyncMessage) => void) => {
+    syncListeners.current.add(listener)
+    return () => void syncListeners.current.delete(listener)
+  }, [])
 
   const controllers = useRef<{ video: PlaybackController | null; audio: PlaybackController | null }>({ video: null, audio: null })
   const register = useCallback((kind: PlaybackKind, controller: PlaybackController | null) => {
@@ -239,6 +248,9 @@ export function RemoteProvider({ session, go, children }: { session: Session; go
           return
         case 'keepAlive':
           return
+        case 'sync':
+          for (const listener of syncListeners.current) listener(message.message)
+          return
       }
     },
     [startHere, active, music],
@@ -320,7 +332,7 @@ export function RemoteProvider({ session, go, children }: { session: Session; go
     follow(null)
   }
 
-  const value = useMemo<RemoteApi>(() => ({ devices, refresh, playOn, sendCurrent, register }), [devices, refresh, playOn, sendCurrent, register])
+  const value = useMemo<RemoteApi>(() => ({ devices, refresh, playOn, sendCurrent, register, subscribeSync }), [devices, refresh, playOn, sendCurrent, register, subscribeSync])
 
   return (
     <RemoteContext.Provider value={value}>

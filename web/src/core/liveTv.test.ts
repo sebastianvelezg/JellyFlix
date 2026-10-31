@@ -4,11 +4,26 @@ import { chromeLikeCapabilities } from '../../test/fixtures'
 import { startMockJellyfin, type MockServer } from '../../test/mock/mockJellyfin'
 import { connect } from './auth'
 import type { Session } from './jellyfin'
-import { getChannel, getChannels, getGuide, guideBlocks, guideStart, isOnNow, matchesChannel, neighbourChannel, programProgress, splitChannelName, toChannel, toProgram } from './liveTv'
+import { categoryFilter, CHANNEL_CATEGORIES, getChannel, getChannels, isChannelCategory, getGuide, guideBlocks, guideStart, isOnNow, matchesChannel, neighbourChannel, programProgress, splitChannelName, toChannel, toProgram } from './liveTv'
 import { getLibrarySections } from './library'
 import { negotiatePlayback } from './playback'
 
 const HOUR = 3_600_000
+
+describe('channel categories', () => {
+  it('knows which values are categories', () => {
+    expect(CHANNEL_CATEGORIES.every(isChannelCategory)).toBe(true)
+    expect(isChannelCategory('weather')).toBe(false)
+    expect(isChannelCategory(undefined)).toBe(false)
+  })
+
+  it('turns a category into the filter the server takes, and "all" into none', () => {
+    expect(categoryFilter('all')).toEqual({})
+    expect(categoryFilter('favorites')).toEqual({ isFavorite: true })
+    expect(categoryFilter('kids')).toEqual({ isKids: true })
+    expect(categoryFilter('sports')).toEqual({ isSports: true })
+  })
+})
 
 describe('programmes and the guide, as numbers', () => {
   const program = (startH: number, endH: number) => ({ id: `p${startH}`, channelId: 'c', name: 'N', startMs: startH * HOUR, endMs: endH * HOUR, genres: [] })
@@ -110,8 +125,15 @@ describe('live TV against a mock Jellyfin server', () => {
     expect(page.channels.map((c) => c.id)).toEqual(['ch0001', 'ch0002'])
     expect(page.channels[0]?.now && isOnNow(page.channels[0].now, Date.now())).toBe(true)
     mock.user.favorites.add('ch0004')
-    expect((await getChannels(session, { favorites: true })).channels.map((c) => [c.id, c.favorite])).toEqual([['ch0004', true]])
+    expect((await getChannels(session, { category: 'favorites' })).channels.map((c) => [c.id, c.favorite])).toEqual([['ch0004', true]])
     expect((await getChannel(session, 'ch0003')).name).toBe('Test Channel 03')
+  })
+
+  it('narrows the channels to a kind, which the server decides', async () => {
+    expect((await getChannels(session, { category: 'sports' })).channels.map((c) => c.id)).toEqual(['ch0003'])
+    expect((await getChannels(session, { category: 'news' })).channels.map((c) => c.id)).toEqual(['ch0004'])
+    expect((await getChannels(session, { category: 'movies' })).channels.map((c) => c.id)).toEqual(['ch0001'])
+    expect((await getChannels(session, { category: 'all' })).total).toBe(5)
   })
 
   it('reads the guide of some channels for a window, in time order, and nothing for no channels', async () => {

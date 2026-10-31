@@ -50,6 +50,9 @@ object Posters {
     var size by mutableStateOf(PosterSize.Comfortable)
     val scale: Float get() = size.scale
 
+    /** Whether the cards carry their titles (Settings, Appearance). */
+    var titles by mutableStateOf(true)
+
     /** [base] columns at the comfortable size, one more at the compact size, one fewer at the large one. */
     fun columns(base: Int): Int = (base + size.columnsOffset).coerceAtLeast(2)
 }

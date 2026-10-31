@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement, type RefObject } from 'react'
+import { useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
 import type { Section, Session } from '../core'
 import { AnimeIcon, BookIcon, CloseIcon, FilmIcon, HomeIcon, LiveTvIcon, LogoMark, MusicIcon, MusicVideoIcon, SearchIcon, TvIcon, Wordmark } from './icons'
 import { t, tr } from '../i18n'
@@ -376,6 +376,7 @@ export function Header({
   onSettings,
   onSignOut,
   kids = false,
+  together,
 }: {
   session: Session
   query: string
@@ -390,6 +391,8 @@ export function Header({
   onSignOut: () => void
   /** Kids mode is on: the round button leaves it (with the PIN) instead of opening Settings, and there is no Sign out. */
   kids?: boolean
+  /** The button for watching together (the page decides when it is offered). */
+  together?: ReactNode
 }) {
   // Transparent over the hero at the top of the page, frosted black once you scroll.
   const [scrolled, setScrolled] = useState(() => window.scrollY > 12)
@@ -430,6 +433,7 @@ export function Header({
             <p className="max-w-40 truncate font-medium text-neutral-100">{session.userName}</p>
             <p className="max-w-40 truncate text-neutral-500">{session.serverName}</p>
           </div>
+          {together}
           <button
             type="button"
             onClick={onSettings}

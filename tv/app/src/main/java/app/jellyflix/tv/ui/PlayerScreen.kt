@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import app.jellyflix.tv.data.splitChannelName
 import app.jellyflix.tv.data.TrickplayPictures
 import androidx.compose.foundation.layout.Arrangement
@@ -122,6 +123,8 @@ class PlayerActions(
     val onExit: () -> Unit,
     /** A live channel: change to the one before (-1) or after (+1) this one. */
     val onChannelStep: (Int) -> Unit = {},
+    /** A live channel: the names of the channels before and after it, for the hint that says what up and down do. */
+    val liveNeighbours: () -> Pair<String, String>? = { null },
     /** "Search online…" in the subtitle menu: look for subtitles on the server's plugin, from this position. */
     val onSearchSubtitles: (positionMs: Long) -> Unit = {},
     /** The seasons of the series (an episode), and the episodes of one of them: the list that changes episode. */
@@ -500,6 +503,19 @@ fun PlayerScreen(
                 picture = picture,
                 pictureRatio = pictures?.info?.let { it.height.toFloat() / it.width } ?: (9f / 16f),
             )
+        }
+        if (controlsVisible && !panelOpen && plan.liveStreamId != null) {
+            actions.liveNeighbours()?.let { (before, after) ->
+                Text(
+                    stringResource(R.string.live_neighbours, before, after),
+                    fontSize = 15.sp,
+                    color = Palette.TextDim,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 48.dp, top = 32.dp).fillMaxWidth(0.5f),
+                    textAlign = TextAlign.End,
+                )
+            }
         }
         if (showInfo && !panelOpen) {
             InfoOverlay(plan, player, tick = position, modifier = Modifier.align(Alignment.TopStart).padding(start = 48.dp, top = 32.dp))

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  CHANNEL_CATEGORIES,
   channelLogoUrl,
   CHANNEL_PAGE_SIZE,
   CHANNEL_SEARCH_LIMIT,
@@ -13,9 +14,11 @@ import {
   setFavorite,
   splitChannelName,
   type Channel,
+  type ChannelCategory,
   type Program,
   type Session,
 } from '../../core'
+import { readUiPrefs, writeUiPrefs } from '../../platform/web/prefs'
 import { HeartIcon, PlayIcon, SearchIcon } from '../icons'
 import { Img } from '../Img'
 import { ReadProgress } from '../reader/ReaderShell'
@@ -31,10 +34,20 @@ const GUIDE_HOURS = 4
 const GUIDE_HOUR_WIDTH_REM = 12
 const GUIDE_CHANNELS_AT_A_TIME = 20
 
-type Loaded = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; channels: Channel[]; total: number; favorites: boolean }
+type Loaded = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; channels: Channel[]; total: number; category: ChannelCategory }
+
+const CATEGORY_LABELS: Record<ChannelCategory, string> = {
+  all: 'All',
+  favorites: 'Favorites',
+  movies: 'Movies',
+  series: 'Series',
+  sports: 'Sports',
+  news: 'News',
+  kids: 'Kids',
+}
 
 /** The channels of the account, read a page at a time and read again now and then so that "on now" stays true. */
-function useChannels(session: Session, favorites: boolean, wanted: number, all: boolean, paused: boolean): { state: Loaded; more: () => void; setFavoriteLocally: (id: string, favorite: boolean) => void } {
+function useChannels(session: Session, category: ChannelCategory, wanted: number, all: boolean, paused: boolean): { state: Loaded; more: () => void; setFavoriteLocally: (id: string, favorite: boolean) => void } {
   const [state, setState] = useState<Loaded>({ status: 'loading' })
   const [pages, setPages] = useState(wanted)
   // Looking for a channel needs all of them, not just the first page.
@@ -44,8 +57,8 @@ function useChannels(session: Session, favorites: boolean, wanted: number, all: 
   useEffect(() => {
     let cancelled = false
     const load = () =>
-      getChannels(session, { limit: count, favorites })
-        .then((page) => !cancelled && setState({ status: 'ready', channels: page.channels, total: page.total, favorites }))
+      getChannels(session, { limit: count, category })
+        .then((page) => !cancelled && setState({ status: 'ready', channels: page.channels, total: page.total, category }))
         .catch((e: unknown) => !cancelled && setState((now) => (now.status === 'ready' ? now : { status: 'error', message: e instanceof Error ? t(e.message) : t('The channels could not be read.') })))
     // While a channel is being watched the page stays behind it: it is not worth asking the server again until it is back.
     if (paused) return
@@ -55,16 +68,16 @@ function useChannels(session: Session, favorites: boolean, wanted: number, all: 
       cancelled = true
       clearInterval(timer)
     }
-  }, [session, favorites, count, version, paused])
+  }, [session, category, count, version, paused])
 
   return {
-    // What was read for the other view (all channels, or only favorites) is not shown under this one while this one loads.
-    state: state.status === 'ready' && state.favorites !== favorites ? ({ status: 'loading' } as const) : state,
+    // What was read for another category is not shown under this one while this one loads.
+    state: state.status === 'ready' && state.category !== category ? ({ status: 'loading' } as const) : state,
     more: () => setPages((n) => n + CHANNEL_PAGE_SIZE),
     setFavoriteLocally: (id, favorite) => {
       setState((now) => (now.status === 'ready' ? { ...now, channels: now.channels.map((c) => (c.id === id ? { ...c, favorite } : c)) } : now))
       // Favourites only: a channel taken out of the list leaves it.
-      if (favorites && !favorite) setVersion((v) => v + 1)
+      if (category === 'favorites' && !favorite) setVersion((v) => v + 1)
     },
   }
 }
@@ -72,11 +85,21 @@ function useChannels(session: Session, favorites: boolean, wanted: number, all: 
 /** Live TV: the channels with what is on each, and the guide of the next hours. */
 export function LiveTvPage({ session, onPlay, paused = false }: { session: Session; onPlay: (channel: Channel) => void; paused?: boolean }) {
   const [view, setView] = useState<View>('channels')
-  const [favorites, setFavorites] = useState(false)
+  // The category is kept: the arrows of the player change channel inside it, and the page opens on it next time.
+  const [category, setCategoryNow] = useState<ChannelCategory>(() => readUiPrefs().liveCategory)
+  const setCategory = (next: ChannelCategory) => {
+    writeUiPrefs({ liveCategory: next })
+    setCategoryNow(next)
+  }
   const [filter, setFilter] = useState('')
   const looking = filter.trim() !== ''
-  const { state, more, setFavoriteLocally } = useChannels(session, favorites, CHANNEL_PAGE_SIZE, looking, paused)
-  const shown = state.status === 'ready' ? state.channels.filter((c) => matchesChannel(c, filter)) : []
+  const { state, more, setFavoriteLocally } = useChannels(session, category, CHANNEL_PAGE_SIZE, looking, paused)
+  const matching = state.status === 'ready' ? state.channels.filter((c) => matchesChannel(c, filter)) : []
+  // The channel watched last (read each time: the player writes it while this page waits behind it).
+  const last = readUiPrefs().lastChannel
+  const lastChannel = last ? matching.find((c) => c.id === last.id) : undefined
+  // In the guide the last channel comes first, so the guide opens where the viewer was.
+  const shown = view === 'guide' && lastChannel ? [lastChannel, ...matching.filter((c) => c.id !== lastChannel.id)] : matching
 
   const toggleFavorite = (channel: Channel) => {
     const next = !channel.favorite
@@ -114,10 +137,22 @@ export function LiveTvPage({ session, onPlay, paused = false }: { session: Sessi
               {v === 'channels' ? t('Channels') : t('Guide')}
             </button>
           ))}
-          <button type="button" className="btn" aria-pressed={favorites} onClick={() => setFavorites((f) => !f)}>
-            <HeartIcon filled={favorites} /> {t('Favorites')}
-          </button>
         </div>
+      </div>
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <div role="group" aria-label={t('Category')} className="flex min-w-0 flex-wrap gap-2">
+          {CHANNEL_CATEGORIES.map((c) => (
+            <button key={c} type="button" className="btn" aria-pressed={category === c} onClick={() => setCategory(c)}>
+              {c === 'favorites' && <HeartIcon filled={category === 'favorites'} />}
+              {t(CATEGORY_LABELS[c])}
+            </button>
+          ))}
+        </div>
+        {last && (
+          <button type="button" className="btn ml-auto" onClick={() => onPlay({ id: last.id, name: last.name, favorite: false })}>
+            <PlayIcon /> {t('Last watched: {channel}', { channel: splitChannelName(last.name).title })}
+          </button>
+        )}
       </div>
 
       {state.status === 'loading' && (
@@ -129,7 +164,13 @@ export function LiveTvPage({ session, onPlay, paused = false }: { session: Sessi
       {state.status === 'ready' && state.channels.length === 0 && (
         <StateMessage
           kind="empty"
-          message={favorites ? t('You have no favorite channels yet. Use the heart on a channel to add one.') : t('This account has no channels. Add a tuner or a channel list in Jellyfin and they will appear here.')}
+          message={
+            category === 'favorites'
+              ? t('You have no favorite channels yet. Use the heart on a channel to add one.')
+              : category === 'all'
+                ? t('This account has no channels. Add a tuner or a channel list in Jellyfin and they will appear here.')
+                : t('No channels in this category.')
+          }
         />
       )}
       {state.status === 'ready' && state.channels.length > 0 && shown.length === 0 && (
@@ -143,7 +184,7 @@ export function LiveTvPage({ session, onPlay, paused = false }: { session: Sessi
           {view === 'channels' ? (
             <ChannelGrid session={session} channels={shown} onPlay={onPlay} onFavorite={toggleFavorite} />
           ) : (
-            <Guide session={session} channels={shown} onPlay={onPlay} />
+            <Guide session={session} channels={shown} lastId={lastChannel?.id} onPlay={onPlay} />
           )}
           {!looking && state.channels.length < state.total && (
             <div className="mt-8 flex justify-center">
@@ -231,7 +272,7 @@ function ChannelGrid({ session, channels, onPlay, onFavorite }: { session: Sessi
 }
 
 /** The guide: a row for each channel and a block for each programme, over the next hours. Choosing a programme shows it; Watch plays its channel. */
-function Guide({ session, channels, onPlay }: { session: Session; channels: Channel[]; onPlay: (channel: Channel) => void }) {
+function Guide({ session, channels, lastId, onPlay }: { session: Session; channels: Channel[]; lastId?: string; onPlay: (channel: Channel) => void }) {
   const [visible, setVisible] = useState(GUIDE_CHANNELS_AT_A_TIME)
   const [now, setNow] = useState(() => Date.now())
   const [programs, setPrograms] = useState<Map<string, Program[]> | null>(null)
@@ -310,6 +351,7 @@ function Guide({ session, channels, onPlay }: { session: Session; channels: Chan
                 >
                   {channel.number && <span className="text-xs text-neutral-500">{channel.number}</span>}
                   <span className="truncate" title={channel.name}>{splitChannelName(channel.name).title}</span>
+                  {channel.id === lastId && <span className="rounded bg-white/10 px-1.5 text-[10px] uppercase leading-5 tracking-wide text-neutral-300">{t('Last')}</span>}
                 </button>
                 <div className="relative h-14 shrink-0" style={{ width }} role="list" aria-label={channel.name}>
                   {blocks.map((block) => {
