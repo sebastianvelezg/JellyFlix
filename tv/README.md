@@ -36,7 +36,7 @@ What differs is how it is used: everything is built for a remote control and a T
 ### Music videos, books and Live TV
 - **Music videos**: a tab with wide cards (the artist under the title), a title page, the usual player, search, a "New music videos" row on Home and a place in Continue watching. A video played on its own goes on with the other videos of its folder when it ends (with autoplay on). Browsing by folder, repeating the list and the mini player are for the web app.
 - **Books**: a tab with books and audiobooks. **Audiobooks** play in the music player from where they were left. Books to read are not shown on the TV: choosing one says so and points to the web app or a phone.
-- **Live TV**: your channels with what is on each (quality and notes of the name as small tags), "now and next", a guide view, and favorites. Watching a channel opens the stream your server provides: no seek bar, OK shows the controls, up and down (or the remote's channel keys) change channel, and a channel the server cannot play shows a message. Recording and timers are not built.
+- **Live TV**: your channels with what is on each (quality and notes of the name as small tags), "now and next", a guide view, and favorites. Watching a channel opens the stream your server provides: no seek bar, OK shows the controls, up and down (or the remote's channel keys) change channel, and a channel the server cannot play shows a message. Recording and timers are not built. The channels can be narrowed to Movies, Series, Sports, News, Kids or Favorites, the player says which channel up and down lead to, and a *Last watched* button goes back to the channel you left.
 
 ### Your libraries
 - **Movies, Series, Anime, Collections**: poster grids (six across at 1080p), sort by recently added, name, year or rating, more titles loading as you scroll. A long title scrolls by itself while its poster has the remote.
@@ -74,6 +74,10 @@ What differs is how it is used: everything is built for a remote control and a T
 - Media keys on the remote work, and playing a video pauses the music. What is played is reported to Jellyfin.
 
 <p align="center"><img src="../docs/screenshots/tv-music.jpg" alt="The Music page" width="70%"></p>
+
+### Screensaver and catch-up with the web app
+- **Screensaver** (Settings → Display, off by default): after 2 to 15 minutes without a key it shows backdrops from your library (movies, series or both, up to a highest age rating), drifting slowly; any key brings the app back and it never starts while a video plays. It is drawn by the app itself, not by Android's screensaver setting.
+- *Titles under posters* can be turned off, *Next up* can look back only so far, the title page has *I like it* and *Not for me*, and an **Episodes** button in the player lists the series. Skippable stretches (intro, recap, credits, preview) each have their own choice, and a list of sound formats the server should convert (AC-3, E-AC-3, DTS, TrueHD, FLAC).
 
 ### Appearance
 Settings → Appearance (the choices stay on the TV):
@@ -250,7 +254,7 @@ Jellyfin returns playlist ids without dashes, so they are never parsed as UUIDs.
 - **Devices:** Android TV and Google TV running Android 9 or newer. The emulator only offers software decoders and one 60 Hz mode, so a few things can only be confirmed on a real TV: HDR and Dolby decisions, 4K, the automatic frame-rate switch,
   a screen that crops the picture (the *Screen margin* setting) and the version picker for merged titles. If you try one of these, please [open an issue](https://github.com/sebastianvelezg/JellyFlix/issues/new/choose) with what you saw.
 - **Servers:** developed against Jellyfin 12.x. Skip intro / recap / credits need segments from the server (for example the Intro Skipper plugin); without them the buttons simply do not appear.
-- **Not built:** voice search, music playing after you leave the app, server discovery on the network, recording and timers for live TV, a reader for books. Administration tools are on the web app only, on purpose.
+- **Not built:** voice search, music playing after you leave the app, server discovery on the network, recording and timers for live TV, a reader for books, watching together (SyncPlay), Kids mode, trailers and the first-run setup (web only for now). Administration tools are on the web app only, on purpose.
 
 ## License
 

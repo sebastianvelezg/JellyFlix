@@ -183,6 +183,13 @@ The buttons at the top can show icons and names, only icons or only names, in th
 | Gapless music | ✅ (+ crossfade, colours from the cover) | ✅ (no crossfade) |
 | Cinema mode, Up next card with a countdown, visualizer | ✅ | — |
 | Seek-bar pictures, skip intro / credits, chapters, audio and subtitle tracks | ✅ | ✅ |
+| Episodes list in the player, a choice per kind of skippable stretch, converted sound formats | ✅ | ✅ |
+| A second subtitle line, version / audio / subtitle choice before Play, seek-bar labels | ✅ | — |
+| Live TV by kind (movies, sports, news…), back to the last channel | ✅ | ✅ |
+| Watch together (SyncPlay) | ✅ | — |
+| Like / dislike a title, titles under the posters, what a Continue watching card does | ✅ | ✅ |
+| Kids mode with a PIN, search in Settings, first-run setup, trailers | ✅ | — |
+| Screensaver with backdrops from your library | — | ✅ |
 | Appearance: backgrounds, accents, poster size, home rows, top menu (icons or names, order, hide) | ✅ (+ any colour) | ✅ |
 | Back up your look on the server | ✅ | ✅ |
 | Your stats, and Playback Reporting data | ✅ | ✅ |
@@ -421,9 +428,9 @@ No, only Jellyfin.
 
 ## 🛣️ What could come next
 
-Jellyflix 1.1 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
+Jellyflix 1.3 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
 
-- **Playback:** SyncPlay (watch together), recording and timers for live TV, a version picker on the web.
+- **Playback:** recording and timers for live TV, watch together on the TV app.
 - **Books:** a reader for the TV app, Mobi and RAR comics.
 - **Sign in:** find servers on the network, several servers and users.
 - **Reach:** Fire TV, more languages, a public demo of the web app.

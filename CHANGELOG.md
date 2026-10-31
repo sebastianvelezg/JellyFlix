@@ -5,6 +5,8 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-31
+
 A visual polish of the whole web app, without changing its identity (calmer, simpler and more consistent), and the first three phases of the roadmap: the player and the way a title starts, the household, and the bigger pieces.
 
 ### Audit before the release: security and performance
