@@ -2,7 +2,7 @@
 #   docker build -t jellyflix-web .
 #   docker run -d -p 8080:80 -e JELLYFIN_URL=http://192.168.x.x:8096 jellyflix-web
 # The build output is plain files, so it is made once on the builder's own CPU whatever platform the image is for.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
