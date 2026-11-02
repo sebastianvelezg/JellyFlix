@@ -95,6 +95,15 @@ function Libraries({ session }: { session: Session }) {
 // ---- finding titles and changing many at once ----------------------------------------------------------
 
 type Kind = 'Movie' | 'Series'
+
+/** The page of titles to ask the server for, from what the filter bar holds. */
+const titleQuery = (query: { text: string; kind: Kind; unidentified: boolean }, start: number): TitleQuery => ({
+  text: query.text,
+  type: query.kind,
+  unidentified: query.unidentified,
+  start,
+  limit: TITLE_PAGE,
+})
 type ActionChoice = 'watched' | 'unwatched' | 'scan' | 'missing' | 'all' | 'lock' | 'unlock' | 'tag' | 'untag'
 
 const ACTION_LABEL: Record<ActionChoice, string> = {
@@ -229,8 +238,11 @@ function TitleList({
   onSelectMany: (rows: TitleRow[]) => void
   onChanged: () => void
 }) {
-  const make = (start: number): TitleQuery => ({ text: query.text, type: query.kind, unidentified: query.unidentified, start, limit: TITLE_PAGE })
-  const load = useCallback(() => findTitles(session, make(0)), [session, query.text, query.kind, query.unidentified]) // eslint-disable-line react-hooks/exhaustive-deps
+  const make = (start: number): TitleQuery => titleQuery(query, start)
+  const load = useCallback(
+    () => findTitles(session, titleQuery({ text: query.text, kind: query.kind, unidentified: query.unidentified }, 0)),
+    [session, query.text, query.kind, query.unidentified],
+  )
   const first = useAsync(load)
   useReloadOnEdit(first.retry)
   const [more, setMore] = useState<TitleRow[]>([])

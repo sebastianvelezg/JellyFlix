@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useEffectEvent, useState, type FormEvent } from 'react'
 import { isUnencryptedPublic, normalizeServerUrl, type QuickConnectRequest, type Session } from '../core'
 import { readKeepSignedIn, writeKeepSignedIn } from '../platform/web/storage'
 import { readRememberedServerUrl, rememberServerUrl } from '../platform/web/browser'
@@ -74,21 +74,27 @@ export function ConnectForm({
     }
   }
 
+  // (Effect events read the latest of these without starting the polling over when the form re-renders.)
+  const isApproved = useEffectEvent((code: QuickConnectRequest) => quickConnect?.approved(code) ?? Promise.resolve(false))
+  const completeWith = useEffectEvent((code: QuickConnectRequest) => (quickConnect as QuickConnectActions).complete(code))
+  const signedIn = useEffectEvent((session: Session) => {
+    rememberServerUrl(session.serverUrl)
+    writeKeepSignedIn(keep)
+    onConnected(session, keep)
+  })
+  const offered = !!quickConnect
   // While a code is showing, ask every two seconds whether it was approved, and give up after ten minutes.
   useEffect(() => {
-    if (!request || !quickConnect) return
+    if (!request || !offered) return
     let stopped = false
     let checking = false
     const check = async () => {
       if (checking || stopped) return
       checking = true
       try {
-        if (!(await quickConnect.approved(request)) || stopped) return
+        if (!(await isApproved(request)) || stopped) return
         stopped = true
-        const session = await quickConnect.complete(request)
-        rememberServerUrl(session.serverUrl)
-        writeKeepSignedIn(keep)
-        onConnected(session, keep)
+        signedIn(await completeWith(request))
       } catch (e) {
         stopped = true
         setRequest(null)
@@ -108,9 +114,7 @@ export function ConnectForm({
       window.clearInterval(timer)
       window.clearTimeout(expiry)
     }
-    // The form's other fields do not matter while a code is showing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request])
+  }, [request, offered])
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden">

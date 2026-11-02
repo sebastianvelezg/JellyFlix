@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 import { backdropImageUrl, formatRuntime, getMovieDetails, ticksToSeconds, type Movie, type Session } from '../core'
 import { PlayOnButton } from './remote/PlayOnButton'
 import { ChevronLeftIcon, ChevronRightIcon, InfoIcon, PlayIcon, StarIcon } from './icons'
@@ -61,16 +61,18 @@ export function HeroCarousel({
   // Warm the next backdrop so the change is not a blank flash.
   const nextUrl = count > 1 ? backdropImageUrl(session.serverUrl, items[(index + 1) % count] as Movie) : null
   const nextTitle = count > 1 ? (items[(index + 1) % count] as Movie) : null
+  // (Only a different next picture starts the check, not a new callback.)
+  const nextBackdropFailed = useEffectEvent(() => {
+    if (nextTitle) onBackdropFail(nextTitle)
+  })
   useEffect(() => {
-    if (!nextUrl || !nextTitle) return
+    if (!nextUrl) return
     const image = new Image()
-    image.onerror = () => onBackdropFail(nextTitle)
+    image.onerror = () => nextBackdropFailed()
     image.src = nextUrl
     return () => {
       image.onerror = null
     }
-    // Only a different next title matters, not a new callback.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextUrl])
 
   const moving = rotate && !reduced && count > 1
