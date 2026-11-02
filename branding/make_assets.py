@@ -9,7 +9,7 @@ Run it again only when the artwork changes. The outputs are committed, so buildi
 
 Writes:
   web/public/            icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon.png
-  web/src/assets/        logo.png (the jellyfish, transparent), wordmark.png (the word, transparent)
+  web/src/assets/        logo.webp (the jellyfish, transparent), wordmark.webp (the word, transparent): WebP, a quarter of the size of PNG
   tv/app/src/main/res/   drawable-nodpi/{logo,wordmark,banner,ic_launcher_foreground}.png
   branding/              banner.png (README header), social-preview.png (GitHub link preview, 1280x640)
 """
@@ -27,6 +27,13 @@ def save(img: Image.Image, path: Path, **kw) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path, optimize=True, **kw)
     print('wrote', path.relative_to(ROOT), img.size)
+
+
+def save_webp(img: Image.Image, path: Path) -> None:
+    """The pictures the web app draws at first paint: lossy WebP keeps the transparency and is a fraction of the PNG."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(path, 'WEBP', quality=90, method=6, alpha_quality=100)
+    print('wrote', path.relative_to(ROOT), img.size, path.stat().st_size, 'bytes')
 
 
 def key_icon(im: Image.Image) -> Image.Image:
@@ -88,8 +95,9 @@ save(on_black(glow, 192), pub / 'icon-192.png')
 save(on_black(glow, 512), pub / 'icon-maskable-512.png')  # the body already sits inside the central 80%
 save(on_black(glow, 180), pub / 'apple-touch-icon.png')
 save(on_black(body, 64), pub / 'favicon.png')
-save(body.resize((256, 256), Image.LANCZOS), ROOT / 'web' / 'src' / 'assets' / 'logo.png')
-save(fit(word, width=640), ROOT / 'web' / 'src' / 'assets' / 'wordmark.png')
+# Drawn at 96 px and 40 px high at the most, so twice and three times that is plenty.
+save_webp(body.resize((192, 192), Image.LANCZOS), ROOT / 'web' / 'src' / 'assets' / 'logo.webp')
+save_webp(fit(word, width=480), ROOT / 'web' / 'src' / 'assets' / 'wordmark.webp')
 
 # TV
 res = ROOT / 'tv' / 'app' / 'src' / 'main' / 'res' / 'drawable-nodpi'

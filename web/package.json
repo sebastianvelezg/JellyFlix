@@ -17,6 +17,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "serve": "node scripts/serve.mjs",
+    "size": "node scripts/check-size.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.core.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run",

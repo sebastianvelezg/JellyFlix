@@ -20,7 +20,9 @@ import { ACCENTS, CANVASES } from '../theme/themes'
 import { es, esPatterns } from './es'
 import { getLanguage, resolveLanguage, setLanguage, t } from './index'
 
-afterEach(() => setLanguage('en'))
+afterEach(async () => {
+  await setLanguage('en')
+})
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort()
 
@@ -32,26 +34,43 @@ describe('t', () => {
     expect(t('Nothing {here}', {})).toBe('Nothing {here}') // an unknown placeholder is left alone
   })
 
-  it('uses the Spanish text, with placeholders, once the language is Spanish', () => {
-    setLanguage('es')
+  it('uses the Spanish text, with placeholders, once the language is Spanish', async () => {
+    await setLanguage('es')
     expect(getLanguage()).toBe('es')
     expect(t('Continue watching')).toBe('Continuar viendo')
     expect(t('Resume from {time}', { time: '32:48' })).toBe('Continuar desde 32:48')
   })
 
-  it('shows English for a text that has no translation, never a blank or a key', () => {
-    setLanguage('es')
+  it('shows English for a text that has no translation, never a blank or a key', async () => {
+    await setLanguage('es')
     expect(t('A text nobody translated')).toBe('A text nobody translated')
   })
 
-  it('translates messages with numbers or names in them by pattern', () => {
-    setLanguage('es')
+  it('translates messages with numbers or names in them by pattern', async () => {
+    await setLanguage('es')
     expect(t('The server reported an error (HTTP 503).')).toBe('El servidor informó un error (HTTP 503).')
     expect(t('Could not play “Song 1.1”. The connection to the server was lost.')).toBe(
       'No se pudo reproducir “Song 1.1”. The connection to the server was lost.',
     )
-    setLanguage('en')
+    await setLanguage('en')
     expect(t('The server reported an error (HTTP 503).')).toBe('The server reported an error (HTTP 503).')
+  })
+})
+
+describe('setLanguage', () => {
+  it('lets the last choice win when an earlier one is still being fetched', async () => {
+    const slow = setLanguage('es')
+    const quick = setLanguage('en')
+    await Promise.all([slow, quick])
+    expect(getLanguage()).toBe('en')
+    expect(t('Continue watching')).toBe('Continue watching')
+  })
+
+  it('keeps the Spanish texts in memory once they were fetched', async () => {
+    await setLanguage('es')
+    await setLanguage('en')
+    await setLanguage('es')
+    expect(t('Continue watching')).toBe('Continuar viendo')
   })
 })
 

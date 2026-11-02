@@ -31,6 +31,8 @@ jobs:
       - run: npm run lint
       - run: npx vitest run
       - run: npm run build
+      # What a visitor downloads for the first screen has a budget (scripts/size-budget.json).
+      - run: npm run size
 
   # The browser tests (player, books, settings, admin, Content-Security-Policy, accessibility...) against the production build.
   # They need Google Chrome (the runner has it, with the H.264/AAC decoders) and ffmpeg (to make the synthetic test media).

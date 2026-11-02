@@ -93,3 +93,41 @@ test('a browser set to English shows English, and Settings can switch it to Span
   await expect(page.getByRole('heading', { name: 'Ajustes', level: 1 })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', 'es')
 })
+
+/** The Spanish texts are a file of their own: whoever reads English never downloads them. (Dev server: src/i18n/es.ts; build: assets/es-<hash>.js.) */
+const isSpanishFile = (url: string) => /\/i18n\/es(\.ts)?(\?|$)|\/assets\/es-[\w-]+\.js/.test(url)
+
+test.describe('the Spanish texts are downloaded only for Spanish', () => {
+  test('a browser set to English never asks for them, until Settings switches to Spanish', async ({ page }) => {
+    mock = await startMock(everything)
+    const asked: string[] = []
+    page.on('request', (r) => isSpanishFile(r.url()) && asked.push(r.url()))
+    await page.addInitScript(() => localStorage.setItem('jellyflix.setup', '1'))
+    await page.goto('/#/settings')
+    await expect(page.getByRole('button', { name: 'Connect' })).toBeVisible()
+    expect(asked).toEqual([])
+    await page.getByLabel('Server URL').fill(mock.url)
+    await page.getByLabel('Username').fill('tester')
+    await page.getByLabel('Password').fill('secret')
+    await page.getByRole('button', { name: 'Connect' }).click()
+    await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
+    expect(asked).toEqual([])
+    await page.getByLabel('Language').selectOption('es')
+    await expect(page.getByRole('heading', { name: 'Ajustes', level: 1 })).toBeVisible()
+    expect(asked).toHaveLength(1)
+  })
+
+  test.describe('a browser set to Spanish', () => {
+    test.use({ locale: 'es-CO' })
+
+    test('draws its first screen already in Spanish, after one download of the texts', async ({ page }) => {
+      mock = await startMock(everything)
+      const asked: string[] = []
+      page.on('request', (r) => isSpanishFile(r.url()) && asked.push(r.url()))
+      await page.addInitScript(() => localStorage.setItem('jellyflix.setup', '1'))
+      await page.goto('/#/')
+      await expect(page.getByRole('button', { name: 'Conectar' })).toBeVisible()
+      expect(asked).toHaveLength(1)
+    })
+  })
+})
