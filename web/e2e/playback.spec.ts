@@ -78,8 +78,10 @@ test.describe('direct play', () => {
     await page.getByRole('slider', { name: 'Volume' }).focus()
     await page.keyboard.press('ArrowLeft')
     expect(await video(page).evaluate((v: HTMLVideoElement) => v.volume)).toBeLessThan(1)
-    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.player') ?? '{}'))
-    expect(saved.volume).toBeLessThan(1)
+    // (The browser reports the change a moment later, and that is when the choice is saved.)
+    await expect
+      .poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('jellyflix.player') ?? '{}') as { volume?: number }).volume ?? 1))
+      .toBeLessThan(1)
 
     // Playback speed from the settings menu.
     let settings = await openSettings(page, 'Speed')

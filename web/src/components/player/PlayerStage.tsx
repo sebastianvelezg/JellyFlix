@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
-  activeSegment,
   audioChangeRequest,
   episodeCode,
   isEpisode,
   defaultSearchLanguage,
   PlaybackSession,
   playbackTitle,
-  upNextPhase,
   FLOW_COUNTDOWN_SECONDS,
   describePlayback,
   retryRequest,
@@ -25,40 +23,29 @@ import {
 } from '../../core'
 import { reportStopOnPageHide } from '../../platform/web/browser'
 import { attachMedia, type Attached } from '../../platform/web/mediaAttach'
-import { bindMediaSession, keepScreenAwake } from '../../platform/web/mediaSession'
-import {
-  readPlayerPrefs,
-  readSeriesPrefs,
-  readSubtitleOffset,
-  writePlayerPrefs,
-  writeSubtitleOffset,
-} from '../../platform/web/prefs'
-import { CloseIcon, FullscreenIcon, PauseIcon, PlayIcon, SkipIcon, SkipNextIcon } from '../icons'
-import { SeekBar } from '../music/controls'
+import { readPlayerPrefs, readSeriesPrefs, writePlayerPrefs } from '../../platform/web/prefs'
 import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
 import { useSyncPlay, useSyncPlayVideo } from '../syncplay/SyncPlayProvider'
 import { Controls } from './Controls'
-import { DOCK_BAR_CLASS, DOCK_BUTTON, DOCK_THUMB_CLASS } from './dock'
+import { DOCK_BAR_CLASS, DOCK_THUMB_CLASS } from './dock'
 import { enterFullscreen, inFullscreen, leaveFullscreen } from './fullscreen'
+import { BufferingSpinner, Curtain, ErrorPanel, MiniBar, SkipSegmentButton, SubtitleNotice, SyncNote, UpNextCard } from './PlayerOverlays'
+import { handlePlayerKey } from './playerKeys'
 import { SubtitleOverlay, type SubtitleStyle } from './SubtitleOverlay'
 import { SubtitleSearchDialog } from './SubtitleSearchDialog'
+import { useControlsVisibility } from './useControlsVisibility'
+import { useSegmentSkipping } from './useSegmentSkipping'
+import { useStageEnvironment } from './useStageEnvironment'
+import { useSubtitleSync } from './useSubtitleSync'
 import { useSubtitleTrack } from './useSubtitleTrack'
 import { useTrickplay } from './useTrickplay'
+import { useUpNext } from './useUpNext'
 import { getLanguage, t } from '../../i18n'
-import { offsetLabel } from '../offsetLabel'
 
-const HIDE_CONTROLS_MS = 3000
-/** In cinema mode the controls get out of the way sooner. */
-const HIDE_CONTROLS_CINEMA_MS = 1800
-/** A skip button nobody pressed is taken away after this long. */
-const SKIP_BUTTON_MS = 10_000
 const PROGRESS_INTERVAL_MS = 10_000
 const STOP_TIMEOUT_MS = 2000
-const SKIP_SECONDS = 10
-/** How long the picture takes to fade in from black (and out at the very end) in cinema mode. */
-const CURTAIN_MS = 1400
-/** The fade out starts this long before the end. */
+/** The fade out of cinema mode starts this long before the end. */
 const CURTAIN_OUT_SECONDS = 1.5
 
 function mediaErrorMessage(error: MediaError): string {
@@ -167,9 +154,6 @@ export function PlayerStage({
     onPlayingRef.current = onPlaying
   })
   const containerRef = useRef<HTMLDivElement>(null)
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // The latest `poke` (shows the controls for a moment), for the video's own event handlers.
-  const pokeRef = useRef<() => void>(() => undefined)
   const attachedRef = useRef<Attached | null>(null)
   const lastSubtitle = useRef<number | null>(null)
 
@@ -191,34 +175,23 @@ export function PlayerStage({
   })
   // Sync is remembered per movie, and per series for episodes (its episodes usually share one release).
   const syncKey = isEpisode(movie) ? movie.seriesId : movie.id
-  const [subtitleOffset, setSubtitleOffsetState] = useState(() => readSubtitleOffset(syncKey))
-  // Keys can arrive faster than the screen updates (holding one down), so the next step starts from this, not from the last render.
-  const offsetNow = useRef(subtitleOffset)
-  const [syncNote, setSyncNote] = useState<string | null>(null)
-  const syncNoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { subtitleOffset, offsetNow, syncNote, setSubtitleOffset } = useSubtitleSync(syncKey)
   // (A video that follows another one starts in full screen when the one before was.)
   const [fullscreen, setFullscreen] = useState(inFullscreen)
-  const [awake, setAwake] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const title = playbackTitle(movie)
-  // Up next: set when an episode finishes; counts down, then starts the next episode.
-  const [ended, setEnded] = useState(false)
-  // Set once a flow has moved on to the next video, so that it happens once.
-  const advanced = useRef(false)
-  const [upNextDismissed, setUpNextDismissed] = useState(false)
-  // After a title ends the next one starts by itself once this many seconds have counted down (chosen in Settings).
   // One music video after another is meant to flow: the countdown runs over the last seconds of the video, and the next one starts
   // the moment it ends.
   const flow = !!movie.musicVideo
   const [countdownSeconds] = useState(flow ? FLOW_COUNTDOWN_SECONDS : initialPrefs.autoplayCountdown)
-  const [secondsLeft, setSecondsLeft] = useState(countdownSeconds)
   const [autoplay, setAutoplay] = useState(initialPrefs.autoplayNext)
   // Cinema mode: the picture fades in from black, and the controls leave when you are not using them, even while paused.
   const [cinema, setCinema] = useState(initialPrefs.cinemaMode)
   const [curtainUp, setCurtainUp] = useState(false)
   const [pip, setPip] = useState(false)
   const canPip = typeof document !== 'undefined' && document.pictureInPictureEnabled === true
+  const { awake, poke, pokeRef } = useControlsVisibility(cinema)
 
   // A file from the viewer's device replaces the server's track while it is in use.
   const subtitle = useSubtitleTrack(session, plan, localSubtitle ? null : subtitleIndex)
@@ -226,24 +199,6 @@ export function PlayerStage({
   const showingSubtitles = subtitleIndex !== null || !!localSubtitle
   const secondSubtitle = useSubtitleTrack(session, plan, secondSubtitleIndex)
   const secondUrl = showingSubtitles ? secondSubtitle.url : null
-
-  const setSubtitleOffset = useCallback(
-    (seconds: number) => {
-      offsetNow.current = seconds
-      setSubtitleOffsetState(seconds)
-      writeSubtitleOffset(syncKey, seconds)
-      setSyncNote(t('Subtitles: {offset}', { offset: offsetLabel(seconds) }))
-      if (syncNoteTimer.current) clearTimeout(syncNoteTimer.current)
-      syncNoteTimer.current = setTimeout(() => setSyncNote(null), 1800)
-    },
-    [syncKey],
-  )
-  useEffect(
-    () => () => {
-      if (syncNoteTimer.current) clearTimeout(syncNoteTimer.current)
-    },
-    [],
-  )
 
   // All server reporting (start / progress / stop and which position to trust) lives in core.
   const playback = useMemo(() => new PlaybackSession(session, plan, startSeconds), [session, plan, startSeconds])
@@ -260,6 +215,39 @@ export function PlayerStage({
       volume: video?.volume ?? 1,
     }
   }, [])
+
+  // Leaving, or moving on to another title, first waits (briefly) for the final position to reach the server so the library shows it.
+  const stopped = useCallback(
+    () => Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))]),
+    [playback, device],
+  )
+  const back = useCallback(async () => {
+    await stopped()
+    onExit()
+  }, [stopped, onExit])
+  /** Closing the mini bar: the same wait for the final position, then the video goes away. */
+  const closeBar = useCallback(async () => {
+    await stopped()
+    onClose?.()
+  }, [stopped, onClose])
+  /** Report where this episode stopped (so it counts as watched), then move on to the next one. */
+  const goNext = useCallback(async () => {
+    if (!onNext) return
+    await stopped()
+    onNext()
+  }, [stopped, onNext])
+  /** Report where this one stopped, then play the episode picked from the list. */
+  const pickEpisode = useCallback(
+    async (episode: Movie) => {
+      if (!onPickEpisode) return
+      await stopped()
+      onPickEpisode(episode)
+    },
+    [stopped, onPickEpisode],
+  )
+
+  // Near the end the card shows what follows; once the title ends it counts down (when autoplay is on) and moves on.
+  const upNext = useUpNext({ flow, next, error: !!error, autoplay, duration, currentTime, countdownSeconds, goNext, onNext })
 
   // Apply remembered volume and the chosen speed before the stream starts.
   useEffect(() => {
@@ -297,37 +285,10 @@ export function PlayerStage({
     }
   }, [plan, session, startSeconds])
 
-  // OS media keys / now-playing while this stage is open (also in the mini bar, so the keys of the keyboard still work).
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    return bindMediaSession(video, title)
-  }, [title])
-
-  // The screen wake lock and the tab title are for the full-screen player; the bar leaves the page its own.
-  useEffect(() => {
-    if (mini) return
-    const release = keepScreenAwake()
-    const previousTitle = document.title
-    document.title = `▶ ${title}`
-    return () => {
-      release()
-      document.title = previousTitle
-    }
-  }, [title, mini])
-
-  // The mini bar is not a full-screen element, and it does not take the keyboard: it gives both back, and takes them again when opened.
-  useEffect(() => {
-    if (mini) {
-      leaveFullscreen()
-      const active = document.activeElement
-      if (active instanceof HTMLElement && containerRef.current?.contains(active)) active.blur()
-    } else {
-      containerRef.current?.focus()
-    }
-  }, [mini])
+  useStageEnvironment({ videoRef, containerRef, title, mini })
 
   // Mirror <video> state into React and drive progress reporting from the same events.
+  const { markPlaying, markEnded } = upNext
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -339,13 +300,11 @@ export function PlayerStage({
       pause: () => {
         setPaused(true)
         playback.stateChanged(video.currentTime, device())
-        // Cinema mode: the controls show for a moment after pausing, then leave (see `poke`, which is set further down).
+        // Cinema mode: the controls show for a moment after pausing, then leave (see `poke`).
         pokeRef.current()
       },
       playing: () => {
-        setEnded(false)
-        advanced.current = false
-        setSecondsLeft(countdownSeconds)
+        markPlaying()
         setCurtainUp(true)
         setBuffering(false)
         playback.playing(video.currentTime, device())
@@ -376,7 +335,7 @@ export function PlayerStage({
       },
       ended: () => {
         setPaused(true)
-        setEnded(true)
+        markEnded()
         void playback.ended(video.duration, device())
       },
       error: () => {
@@ -413,26 +372,14 @@ export function PlayerStage({
       // Covers unmounting for any reason (audio switch, sign-out). A no-op if already stopped.
       void playback.stop(device())
     }
-  }, [playback, device, plan, fallback, onRequest, countdownSeconds])
+  }, [playback, device, plan, fallback, onRequest, markPlaying, markEnded, pokeRef])
 
   useEffect(() => {
+    // Full screen is not left here: the next video (a new player) goes on in it. Leaving the player ends it (see the app).
     const onChange = () => setFullscreen(inFullscreen())
     document.addEventListener('fullscreenchange', onChange)
-    return () => {
-      document.removeEventListener('fullscreenchange', onChange)
-      if (hideTimer.current) clearTimeout(hideTimer.current)
-      // Full screen is not left here: the next video (a new player) goes on in it. Leaving the player ends it (see the app).
-    }
+    return () => document.removeEventListener('fullscreenchange', onChange)
   }, [])
-
-  const poke = useCallback(() => {
-    setAwake(true)
-    if (hideTimer.current) clearTimeout(hideTimer.current)
-    hideTimer.current = setTimeout(() => setAwake(false), cinema ? HIDE_CONTROLS_CINEMA_MS : HIDE_CONTROLS_MS)
-  }, [cinema])
-  useEffect(() => {
-    pokeRef.current = poke
-  }, [poke])
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current
@@ -511,35 +458,6 @@ export function PlayerStage({
     getLanguage(),
   )
 
-  const back = useCallback(async () => {
-    // Wait (briefly) for the final position to reach the server so the library shows it.
-    await Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))])
-    onExit()
-  }, [playback, device, onExit])
-
-  /** Closing the mini bar: the same wait for the final position, then the video goes away. */
-  const closeBar = useCallback(async () => {
-    await Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))])
-    onClose?.()
-  }, [playback, device, onClose])
-
-  /** Report where this episode stopped (so it counts as watched), then move on to the next one. */
-  const goNext = useCallback(async () => {
-    if (!onNext) return
-    await Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))])
-    onNext()
-  }, [playback, device, onNext])
-
-  /** Report where this one stopped, then play the episode picked from the list. */
-  const pickEpisode = useCallback(
-    async (episode: Movie) => {
-      if (!onPickEpisode) return
-      await Promise.race([playback.stop(device()), new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))])
-      onPickEpisode(episode)
-    },
-    [playback, device, onPickEpisode],
-  )
-
   // Other devices can drive this player ("pause", "seek", "send it to the TV"): see the remote-control provider.
   const remoteController = useMemo<PlaybackController>(
     () => ({
@@ -571,29 +489,15 @@ export function PlayerStage({
     else void video.requestPictureInPicture().catch(() => undefined)
   }, [])
 
-  // "Skip intro" / "Skip credits" while the playhead is inside such a segment. Each kind can be offered, skipped at once, or ignored.
-  const segment = activeSegment(extras.segments, currentTime)
-  const skipSegment = useCallback(() => {
-    if (!segment) return
-    if (segment.kind === 'outro' && next) void goNext()
-    else seek(segment.endSeconds)
-  }, [segment, next, goNext, seek])
-  const segmentKey = segment ? `${segment.kind}:${segment.startSeconds}` : null
-  const segmentAction = segment ? initialPrefs.skipActions[segment.kind] : 'ask'
-  const autoSkipped = useRef(new Set<string>())
-  // A button left alone goes away after a few seconds (it comes back with the controls).
-  const [staleSegment, setStaleSegment] = useState<string | null>(null)
-  useEffect(() => {
-    if (!segmentKey || segmentAction !== 'ask') return
-    const timer = setTimeout(() => setStaleSegment(segmentKey), SKIP_BUTTON_MS)
-    return () => clearTimeout(timer)
-  }, [segmentKey, segmentAction])
-  useEffect(() => {
-    // Once for each stretch, so going back into an intro after skipping it does not throw you out again.
-    if (!segment || !segmentKey || segmentAction !== 'auto' || mini || autoSkipped.current.has(segmentKey)) return
-    autoSkipped.current.add(segmentKey)
-    skipSegment()
-  }, [segment, segmentKey, segmentAction, mini, skipSegment])
+  const { segment, segmentKey, segmentAction, staleSegment, skipSegment } = useSegmentSkipping({
+    extras,
+    currentTime,
+    next,
+    mini,
+    skipActions: initialPrefs.skipActions,
+    goNext,
+    seek,
+  })
 
   // Dragging the seek bar can hold the picture still until it is let go.
   const scrubResume = useRef(false)
@@ -611,38 +515,6 @@ export function PlayerStage({
     },
     [initialPrefs.pauseWhileScrubbing],
   )
-
-  // Near the end the card shows what follows; once the title ends it counts down (when autoplay is on) and moves on.
-  const phase = upNextPhase({
-    hasNext: !!next,
-    ended,
-    remainingSeconds: duration - currentTime,
-    durationSeconds: duration,
-    dismissed: upNextDismissed,
-    autoplay,
-    error: !!error,
-    flow,
-  })
-  const upNextVisible = phase !== 'hidden'
-  const counting = phase === 'counting'
-  // A flow counts with the video itself (its last seconds); anything else counts on a clock once the title has ended.
-  const timed = counting && !flow
-  useEffect(() => {
-    if (!timed) return
-    const timer = setInterval(() => setSecondsLeft((n) => n - 1), 1000)
-    return () => clearInterval(timer)
-  }, [timed])
-  useEffect(() => {
-    if (timed && secondsLeft <= 0) void goNext()
-  }, [timed, secondsLeft, goNext])
-  // The video ended and the next one follows: straight away (the end was already reported to the server when the video ended).
-  useEffect(() => {
-    if (!flow || !counting || !ended || advanced.current || !onNext) return
-    advanced.current = true
-    onNext()
-  }, [flow, counting, ended, onNext])
-  const flowSeconds = Math.min(FLOW_COUNTDOWN_SECONDS, Math.max(0, duration - currentTime))
-  const shownSeconds = flow ? Math.max(1, Math.ceil(flowSeconds)) : Math.max(0, secondsLeft)
 
   const changeAudio = useCallback(
     (index: number) => {
@@ -681,89 +553,33 @@ export function PlayerStage({
     // The mini bar has its own buttons and leaves the keys (Esc included) to the page behind it.
     if (mini) return
     poke()
-    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
-    const target = event.target as HTMLElement
-    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
-    const onButton = target.tagName === 'BUTTON'
-    const key = event.key
-    if (/^[0-9]$/.test(key) && duration > 0) {
-      event.preventDefault()
-      seek((Number(key) / 10) * duration)
-      return
-    }
-    switch (key) {
-      case ' ':
-      case 'k':
-        if (onButton) return
-        event.preventDefault()
-        togglePlay()
-        break
-      case 'ArrowLeft':
-      case 'j':
-        event.preventDefault()
-        skip(-SKIP_SECONDS)
-        break
-      case 'ArrowRight':
-      case 'l':
-        event.preventDefault()
-        skip(SKIP_SECONDS)
-        break
-      case 'ArrowUp':
-        event.preventDefault()
-        changeVolume((videoRef.current?.volume ?? 1) + 0.1)
-        break
-      case 'ArrowDown':
-        event.preventDefault()
-        changeVolume((videoRef.current?.volume ?? 1) - 0.1)
-        break
-      case 'Home':
-        event.preventDefault()
-        seek(0)
-        break
-      case 'End':
-        event.preventDefault()
-        seek(duration - 1)
-        break
-      case 'm':
-        toggleMute()
-        break
-      case 'f':
-        toggleFullscreen()
-        break
-      case 'c':
-        toggleSubtitles()
-        break
-      case 'z':
-      case 'Z':
-      case 'x':
-      case 'X':
-        // Z shows the subtitles earlier, X later; Shift takes bigger steps.
-        if (showingSubtitles) {
-          event.preventDefault()
-          const step = event.shiftKey ? SYNC_STEP_LARGE : SYNC_STEP
-          setSubtitleOffset(stepOffset(offsetNow.current, key.toLowerCase() === 'z' ? -step : step))
-        }
-        break
-      case 'n':
-        if (next) void goNext()
-        break
-      case 's':
-        skipSegment()
-        break
-      case 'p':
-        if (canPip) togglePip()
-        break
-      case 'Escape':
-        if (!document.fullscreenElement) void back()
-        break
-    }
+    handlePlayerKey(event, {
+      duration,
+      seek,
+      skip,
+      togglePlay,
+      volume: () => videoRef.current?.volume ?? 1,
+      changeVolume,
+      toggleMute,
+      toggleFullscreen,
+      toggleSubtitles,
+      showingSubtitles,
+      nudgeSubtitles: (direction, large) =>
+        setSubtitleOffset(stepOffset(offsetNow.current, direction * (large ? SYNC_STEP_LARGE : SYNC_STEP))),
+      hasNext: !!next,
+      goNext: () => void goNext(),
+      skipSegment,
+      canPip,
+      togglePip,
+      back: () => void back(),
+    })
   }
 
   // Cinema mode lets go of the "paused means controls" rule: they come back with the mouse, a key or a tap.
   const controlsVisible = (!cinema && paused) || awake || menuOpen || !!error
   // The black curtain: closed until playback starts, and closing again in the last moments of the title.
   const curtainDown =
-    cinema && (!curtainUp || ended || (!paused && duration > 0 && duration - currentTime < CURTAIN_OUT_SECONDS))
+    cinema && (!curtainUp || upNext.ended || (!paused && duration > 0 && duration - currentTime < CURTAIN_OUT_SECONDS))
   const showSpinner = buffering && !error
 
   return (
@@ -792,273 +608,144 @@ export function PlayerStage({
       </video>
 
       {mini && (
-        <>
-          <button
-            type="button"
-            onClick={onExpand}
-            aria-label={t('Open the video full screen: {title}', { title: movie.artist ? `${title} — ${movie.artist}` : title })}
-            className="min-w-0 flex-1 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] sm:w-1/4 sm:flex-none"
-          >
-            <span className="block truncate text-sm font-medium text-white">{title}</span>
-            <span className={`block truncate text-xs ${error ? 'text-red-300' : 'text-neutral-400'}`}>
-              {error
-                ? t(error)
-                : buffering
-                  ? t('Loading…')
-                  : upNextVisible && next
-                    ? t('Up next: {title}', { title: next.name })
-                    : movie.artist ?? ''}
-            </span>
-          </button>
-
-          <div className="flex shrink-0 flex-col items-center gap-0.5 sm:flex-1">
-            <div className="flex items-center gap-1 sm:gap-2">
-              {error ? (
-                <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={retry}>
-                  {t('Try again')}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  aria-label={paused ? t('Play') : t('Pause')}
-                  title={paused ? t('Play') : t('Pause')}
-                  onClick={togglePlay}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition duration-150 hover:scale-105 active:scale-90"
-                >
-                  {paused ? <PlayIcon /> : <PauseIcon />}
-                </button>
-              )}
-              <button
-                type="button"
-                aria-label={t('Next title')}
-                title={t('Next title')}
-                disabled={!next}
-                onClick={() => void goNext()}
-                className={DOCK_BUTTON}
-              >
-                <SkipNextIcon />
-              </button>
-            </div>
-            <SeekBar value={currentTime} max={duration} onSeek={seek} className="hidden w-full max-w-xl sm:flex" />
-          </div>
-
-          <div className="flex shrink-0 items-center justify-end gap-1 sm:w-1/4">
-            <button type="button" aria-label={t('Full screen')} title={t('Full screen')} onClick={onExpand} className={DOCK_BUTTON}>
-              <FullscreenIcon />
-            </button>
-            <button type="button" aria-label={t('Close the video player')} title={t('Close')} onClick={() => void closeBar()} className={DOCK_BUTTON}>
-              <CloseIcon />
-            </button>
-          </div>
-          {/* On a phone the timeline is a thin line along the top of the bar. */}
-          <SeekBar value={currentTime} max={duration} onSeek={seek} showTimes={false} className="absolute inset-x-0 -top-2.5 h-5 sm:hidden" />
-        </>
+        <MiniBar
+          title={title}
+          movie={movie}
+          error={error}
+          buffering={buffering}
+          upNextTitle={upNext.visible && next ? next.name : null}
+          paused={paused}
+          hasNext={!!next}
+          currentTime={currentTime}
+          duration={duration}
+          onExpand={onExpand}
+          onTogglePlay={togglePlay}
+          onNext={() => void goNext()}
+          onRetry={retry}
+          onClose={() => void closeBar()}
+          onSeek={seek}
+        />
       )}
 
       {!mini && (
-      <>
-      <SubtitleOverlay videoRef={videoRef} trackUrl={subtitleUrl} secondUrl={secondUrl} lifted={controlsVisible} style={subtitleStyle} offset={subtitleOffset} />
+        <>
+          <SubtitleOverlay videoRef={videoRef} trackUrl={subtitleUrl} secondUrl={secondUrl} lifted={controlsVisible} style={subtitleStyle} offset={subtitleOffset} />
 
-      {cinema && (
-        <div
-          aria-hidden="true"
-          data-testid="curtain"
-          data-down={curtainDown}
-          className="pointer-events-none absolute inset-0 bg-black transition-opacity ease-in-out motion-reduce:transition-none"
-          style={{ opacity: curtainDown ? 1 : 0, transitionDuration: `${CURTAIN_MS}ms` }}
-        />
-      )}
+          {cinema && <Curtain down={curtainDown} />}
 
-      {syncNote && (
-        <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
-          <p role="status" className="rounded-full border border-white/10 bg-black/75 px-4 py-1.5 text-sm tabular-nums text-neutral-100 backdrop-blur-xl">
-            {syncNote}
-          </p>
-        </div>
-      )}
+          {syncNote && <SyncNote text={syncNote} />}
 
-      {(subtitle.loading || subtitle.failed) && (
-        <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
-          <div
-            role="status"
-            className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-black/75 px-4 py-2 text-sm text-neutral-100 shadow-lg backdrop-blur-xl"
-          >
-            {subtitle.loading ? (
-              <>
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/20 border-t-[var(--color-accent)]" aria-hidden="true" />
-                {t('Loading subtitles… the first time can take a little while')}
-              </>
-            ) : (
-              <>
-                {t('Could not load subtitles')}
-                <button type="button" className="font-semibold text-[var(--color-accent)] hover:underline" onClick={subtitle.retry}>
-                  {t('Try again')}
-                </button>
-                <button type="button" className="text-neutral-400 hover:text-white" onClick={() => chooseSubtitle(null)}>
-                  {t('Turn off')}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {showSpinner && (
-        <div role="status" aria-label={t('Buffering')} className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-[var(--color-accent)]" />
-        </div>
-      )}
-
-      {error && (
-        <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
-          <p className="max-w-md text-neutral-100">{t(error)}</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <button type="button" className="btn-primary" onClick={retry}>
-              {t('Try again')}
-            </button>
-            {transcodeInstead && (
-              <button type="button" className="btn" onClick={() => onRequest(transcodeInstead)}>
-                {t('Let the server transcode')}
-              </button>
-            )}
-            <button type="button" className="btn" onClick={() => void back()}>
-              {t('Back')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {segment && segmentAction === 'ask' && (controlsVisible || staleSegment !== segmentKey) && !upNextVisible && (
-        <button
-          type="button"
-          onClick={skipSegment}
-          className="btn-primary absolute bottom-28 right-4 z-20 gap-2 sm:right-6"
-        >
-          <SkipIcon />
-          {segment.kind === 'intro' ? t('Skip intro') : segment.kind === 'recap' ? t('Skip recap') : segment.kind === 'preview' ? t('Skip preview') : next ? (isEpisode(next) ? t('Next episode') : t('Next title')) : t('Skip credits')}
-        </button>
-      )}
-
-      {upNextVisible && next && (
-        <div
-          role="status"
-          aria-label={t('Up next')}
-          className="absolute bottom-28 right-4 z-20 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/10 bg-black/80 p-4 shadow-[0_24px_70px_-10px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:right-6"
-        >
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)]">{t('Up next')}</p>
-          <p className="mt-1 truncate font-medium text-white">{next.name}</p>
-          <p className="truncate text-sm text-neutral-400">
-            {(isEpisode(next) ? [next.seriesName, episodeCode(next)] : [next.year ? String(next.year) : '']).filter(Boolean).join(' · ')}
-          </p>
-          {counting && <p className="mt-2 text-sm text-neutral-300">{t('Starting in {seconds}s', { seconds: shownSeconds })}</p>}
-          <div className="mt-3 flex gap-2">
-            <button type="button" className="btn-primary flex-1 py-2" onClick={() => void goNext()}>
-              {t('Play now')}
-            </button>
-            {(counting || phase === 'preview') && (
-              <button type="button" className="btn py-2" onClick={() => setUpNextDismissed(true)}>
-                {counting ? t('Cancel') : t('Close')}
-              </button>
-            )}
-          </div>
-          {counting && (
-            <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-white/10">
-              <div
-                data-testid="countdown-bar"
-                className={`h-full bg-[var(--color-accent)] transition-[width] ease-linear motion-reduce:transition-none ${flow ? 'duration-300' : 'duration-1000'}`}
-                style={{
-                  width: `${
-                    (flow ? flowSeconds / FLOW_COUNTDOWN_SECONDS : Math.max(0, Math.min(1, (secondsLeft - 1) / Math.max(1, countdownSeconds - 1)))) * 100
-                  }%`,
-                }}
-              />
-            </div>
+          {(subtitle.loading || subtitle.failed) && (
+            <SubtitleNotice loading={subtitle.loading} onRetry={subtitle.retry} onTurnOff={() => chooseSubtitle(null)} />
           )}
-        </div>
-      )}
 
-      <Controls
-        title={title}
-        visible={controlsVisible}
-        paused={paused}
-        currentTime={currentTime}
-        now={now}
-        duration={duration}
-        bufferedEnd={bufferedEnd}
-        volume={volume}
-        muted={muted}
-        fullscreen={fullscreen}
-        speed={speed}
-        audioTracks={plan.audioTracks}
-        audioIndex={plan.audioIndex}
-        subtitleTracks={plan.subtitleTracks}
-        subtitleIndex={localSubtitle ? null : subtitleIndex}
-        secondSubtitleIndex={secondSubtitleIndex}
-        onSecondSubtitle={onSecondSubtitle}
-        subtitleStatus={subtitle.loading ? 'loading' : subtitle.failed ? 'failed' : 'idle'}
-        subtitleStyle={subtitleStyle}
-        subtitleOffset={subtitleOffset}
-        localSubtitle={localSubtitle?.name ?? null}
-        subtitleFileError={subtitleFileError}
-        onBack={() => void back()}
-        onTogglePlay={togglePlay}
-        onSkip={skip}
-        onSeek={seek}
-        onVolume={changeVolume}
-        onToggleMute={toggleMute}
-        onToggleFullscreen={toggleFullscreen}
-        onAudio={changeAudio}
-        quality={quality}
-        playback={describePlayback(plan)}
-        onQuality={changeQuality}
-        onSubtitle={chooseSubtitle}
-        onSubtitleStyle={(patch) => {
-          setSubtitleStyle((style) => ({ ...style, ...patch }))
-          writePlayerPrefs({
-            ...(patch.size && { subtitleSize: patch.size }),
-            ...(patch.color && { subtitleColor: patch.color }),
-            ...(patch.background && { subtitleBackground: patch.background }),
-            ...(patch.position && { subtitlePosition: patch.position }),
-          })
-        }}
-        onSubtitleOffset={setSubtitleOffset}
-        onSubtitleFile={onSubtitleFile}
-        onFindSubtitles={openSubtitleSearch}
-        onSpeed={onSpeed}
-        onMenuOpenChange={setMenuOpen}
-        chapters={extras.chapters}
-        chapterMarks={initialPrefs.chapterMarks}
-        timeLabels={{ left: initialPrefs.timeLeft, right: initialPrefs.timeRight }}
-        onScrubbing={scrubbing}
-        trickplay={trickplay}
-        pictureInPicture={canPip ? { active: pip, onToggle: togglePip } : undefined}
-        nextEpisode={next ? { label: `${isEpisode(next) ? episodeCode(next) : ''} ${next.name}`.trim(), onPlay: () => void goNext() } : undefined}
-        repeatQueue={repeat}
-        episodes={isEpisode(movie) && onPickEpisode ? { session, current: movie, onPick: (episode) => void pickEpisode(episode) } : undefined}
-        cinemaMode={{
-          enabled: cinema,
-          onChange: (on) => {
-            setCinema(on)
-            writePlayerPrefs({ cinemaMode: on })
-          },
-        }}
-        autoplayNext={next ? { enabled: autoplay, onChange: (on) => {
-          setAutoplay(on)
-          writePlayerPrefs({ autoplayNext: on })
-        } } : undefined}
-      />
+          {showSpinner && <BufferingSpinner />}
 
-      {searchOpen && (
-        <SubtitleSearchDialog
-          session={session}
-          itemId={plan.itemId}
-          title={title}
-          initialLanguage={searchLanguage}
-          onSaved={() => onSubtitleSaved(playback.position)}
-          onClose={closeSubtitleSearch}
-        />
-      )}
-      </>
+          {error && (
+            <ErrorPanel message={error} transcodeInstead={transcodeInstead} onRetry={retry} onRequest={onRequest} onBack={() => void back()} />
+          )}
+
+          {segment && segmentAction === 'ask' && (controlsVisible || staleSegment !== segmentKey) && !upNext.visible && (
+            <SkipSegmentButton segment={segment} next={next} onSkip={skipSegment} />
+          )}
+
+          {upNext.visible && next && (
+            <UpNextCard
+              next={next}
+              phase={upNext.phase}
+              counting={upNext.counting}
+              flow={flow}
+              flowSeconds={upNext.flowSeconds}
+              shownSeconds={upNext.shownSeconds}
+              secondsLeft={upNext.secondsLeft}
+              countdownSeconds={countdownSeconds}
+              onPlayNow={() => void goNext()}
+              onDismiss={upNext.dismiss}
+            />
+          )}
+
+          <Controls
+            title={title}
+            visible={controlsVisible}
+            paused={paused}
+            currentTime={currentTime}
+            now={now}
+            duration={duration}
+            bufferedEnd={bufferedEnd}
+            volume={volume}
+            muted={muted}
+            fullscreen={fullscreen}
+            speed={speed}
+            audioTracks={plan.audioTracks}
+            audioIndex={plan.audioIndex}
+            subtitleTracks={plan.subtitleTracks}
+            subtitleIndex={localSubtitle ? null : subtitleIndex}
+            secondSubtitleIndex={secondSubtitleIndex}
+            onSecondSubtitle={onSecondSubtitle}
+            subtitleStatus={subtitle.loading ? 'loading' : subtitle.failed ? 'failed' : 'idle'}
+            subtitleStyle={subtitleStyle}
+            subtitleOffset={subtitleOffset}
+            localSubtitle={localSubtitle?.name ?? null}
+            subtitleFileError={subtitleFileError}
+            onBack={() => void back()}
+            onTogglePlay={togglePlay}
+            onSkip={skip}
+            onSeek={seek}
+            onVolume={changeVolume}
+            onToggleMute={toggleMute}
+            onToggleFullscreen={toggleFullscreen}
+            onAudio={changeAudio}
+            quality={quality}
+            playback={describePlayback(plan)}
+            onQuality={changeQuality}
+            onSubtitle={chooseSubtitle}
+            onSubtitleStyle={(patch) => {
+              setSubtitleStyle((style) => ({ ...style, ...patch }))
+              writePlayerPrefs({
+                ...(patch.size && { subtitleSize: patch.size }),
+                ...(patch.color && { subtitleColor: patch.color }),
+                ...(patch.background && { subtitleBackground: patch.background }),
+                ...(patch.position && { subtitlePosition: patch.position }),
+              })
+            }}
+            onSubtitleOffset={setSubtitleOffset}
+            onSubtitleFile={onSubtitleFile}
+            onFindSubtitles={openSubtitleSearch}
+            onSpeed={onSpeed}
+            onMenuOpenChange={setMenuOpen}
+            chapters={extras.chapters}
+            chapterMarks={initialPrefs.chapterMarks}
+            timeLabels={{ left: initialPrefs.timeLeft, right: initialPrefs.timeRight }}
+            onScrubbing={scrubbing}
+            trickplay={trickplay}
+            pictureInPicture={canPip ? { active: pip, onToggle: togglePip } : undefined}
+            nextEpisode={next ? { label: `${isEpisode(next) ? episodeCode(next) : ''} ${next.name}`.trim(), onPlay: () => void goNext() } : undefined}
+            repeatQueue={repeat}
+            episodes={isEpisode(movie) && onPickEpisode ? { session, current: movie, onPick: (episode) => void pickEpisode(episode) } : undefined}
+            cinemaMode={{
+              enabled: cinema,
+              onChange: (on) => {
+                setCinema(on)
+                writePlayerPrefs({ cinemaMode: on })
+              },
+            }}
+            autoplayNext={next ? { enabled: autoplay, onChange: (on) => {
+              setAutoplay(on)
+              writePlayerPrefs({ autoplayNext: on })
+            } } : undefined}
+          />
+
+          {searchOpen && (
+            <SubtitleSearchDialog
+              session={session}
+              itemId={plan.itemId}
+              title={title}
+              initialLanguage={searchLanguage}
+              onSaved={() => onSubtitleSaved(playback.position)}
+              onClose={closeSubtitleSearch}
+            />
+          )}
+        </>
       )}
     </div>
   )
