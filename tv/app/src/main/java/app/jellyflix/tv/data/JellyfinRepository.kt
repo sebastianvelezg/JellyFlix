@@ -2,7 +2,6 @@ package app.jellyflix.tv.data
 
 import android.content.Context
 import android.util.Log
-import app.jellyflix.tv.R
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -37,12 +36,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.CreatePlaylistDto
-import org.jellyfin.sdk.model.api.CodecProfile
-import org.jellyfin.sdk.model.api.CodecType
 import org.jellyfin.sdk.model.api.DeviceProfile
-import org.jellyfin.sdk.model.api.DirectPlayProfile
-import org.jellyfin.sdk.model.api.DlnaProfileType
-import org.jellyfin.sdk.model.api.EncodingContext
 import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemFilter
@@ -50,9 +44,7 @@ import org.jellyfin.sdk.model.api.GetProgramsDto
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.MediaSegmentType
 import org.jellyfin.sdk.model.api.MediaType
-import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.MediaStream
-import org.jellyfin.sdk.model.api.MediaStreamProtocol
 import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.PersonKind
 import org.jellyfin.sdk.api.sockets.subscribe
@@ -74,12 +66,7 @@ import org.jellyfin.sdk.model.api.PlaybackStopInfo
 import org.jellyfin.sdk.model.api.RepeatMode
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
-import org.jellyfin.sdk.model.api.ProfileCondition
-import org.jellyfin.sdk.model.api.ProfileConditionType
-import org.jellyfin.sdk.model.api.ProfileConditionValue
-import org.jellyfin.sdk.model.api.SubtitleProfile
 import org.jellyfin.sdk.model.api.TaskState
-import org.jellyfin.sdk.model.api.TranscodingProfile
 import java.util.UUID
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -1437,7 +1424,7 @@ class JellyfinRepository(context: Context) {
             startMs = startMs,
             liveStreamId = source.liveStreamId?.takeIf { it.isNotBlank() },
             directAllowed = directAllowed,
-            info = streamInfo(source, chosenAudio, if (direct) emptyList() else transcodeReasons(transcodingUrl)),
+            info = streamInfoOf(source, chosenAudio, if (direct) emptyList() else transcodeReasons(transcodingUrl)),
         )
     }
 
@@ -1501,30 +1488,6 @@ class JellyfinRepository(context: Context) {
         return found.groupBy { it.channelId }.mapValues { (_, list) -> list.sortedBy { it.startMs } }
     }
 
-    /** What the Info panel shows about [source]: its container, bitrate, video and the audio track being played. */
-    private fun streamInfo(source: MediaSourceInfo, audioIndex: Int?, reasons: List<String>): StreamInfo {
-        val streams = source.mediaStreams.orEmpty()
-        val video = streams.firstOrNull { it.type == MediaStreamType.VIDEO }
-        val audio = streams.firstOrNull { it.type == MediaStreamType.AUDIO && it.index == audioIndex }
-            ?: streams.firstOrNull { it.type == MediaStreamType.AUDIO }
-        return StreamInfo(
-            sourceName = source.name?.takeIf { it.isNotBlank() },
-            container = source.container,
-            totalBitrate = source.bitrate?.toLong(),
-            videoCodec = video?.codec,
-            width = video?.width,
-            height = video?.height,
-            fps = video?.realFrameRate ?: video?.averageFrameRate,
-            bitDepth = video?.bitDepth,
-            range = video?.videoRangeType?.serialName,
-            videoBitrate = video?.bitRate?.toLong(),
-            audioCodec = audio?.codec,
-            channels = audio?.channels,
-            audioBitrate = audio?.bitRate?.toLong(),
-            reasons = reasons,
-        )
-    }
-
     /** The chapters of a title (empty when it has none, or the server cannot say). */
     suspend fun chapters(session: Session, itemId: UUID): List<Chapter> = runCatching {
         val api = api(session)
@@ -1581,61 +1544,8 @@ class JellyfinRepository(context: Context) {
         ),
     ).content
 
-    /**
-     * What this TV can play, taken from the TV itself ([TvCapabilities]) instead of a fixed list. Whatever its decoders take is
-     * played as it is, at the file's own size (a 4K file stays 4K, a 1080p file stays 1080p); the server converts only what the
-     * TV cannot decode (an audio format, 10-bit video on a TV without it, HDR on a screen without it) and keeps the picture size.
-     */
-    private fun deviceProfile(avoidAudio: Set<String> = emptySet()): DeviceProfile {
-        val caps = TvCapabilities.get(appContext)
-        // Formats chosen in Settings are left out, so the server converts them although the TV could play them.
-        val audio = caps.audio.filterNot { it in avoidAudio }.joinToString(",")
-        val codecProfiles = caps.video.map { (codec, v) ->
-            val conditions = buildList {
-                add(condition(ProfileConditionValue.VIDEO_BIT_DEPTH, ProfileConditionType.LESS_THAN_EQUAL, if (v.tenBit) "10" else "8"))
-                add(condition(ProfileConditionValue.WIDTH, ProfileConditionType.LESS_THAN_EQUAL, v.maxWidth.toString()))
-                add(condition(ProfileConditionValue.HEIGHT, ProfileConditionType.LESS_THAN_EQUAL, v.maxHeight.toString()))
-                v.maxBitrate?.let { add(condition(ProfileConditionValue.VIDEO_BITRATE, ProfileConditionType.LESS_THAN_EQUAL, it.toString())) }
-                if (v.profiles.isNotEmpty()) add(condition(ProfileConditionValue.VIDEO_PROFILE, ProfileConditionType.EQUALS_ANY, v.profiles.joinToString("|")))
-                // Colour range: HDR the screen cannot show is converted (tone mapped) by the server instead of looking washed out.
-                add(condition(ProfileConditionValue.VIDEO_RANGE_TYPE, ProfileConditionType.EQUALS_ANY, caps.rangeTypes.joinToString("|")))
-            }
-            CodecProfile(type = CodecType.VIDEO, codec = codec, conditions = conditions, applyConditions = emptyList())
-        }
-        return DeviceProfile(
-            name = "Jellyflix TV",
-            directPlayProfiles = listOf(
-                DirectPlayProfile(
-                    container = "mp4,m4v,mkv,webm,mov,ts,m2ts",
-                    type = DlnaProfileType.VIDEO,
-                    videoCodec = caps.video.keys.joinToString(","),
-                    audioCodec = audio,
-                ),
-            ),
-            transcodingProfiles = listOf(
-                TranscodingProfile(
-                    container = "ts",
-                    type = DlnaProfileType.VIDEO,
-                    videoCodec = "h264",
-                    audioCodec = "aac",
-                    protocol = MediaStreamProtocol.HLS,
-                    context = EncodingContext.STREAMING,
-                    maxAudioChannels = "6",
-                    minSegments = 1,
-                    segmentLength = 6,
-                    breakOnNonKeyFrames = true,
-                    conditions = emptyList(),
-                ),
-            ),
-            containerProfiles = emptyList(),
-            codecProfiles = codecProfiles,
-            // Text subtitles travel as separate WebVTT files; image ones (PGS, VobSub) make the server burn them in.
-            subtitleProfiles = listOf(SubtitleProfile(format = "vtt", method = SubtitleDeliveryMethod.EXTERNAL)),
-        )
-    }
-
-    private fun condition(property: ProfileConditionValue, type: ProfileConditionType, value: String) =
-        ProfileCondition(condition = type, property = property, value = value, isRequired = false)
+    /** What this TV can play, taken from the TV itself (see [buildDeviceProfile]). */
+    private fun deviceProfile(avoidAudio: Set<String> = emptySet()): DeviceProfile = buildDeviceProfile(TvCapabilities.get(appContext), avoidAudio)
 
     /** Lines describing what this TV was found to play, for Settings. */
     fun capabilitySummary(): List<String> = TvCapabilities.get(appContext).summary()
