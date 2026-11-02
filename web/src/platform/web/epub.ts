@@ -180,6 +180,17 @@ const SELF_CLOSED = /<(a|span|div|p|b|i|u|em|strong|small|sup|sub|font|h[1-6]|li
 
 const FORBIDDEN = 'script, iframe, frame, frameset, object, embed, applet, form, audio, video, base, meta, noscript, input, button, textarea, select'
 
+/**
+ * A value a browser would run as a script address. A browser ignores tabs, line breaks and other control characters inside the scheme
+ * ("jav&#9;ascript:"), so they are taken out before looking.
+ */
+const SCRIPT_ADDRESS = /^(javascript|vbscript):/i
+// eslint-disable-next-line no-control-regex
+const IGNORED_BY_BROWSERS = /[\u0000-\u0020\u007f-\u009f]/g
+export function runsAsScript(value: string): boolean {
+  return SCRIPT_ADDRESS.test(value.replace(IGNORED_BY_BROWSERS, ''))
+}
+
 /** What a page of the book may do: show its own style, pictures and fonts, and nothing else (no network, no scripts). */
 const CSP = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"
 
@@ -242,12 +253,14 @@ export function chapterPage(book: EpubBook, index: number, extraCss: string): st
   for (const el of Array.from(doc.querySelectorAll('*'))) {
     for (const attr of Array.from(el.attributes)) {
       const name = attr.name.toLowerCase()
-      if (name.startsWith('on') || /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name)
+      if (name.startsWith('on') || runsAsScript(attr.value)) el.removeAttribute(attr.name)
       else if (name === 'style') el.setAttribute(attr.name, rewriteCss(attr.value))
       else if (name === 'srcset') el.removeAttribute(attr.name)
       else if (name === 'src' || name === 'href' || name === 'xlink:href') {
-        // Links stay as they are (the reader follows them); what is drawn must be inside the book.
-        const draws = name === 'src' || el.tagName.toLowerCase() === 'image'
+        // Links stay as they are (the reader follows them); anything else that points somewhere (a picture, an SVG <use>...) must point
+        // inside the book, or at a spot of the same page.
+        const tag = el.tagName.toLowerCase()
+        const draws = name === 'src' || (tag !== 'a' && tag !== 'area' && !attr.value.trim().startsWith('#'))
         if (draws) {
           const url = local(attr.value)
           if (url) el.setAttribute(attr.name, url)

@@ -47,6 +47,12 @@ const server = createServer(async (req, res) => {
     'Content-Security-Policy': CSP,
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
   }
+  // Only reading: nothing here accepts anything.
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { ...headers, Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8' })
+    res.end('Method not allowed')
+    return
+  }
   try {
     const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
     if (path === '/config.js') {

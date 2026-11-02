@@ -16,6 +16,7 @@ import app.jellyflix.tv.data.Album
 import app.jellyflix.tv.data.AlbumSort
 import app.jellyflix.tv.data.Artist
 import app.jellyflix.tv.data.CastMember
+import app.jellyflix.tv.data.ServerAddress
 import app.jellyflix.tv.data.FilterOptions
 import app.jellyflix.tv.data.FreshSeries
 import app.jellyflix.tv.data.LibraryFilters
@@ -666,8 +667,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Session ----------------------------------------------------------------------------------------------
 
+    /** The unencrypted address the person was warned about; choosing Connect again for the same one goes on. */
+    private var warnedAbout: String? = null
+
+    /** True (after saying why) when this address sends the password in clear text to somewhere that is not the home network. */
+    private fun holdForInsecure(server: String): Boolean {
+        val url = ServerAddress.normalize(server)
+        if (!ServerAddress.isUnencryptedPublic(url) || warnedAbout == url) return false
+        warnedAbout = url
+        errorText = null
+        errorRes = R.string.error_insecure_server
+        return true
+    }
+
     fun signIn(server: String, user: String, password: String) {
-        if (busy) return
+        if (busy || holdForInsecure(server)) return
         busy = true
         errorText = null
         errorRes = null
@@ -697,7 +711,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Asks the server for a code and waits (every two seconds, up to ten minutes) for somebody to approve it. */
     fun startQuickConnect(server: String) {
-        if (server.isBlank()) return
+        if (server.isBlank() || holdForInsecure(server)) return
         quickJob?.cancel()
         errorText = null
         errorRes = null

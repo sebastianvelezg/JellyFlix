@@ -5,6 +5,14 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+### Hardening
+- **TV: the session token is sealed.** It is now encrypted with a key held by the Android key store before it is written to the app's storage, so a copy of that storage does not hold a token that works. A token saved by an older version is sealed the first time the app opens and the clear copy is erased. If a device cannot do this, the app keeps working as before.
+- **A server address typed without `http://` or `https://`** gets `http://` when it is clearly a home address (a private IP range, `.local`, a name with no dot, Tailscale) and `https://` for anything else, because http across the internet sends the password and the session in clear text (web and TV). A typed `http://` to somewhere that is not the home network now shows a warning (on the TV, choose Connect again to go on).
+- **TV: the release app no longer writes its informational log lines.**
+- **Web: the book reader** ignores more disguised script addresses (a tab or line break inside `javascript:`) and drops any reference that points outside the book, not only pictures; a test with a deliberately hostile book and a check of the reader's sandbox keep this from regressing.
+- **`npm run serve`** answers only GET and HEAD.
+- **CI and releases:** the browser tests run in CI, code scanning (CodeQL) and a dependency check run on every change, every GitHub Action is pinned to a commit, releases use read-only permissions except where they publish, and the Docker image carries provenance and an SBOM.
+
 ## [1.3.0] - 2026-10-31
 
 A visual polish of the whole web app, without changing its identity (calmer, simpler and more consistent), and the first three phases of the roadmap: the player and the way a title starts, the household, and the bigger pieces.

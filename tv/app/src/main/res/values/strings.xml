@@ -9,6 +9,7 @@
     <string name="signin_connect">Connect</string>
     <string name="signin_connecting">Connecting…</string>
     <string name="error_sign_in">Could not sign in. Check the address, user and password.</string>
+    <string name="error_insecure_server">This address is not encrypted and is not on your home network, so your password and session would travel in clear text. Use https:// if your server has it, or choose Connect again to continue anyway.</string>
 
     <!-- Navigation -->
     <string name="nav_home">Home</string>

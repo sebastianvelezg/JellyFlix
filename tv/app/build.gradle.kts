@@ -50,6 +50,9 @@ android {
             signingConfig = signingConfigs.getByName(if (keystoreFile.exists()) "own" else "debug")
             optimization {
                 enable = true
+                keepRules {
+                    files.add(project.file("proguard-rules.pro"))
+                }
             }
         }
     }

@@ -18,7 +18,7 @@ You can expect an answer within about a week. This is a volunteer project, so th
 ## How the apps handle secrets
 
 - The password is sent to the user's server while signing in and is never stored. Only a revocable session token is kept: in `sessionStorage` by default, in
-  `localStorage` if the user ticks "Keep me signed in", and in the app's private storage on the TV.
+  `localStorage` if the user ticks "Keep me signed in", and on the TV in the app's private storage, sealed with a key held by the Android key store.
 - Tokens are sent in the `Authorization` header. The only places a token is put in a URL are a media request that cannot carry headers (a `<video src>`) and the address of the
   server's WebSocket (a browser cannot add headers to a socket), which is how Jellyfin's own web client works.
 - The web app is served with a strict Content-Security-Policy (only its own scripts run: no inline script, no `eval`, nothing from another site), and signing out also forgets

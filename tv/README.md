@@ -1,7 +1,7 @@
 # Jellyflix TV
 
 A native Android TV / Google TV client for your own Jellyfin server. Kotlin, Jetpack Compose for TV, Media3 (ExoPlayer) and the official Jellyfin Kotlin SDK. It talks only to the server you type in: no analytics, no other network calls,
-and no addresses or credentials in the source (the session is kept in the app's private storage on the device).
+and no addresses or credentials in the source (the session is kept in the app's private storage on the device, its token sealed with a key from the Android key store).
 
 It is the sibling of the web client in [`../web`](../web/README.md) and follows the same look and the same rules: the same sections in the same order, the same themes, English and Spanish.
 What differs is how it is used: everything is built for a remote control and a TV seen from the sofa.

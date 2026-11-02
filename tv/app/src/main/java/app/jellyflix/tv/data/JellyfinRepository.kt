@@ -141,11 +141,8 @@ class JellyfinRepository(context: Context) {
 
     private fun userId(session: Session): UUID = UUID.fromString(session.userId)
 
-    /** "jellyfin.local:8096" becomes "http://jellyfin.local:8096". */
-    fun normalizeServer(raw: String): String {
-        val trimmed = raw.trim().trimEnd('/')
-        return if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) trimmed else "http://$trimmed"
-    }
+    /** "jellyfin.local:8096" becomes "http://jellyfin.local:8096", "media.example.com" becomes "https://media.example.com". */
+    fun normalizeServer(raw: String): String = ServerAddress.normalize(raw)
 
     suspend fun signIn(server: String, user: String, password: String): Session {
         val url = normalizeServer(server)

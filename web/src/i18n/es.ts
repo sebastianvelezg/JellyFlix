@@ -77,6 +77,8 @@ export const es: Record<string, string> = {
   'Sign in to your Jellyfin server to browse and watch your movies.':
     'Inicia sesión en tu servidor Jellyfin para explorar y ver tus películas.',
   'Server URL': 'Dirección del servidor',
+  'This address is not encrypted and is not on your home network, so your password and session would travel in clear text. Use https:// if your server has it.':
+    'Esta dirección no está cifrada y no es de tu red local, así que tu contraseña y tu sesión viajarían en texto claro. Usa https:// si tu servidor lo tiene.',
   Username: 'Usuario',
   Password: 'Contraseña',
   'Keep me signed in on this device': 'Mantener la sesión iniciada en este dispositivo',
