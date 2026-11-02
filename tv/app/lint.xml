@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Lint reports the public builders of androidx.tvprovider (the Google TV "Continue watching" row) and the activity's own
+         dispatchKeyEvent as library-private. They are the documented API, and the code compiles against them. -->
+    <issue id="RestrictedApi">
+        <ignore path="**/WatchNext.kt" />
+        <ignore path="**/MainActivity.kt" />
+    </issue>
+    <!-- Media3 marks parts of its API as unstable; the code opts in with Kotlin's @OptIn, which lint must be told to accept. -->
+    <issue id="UnsafeOptInUsageError">
+        <option name="opt-in" value="androidx.media3.common.util.UnstableApi" />
+    </issue>
+    <!-- local.properties is each person's own file (the Android SDK folder); it is not part of the project. -->
+    <issue id="PropertyEscape">
+        <ignore path="**/local.properties" />
+    </issue>
+</lint>

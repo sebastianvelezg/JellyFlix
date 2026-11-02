@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
@@ -33,7 +34,6 @@ import app.jellyflix.tv.data.VideoPlaylist
 import app.jellyflix.tv.data.daysUntil
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import java.util.TimeZone
 
 /**
@@ -153,7 +153,7 @@ private fun airsLabel(airsAt: Long?): String? {
     return when (daysUntil(airsAt, System.currentTimeMillis())) {
         0 -> stringResource(R.string.day_today)
         1 -> stringResource(R.string.day_tomorrow)
-        else -> SimpleDateFormat("EEE d MMM", Locale.getDefault()).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(airsAt))
+        else -> SimpleDateFormat("EEE d MMM", LocalConfiguration.current.locales[0]).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(airsAt))
     }
 }
 
