@@ -1,5 +1,7 @@
 package app.jellyflix.tv.data
 
+import org.jellyfin.sdk.model.api.MediaSourceInfo
+import org.jellyfin.sdk.model.api.MediaStreamType
 import androidx.annotation.StringRes
 import app.jellyflix.tv.R
 import java.net.URLDecoder
@@ -187,4 +189,28 @@ fun bestDisplayMode(fps: Float, current: DisplayModeInfo, modes: List<DisplayMod
         ?: return null
     val now = fitOf(current, fps)
     return best.first.takeIf { it.id != current.id && (now == null || FIT_ORDER.compare(best.second, now) < 0) }
+}
+
+/** What the Info panel shows about [source]: its container, bitrate, video and the audio track being played. */
+internal fun streamInfoOf(source: MediaSourceInfo, audioIndex: Int?, reasons: List<String>): StreamInfo {
+    val streams = source.mediaStreams.orEmpty()
+    val video = streams.firstOrNull { it.type == MediaStreamType.VIDEO }
+    val audio = streams.firstOrNull { it.type == MediaStreamType.AUDIO && it.index == audioIndex }
+        ?: streams.firstOrNull { it.type == MediaStreamType.AUDIO }
+    return StreamInfo(
+        sourceName = source.name?.takeIf { it.isNotBlank() },
+        container = source.container,
+        totalBitrate = source.bitrate?.toLong(),
+        videoCodec = video?.codec,
+        width = video?.width,
+        height = video?.height,
+        fps = video?.realFrameRate ?: video?.averageFrameRate,
+        bitDepth = video?.bitDepth,
+        range = video?.videoRangeType?.serialName,
+        videoBitrate = video?.bitRate?.toLong(),
+        audioCodec = audio?.codec,
+        channels = audio?.channels,
+        audioBitrate = audio?.bitRate?.toLong(),
+        reasons = reasons,
+    )
 }

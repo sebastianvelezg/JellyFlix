@@ -179,9 +179,16 @@ test('music: with the server transcoding, music plays through hls.js', async ({ 
   await page.evaluate(() => localStorage.setItem('jellyflix.player', JSON.stringify({ gapless: false })))
   await playSong(page)
   expect(mock.requests.some((r) => r.path === '/audio/tr0001-1-1/master.m3u8')).toBe(true)
+  // The song ends the moment it is at its end and the next one starts, so the time can be below 20 again before a check looks at it:
+  // keep the furthest the song got instead.
+  await audio(page).evaluate((el: HTMLAudioElement) => {
+    const w = window as unknown as { __furthest?: number }
+    w.__furthest = 0
+    for (const name of ['seeked', 'timeupdate']) el.addEventListener(name, () => (w.__furthest = Math.max(w.__furthest ?? 0, el.currentTime)))
+  })
   await bar(page).getByRole('slider', { name: 'Seek' }).focus()
   await page.keyboard.press('End')
-  await expect.poll(() => time(page)).toBeGreaterThan(20)
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __furthest?: number }).__furthest ?? 0)).toBeGreaterThan(20)
 })
 
 test('music: a song that cannot be played is reported, and the next one is tried', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useState, type ReactNode } from 'react'
 import type { Session } from '../core'
 
 /** Where an image is in its loading attempts (see {@link Img}). */
@@ -43,10 +43,10 @@ export function Img({
     }
   }, [attempt.blob])
 
+  // `onFail` is a notification; it must not retrigger when its identity changes.
+  const failed = useEffectEvent(() => onFail?.())
   useEffect(() => {
-    if (step === 'failed') onFail?.()
-    // `onFail` is a notification; it must not retrigger when its identity changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (step === 'failed') failed()
   }, [step, src])
 
   if (!src || step === 'failed') return <>{fallback}</>

@@ -11,19 +11,38 @@ data class Session(
     val userName: String,
 )
 
-class SessionStore(context: Context) {
+class SessionStore(context: Context, private val vault: TokenVault = KeystoreVault()) {
     private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
 
+    /**
+     * The token is kept sealed ("tokenSealed", see [TokenVault]). "token" is where older versions wrote it in clear: it is sealed and
+     * erased the first time it is read.
+     */
     fun load(): Session? {
         val server = prefs.getString("server", null) ?: return null
-        val token = prefs.getString("token", null) ?: return null
+        val read = readToken(prefs.getString("tokenSealed", null), prefs.getString("token", null), vault)
+        if (read.reseal != null || read.dropPlain) {
+            prefs.edit {
+                read.reseal?.let { putString("tokenSealed", it) }
+                if (read.dropPlain) remove("token")
+            }
+        }
+        val token = read.token ?: return null
         val userId = prefs.getString("userId", null) ?: return null
         return Session(server, token, userId, prefs.getString("userName", "") ?: "")
     }
 
     fun save(session: Session) = prefs.edit {
         putString("server", session.serverUrl)
-        putString("token", session.accessToken)
+        val sealed = vault.seal(session.accessToken)
+        if (sealed != null) {
+            putString("tokenSealed", sealed)
+            remove("token")
+        } else {
+            // This device cannot seal: keep the token as older versions did rather than lose the session.
+            putString("token", session.accessToken)
+            remove("tokenSealed")
+        }
         putString("userId", session.userId)
         putString("userName", session.userName)
     }
@@ -32,6 +51,7 @@ class SessionStore(context: Context) {
     fun clear() = prefs.edit {
         remove("server")
         remove("token")
+        remove("tokenSealed")
         remove("userId")
         remove("userName")
         remove("lastChannelId")

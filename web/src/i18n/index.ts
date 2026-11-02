@@ -1,10 +1,11 @@
-import { es, esPatterns } from './es'
-
 /**
  * Translations. The text in the code is the English text itself, and `t('Continue watching')` returns it unchanged
  * for English or looks it up in the dictionary of the chosen language. A missing translation therefore shows English,
  * never a blank or a key. Placeholders are written `{name}` and filled from the second argument:
  * `t('Open {title}', { title })`. A test checks that every text used in the code has a Spanish entry.
+ *
+ * English is the text in the code, so it needs no dictionary. The Spanish one is a file of its own (about 67 kB compressed) that is
+ * only downloaded when the language is Spanish; see [setLanguage].
  */
 export type Language = 'en' | 'es'
 export type LanguageChoice = 'auto' | Language
@@ -14,18 +15,43 @@ export const LANGUAGES: Array<[Language, string]> = [
   ['es', 'Español'],
 ]
 
-const dictionaries: Record<Language, Record<string, string>> = { en: {}, es }
-const patterns: Record<Language, Array<[RegExp, string]>> = { en: [], es: esPatterns }
+const dictionaries: Record<Language, Record<string, string>> = { en: {}, es: {} }
+const patterns: Record<Language, Array<[RegExp, string]>> = { en: [], es: [] }
+/** How each language's texts are fetched (the dynamic import makes the bundler put them in a file of their own). */
+const loaders: Record<Language, () => Promise<void>> = {
+  en: () => Promise.resolve(),
+  es: async () => {
+    const spanish = await import('./es')
+    dictionaries.es = spanish.es
+    patterns.es = spanish.esPatterns
+  },
+}
+const loaded = new Set<Language>(['en'])
 
 let current: Language = 'en'
+/** The language asked for last, so a slow download of an earlier choice does not win over a later one. */
+let wanted: Language = 'en'
 const listeners = new Set<() => void>()
 
 export function getLanguage(): Language {
   return current
 }
 
-export function setLanguage(language: Language): void {
-  if (language === current) return
+/**
+ * Switches the texts to `language`. The Spanish dictionary is fetched the first time it is needed, so the promise resolves when the
+ * switch has happened (at once when the texts are already here). A download that fails leaves the language as it was.
+ */
+export async function setLanguage(language: Language): Promise<void> {
+  wanted = language
+  if (!loaded.has(language)) {
+    try {
+      await loaders[language]()
+      loaded.add(language)
+    } catch {
+      return
+    }
+  }
+  if (wanted !== language || language === current) return
   current = language
   for (const listener of listeners) listener()
 }
@@ -68,6 +94,3 @@ export function t(text: string, vars?: Record<string, string | number>): string 
 export function tr(text: string): string {
   return text
 }
-
-/** Every text that has a Spanish translation (for the completeness test). */
-export const SPANISH_KEYS: ReadonlySet<string> = new Set(Object.keys(es))

@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import type { QuickConnectRequest, Session } from '../core'
+import { useEffect, useEffectEvent, useState, type FormEvent } from 'react'
+import { isUnencryptedPublic, normalizeServerUrl, type QuickConnectRequest, type Session } from '../core'
 import { readKeepSignedIn, writeKeepSignedIn } from '../platform/web/storage'
 import { readRememberedServerUrl, rememberServerUrl } from '../platform/web/browser'
 import { LogoMark, Wordmark } from './icons'
@@ -14,6 +14,15 @@ export interface QuickConnectActions {
 
 const POLL_MS = 2000
 const CODE_LIFETIME_MS = 10 * 60_000
+
+/** True when what is typed is an http address to somewhere that is not the home network (see `isUnencryptedPublic`). */
+function sendsInClearText(typed: string): boolean {
+  try {
+    return isUnencryptedPublic(normalizeServerUrl(typed))
+  } catch {
+    return false
+  }
+}
 
 export function ConnectForm({
   onConnect,
@@ -65,21 +74,27 @@ export function ConnectForm({
     }
   }
 
+  // (Effect events read the latest of these without starting the polling over when the form re-renders.)
+  const isApproved = useEffectEvent((code: QuickConnectRequest) => quickConnect?.approved(code) ?? Promise.resolve(false))
+  const completeWith = useEffectEvent((code: QuickConnectRequest) => (quickConnect as QuickConnectActions).complete(code))
+  const signedIn = useEffectEvent((session: Session) => {
+    rememberServerUrl(session.serverUrl)
+    writeKeepSignedIn(keep)
+    onConnected(session, keep)
+  })
+  const offered = !!quickConnect
   // While a code is showing, ask every two seconds whether it was approved, and give up after ten minutes.
   useEffect(() => {
-    if (!request || !quickConnect) return
+    if (!request || !offered) return
     let stopped = false
     let checking = false
     const check = async () => {
       if (checking || stopped) return
       checking = true
       try {
-        if (!(await quickConnect.approved(request)) || stopped) return
+        if (!(await isApproved(request)) || stopped) return
         stopped = true
-        const session = await quickConnect.complete(request)
-        rememberServerUrl(session.serverUrl)
-        writeKeepSignedIn(keep)
-        onConnected(session, keep)
+        signedIn(await completeWith(request))
       } catch (e) {
         stopped = true
         setRequest(null)
@@ -99,9 +114,7 @@ export function ConnectForm({
       window.clearInterval(timer)
       window.clearTimeout(expiry)
     }
-    // The form's other fields do not matter while a code is showing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request])
+  }, [request, offered])
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden">
@@ -160,7 +173,13 @@ export function ConnectForm({
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
               disabled={busy || request !== null}
+              aria-describedby={sendsInClearText(serverUrl) ? 'server-url-warning' : undefined}
             />
+            {sendsInClearText(serverUrl) && (
+              <p id="server-url-warning" role="note" className="mt-2 text-xs text-amber-300">
+                {t('This address is not encrypted and is not on your home network, so your password and session would travel in clear text. Use https:// if your server has it.')}
+              </p>
+            )}
           </div>
 
           {request ? (

@@ -20,8 +20,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
@@ -31,35 +31,90 @@ jobs:
       - run: npm run lint
       - run: npx vitest run
       - run: npm run build
+      # What a visitor downloads for the first screen has a budget (scripts/size-budget.json).
+      - run: npm run size
+
+  # The browser tests (player, books, settings, admin, Content-Security-Policy, accessibility...) against the production build.
+  # They need Google Chrome (the runner has it, with the H.264/AAC decoders) and ffmpeg (to make the synthetic test media).
+  web-e2e:
+    name: Web (browser tests, production build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: web
+    env:
+      E2E_PROD: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: npx playwright test
+      - name: Keep the traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-results
+          path: web/test-results
+          retention-days: 7
 
   web-docker:
-    name: Web (Docker image builds and serves)
+    name: Web (Docker image builds, runs locked down, sends its headers)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Build the image
-        run: docker build -t jellyflix-web:ci web
-      - name: Start it and check it answers
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Through the compose file, so its read-only disk, dropped capabilities and no-new-privileges are what is tested.
+      - name: Build the image and start it as docker-compose.yml says
+        working-directory: web
+        env:
+          JELLYFIN_URL: http://jellyfin.local:8096
+        run: docker compose up -d --build
+      - name: It answers, with the address from the settings
         run: |
-          docker run -d --name jf -p 8080:80 -e JELLYFIN_URL=http://jellyfin.local:8096 jellyflix-web:ci
           for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep 1; done
           curl -fsS http://127.0.0.1:8080/ | grep -q "<title>Jellyflix</title>"
           curl -fsS http://127.0.0.1:8080/config.js | grep -q "jellyfin.local:8096"
+      - name: Every kind of answer carries the security headers, and says no more than it has to
+        run: |
+          asset=$(curl -fsS http://127.0.0.1:8080/ | grep -o 'assets/[^"]*\.js' | head -1)
+          for path in / /config.js "/$asset" /does-not-exist; do
+            headers=$(curl -sI "http://127.0.0.1:8080$path")
+            for name in content-security-policy x-content-type-options x-frame-options referrer-policy permissions-policy; do
+              echo "$headers" | grep -qi "^$name:" || { echo "$path is missing $name"; exit 1; }
+            done
+            echo "$headers" | grep -i '^server:' | grep -q '[0-9]' && { echo "$path tells the nginx version"; exit 1; }
+          done
+          echo "headers ok"
+      - name: It only reads
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST --data x http://127.0.0.1:8080/)
+          [ "$code" = "403" ] || { echo "POST answered $code"; exit 1; }
+      - name: Its disk really is read-only
+        run: |
+          docker exec jellyflix-web sh -c 'touch /usr/share/nginx/html/x' && { echo "the app folder is writable"; exit 1; }
+          docker inspect -f '{{.HostConfig.ReadonlyRootfs}} {{.HostConfig.SecurityOpt}} {{.HostConfig.CapDrop}}' jellyflix-web
 
   tv:
-    name: TV (unit tests, debug build)
+    name: TV (unit tests, lint, debug build)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: tv
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - run: chmod +x gradlew
-      - run: ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
+      # Android lint is part of the build's checks (its settings and the few findings it is told to ignore are in tv/app/lint.xml).
+      - run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug

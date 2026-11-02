@@ -1,6 +1,6 @@
 import type { ReactNode, SVGProps } from 'react'
-import logo from '../assets/logo.png'
-import wordmark from '../assets/wordmark.png'
+import logo from '../assets/logo.webp'
+import wordmark from '../assets/wordmark.webp'
 
 function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: ReactNode }) {
   return (

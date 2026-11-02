@@ -452,7 +452,8 @@ describe('series and anime', () => {
     const page = await onTheSeriesPage('Test Show 001')
     await ui.click(await page.findByRole('button', { name: 'Find intros' }))
     expect(await page.findByRole('button', { name: 'Looking for intros…' })).toBeDisabled()
-    expect(shows.taskLog.at(-1)).toMatch(/^scan /)
+    // The button changes before the request reaches the server, so wait for it.
+    await waitFor(() => expect(shows.taskLog.at(-1)).toMatch(/^scan /))
   })
 
   it('marks a whole series watched and favourite', async () => {

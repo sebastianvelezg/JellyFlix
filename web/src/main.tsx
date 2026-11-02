@@ -11,13 +11,15 @@ import { registerServiceWorker } from './platform/web/pwa'
 
 // What other devices see in their "Play on…" list: "iPhone (app)", "Windows · Chrome"...
 setDefaultDeviceName(describeDevice())
-initLanguage()
 applyAppearance()
 startVisit()
 registerServiceWorker()
 
-createRoot(document.getElementById('root') as HTMLElement).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// The first screen is drawn once the texts of the language are here (Spanish is a separate download; English needs none).
+void initLanguage().then(() => {
+  createRoot(document.getElementById('root') as HTMLElement).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+})
