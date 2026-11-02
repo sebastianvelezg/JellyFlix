@@ -63,18 +63,40 @@ jobs:
           retention-days: 7
 
   web-docker:
-    name: Web (Docker image builds and serves)
+    name: Web (Docker image builds, runs locked down, sends its headers)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Build the image
-        run: docker build -t jellyflix-web:ci web
-      - name: Start it and check it answers
+      # Through the compose file, so its read-only disk, dropped capabilities and no-new-privileges are what is tested.
+      - name: Build the image and start it as docker-compose.yml says
+        working-directory: web
+        env:
+          JELLYFIN_URL: http://jellyfin.local:8096
+        run: docker compose up -d --build
+      - name: It answers, with the address from the settings
         run: |
-          docker run -d --name jf -p 8080:80 -e JELLYFIN_URL=http://jellyfin.local:8096 jellyflix-web:ci
           for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep 1; done
           curl -fsS http://127.0.0.1:8080/ | grep -q "<title>Jellyflix</title>"
           curl -fsS http://127.0.0.1:8080/config.js | grep -q "jellyfin.local:8096"
+      - name: Every kind of answer carries the security headers, and says no more than it has to
+        run: |
+          asset=$(curl -fsS http://127.0.0.1:8080/ | grep -o 'assets/[^"]*\.js' | head -1)
+          for path in / /config.js "/$asset" /does-not-exist; do
+            headers=$(curl -sI "http://127.0.0.1:8080$path")
+            for name in content-security-policy x-content-type-options x-frame-options referrer-policy permissions-policy; do
+              echo "$headers" | grep -qi "^$name:" || { echo "$path is missing $name"; exit 1; }
+            done
+            echo "$headers" | grep -i '^server:' | grep -q '[0-9]' && { echo "$path tells the nginx version"; exit 1; }
+          done
+          echo "headers ok"
+      - name: It only reads
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST --data x http://127.0.0.1:8080/)
+          [ "$code" = "403" ] || { echo "POST answered $code"; exit 1; }
+      - name: Its disk really is read-only
+        run: |
+          docker exec jellyflix-web sh -c 'touch /usr/share/nginx/html/x' && { echo "the app folder is writable"; exit 1; }
+          docker inspect -f '{{.HostConfig.ReadonlyRootfs}} {{.HostConfig.SecurityOpt}} {{.HostConfig.CapDrop}}' jellyflix-web
 
   tv:
     name: TV (unit tests, debug build)

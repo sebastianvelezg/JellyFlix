@@ -15,7 +15,9 @@ esac
 # A scheme typed twice ("http://http://host") is reduced to the last one.
 url=$(printf '%s' "$url" | sed -E 's#^(https?://)+(https?://)#\2#')
 
-cat > /usr/share/nginx/html/config.js <<CONFIG
+# Written to /tmp, not next to the app: nginx.conf serves it as /config.js, and the app's own files can stay read-only.
+mkdir -p /tmp/jellyflix
+cat > /tmp/jellyflix/config.js <<CONFIG
 window.JELLYFLIX_CONFIG = { serverUrl: "$url" };
 CONFIG
 echo "jellyflix-web: sign-in starts with server '${url:-(empty)}'"

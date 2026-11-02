@@ -11,6 +11,7 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 - **TV: the release app no longer writes its informational log lines.**
 - **Web: the book reader** ignores more disguised script addresses (a tab or line break inside `javascript:`) and drops any reference that points outside the book, not only pictures; a test with a deliberately hostile book and a check of the reader's sandbox keep this from regressing.
 - **`npm run serve`** answers only GET and HEAD.
+- **Docker image and nginx:** the security headers (including the Content-Security-Policy) are written once, in `docker/security-headers.conf`, instead of three times; nginx no longer tells its version, accepts only GET and HEAD (anything else is refused), and takes no request body. The sign-in address (`config.js`) is written to `/tmp` instead of into the app's folder, so the container runs with a read-only disk. `docker-compose.yml` now starts it that way: read-only, in-memory `/tmp`, `/var/cache/nginx` and `/run`, `no-new-privileges`, and only the four capabilities nginx needs. The port stays 80, so existing `-p 8080:80` setups keep working. The base images are pinned by digest.
 - **CI and releases:** the browser tests run in CI, code scanning (CodeQL) and a dependency check run on every change, every GitHub Action is pinned to a commit, releases use read-only permissions except where they publish, and the Docker image carries provenance and an SBOM.
 
 ## [1.3.0] - 2026-10-31

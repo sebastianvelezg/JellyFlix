@@ -164,7 +164,9 @@ docker run -d --name jellyflix --restart unless-stopped -p 8080:80 \
 ```
 
 The same four settings fit any NAS Docker app (Synology Container Manager, QNAP Container Station, Unraid, TrueNAS, Portainer): image `ghcr.io/sebastianvelezg/jellyflix-web:latest`, container port `80` mapped to a free port,
-optional environment variable `JELLYFIN_URL`, restart policy "always". With no registry access, build it on your computer (`docker build -t jellyflix-web .`, then `docker save`) and import the file.
+optional environment variable `JELLYFIN_URL`, restart policy "always".
+
+The container only serves files, so it can run with nothing writable: `docker-compose.yml` already does (a read-only disk, in-memory `/tmp`, `/var/cache/nginx` and `/run`, no new privileges, and only the four capabilities nginx's start needs). For `docker run` add `--read-only --tmpfs /tmp --tmpfs /var/cache/nginx --tmpfs /run --security-opt no-new-privileges:true --cap-drop ALL --cap-add CHOWN --cap-add SETGID --cap-add SETUID --cap-add NET_BIND_SERVICE`; on a NAS app these are optional extras. With no registry access, build it on your computer (`docker build -t jellyflix-web .`, then `docker save`) and import the file.
 
 ### Node, without Docker
 
@@ -184,7 +186,7 @@ npm run serve        # serves them on port 8080, for every device on your networ
 Run `npm ci && npm run build` and copy the **contents of `dist/`** (or the `jellyflix-web-<version>.zip` of a release) to the folder your nginx, Apache, Caddy or IIS serves. It works from the root of a site or from a sub-folder
 (the file addresses are relative and the pages live after a `#`, so no rewrite rules are needed). To pre-fill the Jellyfin address edit `config.js` in that folder:
 `window.JELLYFLIX_CONFIG = { serverUrl: 'http://192.168.x.x:8096' }`. Cache `assets/` for a long time (the file names carry a hash) but not `index.html`, `config.js` or `sw.js`.
-`docker/nginx.conf` is a complete nginx example. The Docker image and `npm run serve` send a strict `Content-Security-Policy` (the text is in `scripts/csp.mjs`): the app runs only its own scripts. If you serve the files some other way, send the same header (it is a good idea, not a requirement), and keep the `<script>` files next to `index.html` (`paint.js`, `config.js`) since nothing inline is allowed.
+`docker/nginx.conf` (with `docker/security-headers.conf`) is a complete nginx example. The Docker image and `npm run serve` send a strict `Content-Security-Policy` (the text is in `scripts/csp.mjs`): the app runs only its own scripts. If you serve the files some other way, send the same header (it is a good idea, not a requirement), and keep the `<script>` files next to `index.html` (`paint.js`, `config.js`) since nothing inline is allowed.
 
 ### HTTPS, CORS and reverse proxies
 
