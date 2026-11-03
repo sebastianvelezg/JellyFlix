@@ -5,6 +5,10 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-02
+
+No new features: the security, the speed and the structure of what already exists, and a safety net around the next releases.
+
 ### Hardening
 - **TV: the session token is sealed.** It is now encrypted with a key held by the Android key store before it is written to the app's storage, so a copy of that storage does not hold a token that works. A token saved by an older version is sealed the first time the app opens and the clear copy is erased. If a device cannot do this, the app keeps working as before.
 - **A server address typed without `http://` or `https://`** gets `http://` when it is clearly a home address (a private IP range, `.local`, a name with no dot, Tailscale) and `https://` for anything else, because http across the internet sends the password and the session in clear text (web and TV). A typed `http://` to somewhere that is not the home network now shows a warning (on the TV, choose Connect again to go on).
