@@ -40,7 +40,10 @@ test('requests: rows do not ask the server to count everything, the paged grids 
   mock = await startMock({ movieCount: 30, seriesCount: 4, animeCount: 2, musicArtists: 2 })
   await signIn(page, mock, { start: '/#/' })
   await expect(page.getByRole('region', { name: 'Latest movies' })).toBeVisible()
-  const lists = mock.requests.filter((r) => r.path === '/Items' || r.path === '/UserItems/Resume' || r.path === '/Shows/NextUp')
+  // The row of collections is the one row that does read a total: its "See all" link shows how many there are.
+  const lists = mock.requests.filter(
+    (r) => (r.path === '/Items' && r.query.includeItemTypes !== 'BoxSet') || r.path === '/UserItems/Resume' || r.path === '/Shows/NextUp',
+  )
   expect(lists.length).toBeGreaterThan(3)
   for (const r of lists) expect(r.query.enableTotalRecordCount, `${r.path} ${JSON.stringify(r.query)}`).toBe('false')
 

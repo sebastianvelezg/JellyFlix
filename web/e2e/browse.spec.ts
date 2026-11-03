@@ -112,7 +112,10 @@ test('a revoked session returns to sign-in with an explanation', async ({ page }
   mock = await startMock()
   await signIn(page, mock)
   await expect(grid(page).getByRole('button', { name: /Open Test Movie 002/ })).toBeVisible()
-  await page.waitForLoadState('networkidle') // the home rows load in the background; let them finish first
+  // The rows below the first screen only start loading when they come near it: bring them all in, then let them finish.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await page.waitForLoadState('networkidle')
+  await page.evaluate(() => window.scrollTo(0, 0))
   mock.tokens.clear()
   await grid(page).getByRole('button', { name: /Open Test Movie 002/ }).click()
   await expect(page.getByText(/session expired/i)).toBeVisible()

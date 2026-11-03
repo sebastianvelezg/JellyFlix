@@ -361,7 +361,7 @@ export async function getPopularTracks(session: Session, opts: { artistId?: stri
 // ---- home rows ----------------------------------------------------------------------------------------------
 
 export async function getRecentAlbums(session: Session, libraryId: string | undefined, limit = 16): Promise<Album[]> {
-  return (await getAlbumPage(session, { libraryId, startIndex: 0, limit, sort: 'added' })).items
+  return (await getAlbumPage(session, { libraryId, startIndex: 0, limit, sort: 'added', withTotal: false })).items
 }
 
 /** Random albums to try ("Discover"). */
@@ -400,7 +400,7 @@ export async function getRecentlyPlayedTracks(session: Session, libraryId: strin
 }
 
 export async function getFavoriteTracks(session: Session, libraryId: string | undefined, limit = 100): Promise<Track[]> {
-  return (await getTrackPage(session, { libraryId, startIndex: 0, limit, filter: 'favorites', sort: 'added' })).items
+  return (await getTrackPage(session, { libraryId, startIndex: 0, limit, filter: 'favorites', sort: 'added', withTotal: false })).items
 }
 
 /** A mix of songs for "Shuffle everything". */
