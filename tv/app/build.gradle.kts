@@ -23,8 +23,8 @@ android {
         // Google TV on the TCL C6K runs Android 12 or newer; 28 keeps older boxes working too.
         minSdk = 28
         targetSdk = 37
-        versionCode = 22
-        versionName = "1.3.1"
+        versionCode = 23
+        versionName = "1.3.2"
     }
 
     androidResources {
