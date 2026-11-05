@@ -5,6 +5,9 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+### Fixed
+- **Descriptions that come as HTML** (the book synopses of some metadata providers) were shown with their tags (`<p><b>…`). They are now plain text on titles, series, albums, collections and channels (web), and on titles, artists and programmes (TV).
+
 ## [1.3.1] - 2026-11-02
 
 No new features: the security, the speed and the structure of what already exists, and a safety net around the next releases.

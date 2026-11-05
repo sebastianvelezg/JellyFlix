@@ -12,6 +12,7 @@ import { getPlaylistApi } from '@jellyfin/sdk/lib/utils/api/playlist-api'
 import { itemImageUrl } from './images'
 import type { Session } from './jellyfin'
 import { PAGE_SIZE } from './library'
+import { plainText } from './plainText'
 
 // ---- models -------------------------------------------------------------------------------------------
 
@@ -122,7 +123,7 @@ export function toArtist(dto: BaseItemDto): Artist | null {
     name: dto.Name,
     imageTag: dto.ImageTags?.Primary ?? undefined,
     backdropTag: dto.BackdropImageTags?.[0] ?? undefined,
-    overview: dto.Overview ?? undefined,
+    overview: plainText(dto.Overview),
     genres: dto.Genres ?? [],
     favorite: dto.UserData?.IsFavorite ?? false,
   }

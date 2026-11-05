@@ -1074,7 +1074,7 @@ class JellyfinRepository(context: Context) {
         backdropUrl = dto.backdropImageTags?.firstOrNull()?.let {
             api.imageApi.getItemImageUrl(itemId = dto.id, imageType = ImageType.BACKDROP, maxWidth = 1280, tag = it)
         },
-        overview = dto.overview,
+        overview = plainText(dto.overview),
     )
 
     private fun toSong(api: ApiClient, dto: BaseItemDto): Song {
@@ -1439,7 +1439,7 @@ class JellyfinRepository(context: Context) {
             channelId = dto.channelId ?: fallbackChannel ?: return null,
             title = dto.name.orEmpty(),
             episodeTitle = dto.episodeTitle?.takeIf { it.isNotBlank() },
-            overview = dto.overview?.takeIf { it.isNotBlank() },
+            overview = plainText(dto.overview)?.takeIf { it.isNotBlank() },
             startMs = start,
             endMs = end,
         )
@@ -1653,7 +1653,7 @@ class JellyfinRepository(context: Context) {
             posterUrl = image(ImageType.PRIMARY, 360),
             landscapeUrl = image(ImageType.THUMB, 640) ?: backdrop(640) ?: image(ImageType.PRIMARY, 640),
             backdropUrl = backdrop(1920) ?: image(ImageType.THUMB, 1280) ?: image(ImageType.PRIMARY, 1280),
-            overview = dto.overview,
+            overview = plainText(dto.overview),
             year = dto.productionYear,
             runtimeMinutes = dto.runTimeTicks?.let { (it / 600_000_000L).toInt() }?.takeIf { it > 0 },
             genres = dto.genres.orEmpty(),
