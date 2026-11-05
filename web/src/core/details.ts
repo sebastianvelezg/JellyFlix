@@ -7,6 +7,7 @@ import { itemImageUrl } from './images'
 import type { Session } from './jellyfin'
 import { toMovie, type Movie } from './library'
 import { audioLabel, subtitleLabel, uniqueLabels } from './tracks'
+import { plainText } from './plainText'
 
 export interface Person {
   id: string
@@ -177,7 +178,7 @@ export function toMovieDetails(dto: BaseItemDto): MovieDetails | null {
   const people = dto.People ?? []
   return {
     ...base,
-    overview: dto.Overview ?? undefined,
+    overview: plainText(dto.Overview),
     tagline: dto.Taglines?.[0] ?? undefined,
     genres: dto.Genres ?? [],
     officialRating: dto.OfficialRating ?? undefined,

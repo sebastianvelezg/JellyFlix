@@ -5,6 +5,7 @@ import { SortOrder } from '@jellyfin/sdk/lib/generated-client/models/sort-order'
 import { getLiveTvApi } from '@jellyfin/sdk/lib/utils/api/live-tv-api'
 import { itemImageUrl } from './images'
 import type { Session } from './jellyfin'
+import { plainText } from './plainText'
 
 /** A programme on a channel: what is on, from when to when. */
 export interface Program {
@@ -88,7 +89,7 @@ export function toProgram(dto: BaseItemDto): Program | null {
     channelId: dto.ChannelId ?? '',
     name: dto.Name,
     episodeTitle: dto.EpisodeTitle ?? undefined,
-    overview: dto.Overview ?? undefined,
+    overview: plainText(dto.Overview),
     startMs,
     endMs,
     genres: dto.Genres ?? [],

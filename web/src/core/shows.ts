@@ -6,6 +6,7 @@ import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api'
 import { getShowApi } from '@jellyfin/sdk/lib/utils/api/show-api'
 import type { Session } from './jellyfin'
 import { toMovie, type Movie } from './library'
+import { plainText } from './plainText'
 
 /** One episode. It is also a `Movie` (same list/player fields), so anything that plays or lists movies handles it. */
 export interface Episode extends Movie {
@@ -46,7 +47,7 @@ export function toEpisode(dto: BaseItemDto): Episode | null {
     seasonName: dto.SeasonName ?? undefined,
     seasonNumber: dto.ParentIndexNumber ?? undefined,
     episodeNumber: dto.IndexNumber ?? undefined,
-    overview: dto.Overview ?? undefined,
+    overview: plainText(dto.Overview),
   }
 }
 

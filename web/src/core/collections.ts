@@ -9,6 +9,7 @@ import type { Session } from './jellyfin'
 import { nextInQueue } from './musicVideos'
 import { toMovie, type Movie } from './library'
 import type { Page } from './music'
+import { plainText } from './plainText'
 
 /** A collection ("box set"): a hand-made or automatic group of movies, such as a saga. */
 export interface Collection {
@@ -84,7 +85,7 @@ export async function getCollection(session: Session, id: string): Promise<Colle
   const { data } = await getLibraryApi(session.api).getItem({ itemId: id, userId: session.userId })
   const base = toCollection(data)
   if (!base) throw new Error('That collection is no longer available.')
-  return { ...base, overview: data.Overview ?? undefined }
+  return { ...base, overview: plainText(data.Overview) }
 }
 
 /** What is in a collection, oldest first so a saga reads in order. Titles without a year come last. */
