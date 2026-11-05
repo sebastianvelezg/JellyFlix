@@ -14,6 +14,7 @@ Independent and open source. No accounts, no telemetry, no server of ours: it ta
 [![Docker](https://img.shields.io/badge/docker-ready-2496ed?logo=docker&logoColor=white)](web/README.md#host-it-for-your-devices)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-22c55e.svg)](CONTRIBUTING.md)
 
+[**A look around**](#-a-look-around) ·
 [**Features**](#-features) ·
 [**Play on…**](#-play-on-another-device) ·
 [**Make it yours**](#-make-it-yours) ·
@@ -27,7 +28,7 @@ Independent and open source. No accounts, no telemetry, no server of ours: it ta
 
 <img src="docs/screenshots/hero.jpg" alt="Jellyflix on a laptop, a TV and a phone" width="920">
 
-<sub>Real screenshots from the author's own Jellyfin server.</sub>
+<sub>Real screenshots from the author's own Jellyfin server, each one in a different look. See the [disclaimer](#-disclaimer) about what the pictures show.</sub>
 
 </div>
 
@@ -43,6 +44,11 @@ a banner that mixes movies and series, rows that follow what you are watching, a
 - **Two apps, one look.** The web app and the TV app share their design, their rules and their sections, so moving between them feels natural.
 - **Yours to shape.** Backgrounds, accent colours, poster size and the rows of the home page are all your choice, on both apps.
 - **Run your server from it.** Server administrators get tools to scan, fix, edit and manage, right where they watch (web app).
+
+## 📸 A look around
+
+<p align="center"><img src="docs/screenshots/web-themes.jpg" alt="The same home page of Jellyflix Web in six looks: true black with ocean, midnight with violet, dusk with rose, pine with emerald, cocoa with amber and charcoal with aqua" width="100%"></p>
+<p align="center"><sub>One page, six looks: each background and accent colour is a choice in Settings → Appearance, on the web and on the TV. The pictures below use a different one each.</sub></p>
 
 ## ✨ Features
 
@@ -211,12 +217,7 @@ Pick one and the title starts there, resuming where you left off, while a small 
 - **Take it back:** when a device is already playing, the app offers "On *device*: *title*", and its remote has **Play here** to bring it to the screen you are on.
 - Nothing is installed or woken up: the app has to be open on the device that receives it. It works through your own Jellyfin server and nothing else.
 
-<table>
-<tr>
-<td width="58%" valign="middle"><img src="docs/screenshots/web-play-on-picker.png" alt="The Play on… list with the devices you can send it to"></td>
-<td width="42%" valign="middle"><img src="docs/screenshots/web-play-on-remote.png" alt="The floating remote: what is playing on the other device, with Play here and Stop"></td>
-</tr>
-</table>
+<p align="center"><img src="docs/screenshots/web-play-on-picker.png" alt="The Play on… list under the home banner, with a computer and the TV app as devices you can send it to" width="62%"></p>
 
 ## 🎨 Make it yours
 
@@ -276,28 +277,33 @@ A fast, installable web app that talks directly from your browser to your Jellyf
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/web-home.jpg" alt="Web: the home page with a featured banner and Discover cards"></td>
-<td width="50%"><img src="docs/screenshots/web-rows.jpg" alt="Web: rows of recommendations with posters"></td>
+<td width="50%"><img src="docs/screenshots/web-home.jpg" alt="Web: the home page with a featured banner and Discover cards"><br><sub><b>Home:</b> a banner that mixes movies and series, and Discover something new.</sub></td>
+<td width="50%"><img src="docs/screenshots/web-rows.jpg" alt="Web: Continue watching and Next up rows"><br><sub><b>Rows that follow you:</b> Continue watching, Next up, Watch later…</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/web-movies.jpg" alt="Web: the movies page with recently added titles and collections"></td>
-<td><img src="docs/screenshots/web-details.jpg" alt="Web: a movie's page with synopsis, genres and actions"></td>
+<td><img src="docs/screenshots/web-movies.jpg" alt="Web: the movies page with a banner, sort and filters"><br><sub><b>Movies:</b> a banner, sort, filters and an A–Z jump.</sub></td>
+<td><img src="docs/screenshots/web-details.jpg" alt="Web: a movie's page with synopsis, genres, audio and subtitle choices"><br><sub><b>A title:</b> what Play will give, your rating, trailers and Play on…</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/web-series.jpg" alt="Web: a series page with its episodes"></td>
-<td><img src="docs/screenshots/web-music.jpg" alt="Web: the music page with albums to jump back into"></td>
+<td><img src="docs/screenshots/web-series.jpg" alt="Web: a series page with its seasons and episodes"><br><sub><b>Series:</b> seasons, episodes, progress and Mark season watched.</sub></td>
+<td><img src="docs/screenshots/web-music.jpg" alt="Web: the music page with a mix of the day, radios and albums to jump back into"><br><sub><b>Music:</b> made-for-you mixes, albums, artists, playlists and lyrics.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/web-books.jpg" alt="Web: the Books tab with covers, the kind of each book and its year"></td>
-<td><img src="docs/screenshots/web-reader.jpg" alt="Web: the PDF reader on dark pages, with zoom, page colours and a jump to any page"></td>
+<td><img src="docs/screenshots/web-books.jpg" alt="Web: the Books tab with covers, the kind of each book and its year"><br><sub><b>Books:</b> covers, A–Z and filters, like any other library.</sub></td>
+<td><img src="docs/screenshots/web-reader.jpg" alt="Web: the book reader on dark pages with a chapter list, text size and page colours"><br><sub><b>The reader:</b> EPUB, PDF and comics, with your place remembered.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/web-livetv.jpg" alt="Web: Live TV with the channels, their quality and notes as small tags"></td>
-<td><img src="docs/screenshots/web-top-menu.jpg" alt="Web: Settings, Appearance, Top menu: show, hide and reorder the buttons at the top"></td>
+<td><img src="docs/screenshots/web-search.jpg" alt="Web: search results grouped by kind, with the kinds as tabs"><br><sub><b>Search:</b> movies, series, music videos, books and music in one place.</sub></td>
+<td><img src="docs/screenshots/web-anime.jpg" alt="Web: the Anime page with its banner, Continue watching and Next up"><br><sub><b>Anime:</b> its own banner and rows, with the accent you chose.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/web-livetv.jpg" alt="Web: Live TV with the channels, their quality and notes as small tags"><br><sub><b>Live TV:</b> channels with their quality as tags, a guide and favorites.</sub></td>
+<td><img src="docs/screenshots/web-top-menu.jpg" alt="Web: Settings, Appearance, Top menu: show, hide and reorder the buttons at the top"><br><sub><b>Your menu:</b> show, hide and reorder the buttons at the top.</sub></td>
 </tr>
 </table>
 
-<p align="center"><img src="docs/screenshots/web-mobile.jpg" alt="Web on a phone" width="260"></p>
+<p align="center"><img src="docs/screenshots/web-mobile.jpg" alt="Web on a phone: the home page, and the rows below it, with the menu at the bottom of the screen" width="480"></p>
+<p align="center"><sub><b>On a phone:</b> the menu moves to the bottom, the cards grow for a thumb, and it installs as an app.</sub></p>
 
 **Host it with Docker** on a NAS or any always-on machine:
 
@@ -316,24 +322,28 @@ A native app built for a remote control and a TV seen from the sofa: big targets
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/tv-home.jpg" alt="TV: the home screen with a featured banner"></td>
-<td width="50%"><img src="docs/screenshots/tv-discover.jpg" alt="TV: Discover something new"></td>
+<td width="50%"><img src="docs/screenshots/tv-home.jpg" alt="TV: the home screen with a featured banner"><br><sub><b>Home:</b> the banner you skim with the D-pad.</sub></td>
+<td width="50%"><img src="docs/screenshots/tv-discover.jpg" alt="TV: Discover something new, with a random movie, series and album"><br><sub><b>Discover:</b> a random movie, a series you never started and an album.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/tv-movies.jpg" alt="TV: the Movies page with its banner"></td>
-<td><img src="docs/screenshots/tv-rows.jpg" alt="TV: a row of recommendations with the focus on a poster"></td>
+<td><img src="docs/screenshots/tv-rows.jpg" alt="TV: the Continue watching row with the focus on a card"><br><sub><b>Rows:</b> the focus is always easy to see.</sub></td>
+<td><img src="docs/screenshots/tv-movies.jpg" alt="TV: the Movies page with its banner and sort choices"><br><sub><b>Movies:</b> a banner, sort and filters.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/tv-detail.jpg" alt="TV: a movie's page with its cast"></td>
-<td><img src="docs/screenshots/tv-music.jpg" alt="TV: the Music page"></td>
+<td><img src="docs/screenshots/tv-detail.jpg" alt="TV: a movie's page with how it will play, its collection and the cast"><br><sub><b>A title:</b> how it will play, its collection and the cast.</sub></td>
+<td><img src="docs/screenshots/tv-series.jpg" alt="TV: the Series page, a grid of posters"><br><sub><b>Series:</b> a grid of posters, with more loading as you scroll.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/tv-livetv.jpg" alt="TV: Live TV with the channels, their quality and notes as tags, and the top bar with icons"></td>
-<td><img src="docs/screenshots/tv-menu.jpg" alt="TV: Settings, Appearance: choosing the order of the top menu and turning sections off"></td>
+<td><img src="docs/screenshots/tv-music.jpg" alt="TV: the Music page with a random album and albums to jump back into"><br><sub><b>Music:</b> overview, albums, artists, playlists, Mix of the day.</sub></td>
+<td><img src="docs/screenshots/tv-livetv.jpg" alt="TV: Live TV with the channels, their quality and notes as tags, and the top bar with icons"><br><sub><b>Live TV:</b> channels, a guide and favorites.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/tv-settings.jpg" alt="TV: Settings, Playback: next episode, quality limit and frame-rate matching"><br><sub><b>Settings:</b> playback, subtitles, display, appearance, plugins and account.</sub></td>
+<td><img src="docs/screenshots/tv-menu.jpg" alt="TV: Settings, Appearance: choosing the order of the top menu and turning sections off"><br><sub><b>Your menu:</b> the order of the top menu and which sections show.</sub></td>
 </tr>
 </table>
 
-<sub>Jellyflix TV running on a Google TV emulator against a real Jellyfin server. Compatibility and testing notes are in [tv/README.md](tv/README.md#testing-and-compatibility).</sub>
+<sub>Jellyflix TV running on a Google TV emulator against a real Jellyfin server, each picture in a different look. Compatibility and testing notes are in [tv/README.md](tv/README.md#testing-and-compatibility).</sub>
 
 **Install it** by sideloading the APK (adb over Wi-Fi, a USB stick or the Downloader app). **[tv/README.md](tv/README.md#install-it-on-your-tv)** walks through the whole process: getting the APK (download it or build it), putting it on the TV, signing it with your own key and the first sign-in.
 
@@ -434,7 +444,7 @@ Jellyflix 1.3 is complete for daily use. Ideas, in no particular order, and wher
 - **Books:** a reader for the TV app, Mobi and RAR comics.
 - **Sign in:** find servers on the network, several servers and users.
 - **Reach:** Fire TV, more languages, a public demo of the web app.
-- **Quality:** browser tests in CI, a mock server the TV app can use, and testing on more physical TVs (HDR, 4K and frame-rate switching vary a lot between models).
+- **Quality:** a mock server the TV app can use, and testing on more physical TVs (HDR, 4K and frame-rate switching vary a lot between models).
 
 Have an idea? [Open an issue](https://github.com/sebastianvelezg/JellyFlix/issues/new/choose).
 
@@ -472,6 +482,17 @@ The two apps share no code (one is TypeScript, the other Kotlin); they share a d
 ## 🙏 Acknowledgements
 
 Jellyflix exists because of [Jellyfin](https://jellyfin.org) and its official SDKs. Thanks also to the open-source libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## 📜 Disclaimer
+
+The posters, covers, artwork, titles and every other piece of media that appear in the screenshots belong to their respective owners. They come from the author's own Jellyfin library and are shown only to illustrate how the apps look.
+
+- **Jellyflix does not host, store, distribute or provide any media.** It is a client: it shows what *your* Jellyfin server already has, and it plays it from there. It contains no content, no catalogue and no link to any source of content.
+- **The pictures are samples, not a recommendation.** Nothing in them is offered, shared or endorsed by the project.
+- **You are responsible for what is on your server** and for having the right to use it where you live.
+- Jellyfin and every other name, brand or logo mentioned are the property of their owners. Jellyflix is independent and has no affiliation with them.
+
+If you are a rights holder and something in a picture should not be there, [open an issue](https://github.com/sebastianvelezg/JellyFlix/issues/new/choose) and it will be replaced.
 
 ## 📄 License
 
