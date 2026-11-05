@@ -5,8 +5,15 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-05
+
+A small release: the descriptions of books and the README pictures.
+
 ### Fixed
 - **Descriptions that come as HTML** (the book synopses of some metadata providers) were shown with their tags (`<p><b>…`). They are now plain text on titles, series, albums, collections and channels (web), and on titles, artists and programmes (TV).
+
+### Documentation
+- **README:** new pictures taken on a real library, each one in a different look (background and accent), with captions, a gallery of six looks and a disclaimer about the artwork the pictures show.
 
 ## [1.3.1] - 2026-11-02
 
