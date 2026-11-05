@@ -8,9 +8,13 @@ const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"'
 export function plainText(description: string | null | undefined): string | undefined {
   if (!description) return undefined
   if (!/[<&]/.test(description)) return description
-  const text = description
-    .replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/gi, ' ')
-    .replace(/<\/?[a-z][^>]*>/gi, '')
+  // Taking a tag out can leave a new one behind (`<<b>script>`), so it goes on until nothing changes.
+  let stripped = description.replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/gi, ' ')
+  for (let before = ''; before !== stripped; ) {
+    before = stripped
+    stripped = stripped.replace(/<\/?[a-z][^>]*>/gi, '')
+  }
+  const text = stripped
     .replace(/&(?:#(\d{1,6})|#x([0-9a-f]{1,5})|([a-z]+));/gi, (whole, dec: string, hex: string, name: string) => {
       if (name) return ENTITIES[name.toLowerCase()] ?? whole
       const code = dec ? Number(dec) : parseInt(hex, 16)

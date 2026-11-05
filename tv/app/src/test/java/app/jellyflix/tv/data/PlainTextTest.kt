@@ -27,6 +27,11 @@ class PlainTextTest {
     }
 
     @Test
+    fun `taking a tag out does not leave another one`() {
+        assertEquals("alert(1)", plainText("<<b>script>alert(1)<</b>/script>"))
+    }
+
+    @Test
     fun `nothing left is nothing`() {
         assertNull(plainText("<p> </p>"))
     }

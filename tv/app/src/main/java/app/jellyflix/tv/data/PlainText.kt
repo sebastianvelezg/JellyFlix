@@ -15,9 +15,13 @@ private val ENTITIES = mapOf("amp" to "&", "lt" to "<", "gt" to ">", "quot" to "
 fun plainText(description: String?): String? {
     if (description.isNullOrEmpty()) return null
     if (description.none { it == '<' || it == '&' }) return description
-    val text = description
-        .replace(LINE_BREAKS, " ")
-        .replace(TAGS, "")
+    // Taking a tag out can leave a new one behind (`<<b>script>`), so it goes on until nothing changes.
+    var stripped = description.replace(LINE_BREAKS, " ")
+    do {
+        val before = stripped
+        stripped = stripped.replace(TAGS, "")
+    } while (stripped != before)
+    val text = stripped
         .replace(ENTITY) { m ->
             val name = m.groupValues[3]
             if (name.isNotEmpty()) {

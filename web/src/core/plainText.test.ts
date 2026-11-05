@@ -26,6 +26,11 @@ describe('a description as plain text', () => {
     expect(plainText('Hi<script>alert(1)</script> there')).toBe('Hialert(1) there')
   })
 
+  it('does not leave a tag behind when taking one out makes another', () => {
+    expect(plainText('<<b>script>alert(1)<</b>/script>')).toBe('alert(1)')
+    expect(plainText('<scr<script>ipt>alert(1)</scr</script>ipt>')).not.toContain('<')
+  })
+
   it('is empty when nothing is left', () => {
     expect(plainText('<p> </p>')).toBeUndefined()
   })
