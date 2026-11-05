@@ -79,9 +79,10 @@ def phone(shot: Image.Image) -> Image.Image:
 
 
 canvas = backdrop()
-web = Image.open(SHOTS / 'web-home.jpg').convert('RGB')
+web = Image.open(SHOTS / 'web-home.jpg').convert('RGB').resize((800, 450), Image.LANCZOS)
 tvs = Image.open(SHOTS / 'tv-home.jpg').convert('RGB').resize((800, 450), Image.LANCZOS)
 mob = Image.open(SHOTS / 'web-mobile.jpg').convert('RGB')
+mob = mob.crop((0, 0, (mob.width - 40) // 2, mob.height))  # web-mobile.jpg holds two phones side by side: the first one
 mob = mob.resize((round(mob.width * 440 / mob.height), 440), Image.LANCZOS)
 
 shadowed(canvas, browser(web), (40, 80))
