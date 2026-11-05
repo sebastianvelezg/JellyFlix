@@ -237,7 +237,7 @@ Settings → **Appearance**, in both apps. The choices stay on the device; the w
 </tr>
 <tr>
 <td><img src="docs/screenshots/web-layout.jpg" alt="Web: Settings, Appearance, Layout chosen from drawn cards, and the menu buttons"></td>
-<td><img src="docs/screenshots/tv-menu.jpg" alt="TV: choosing the order of the top menu"></td>
+<td><img src="docs/screenshots/web-top-menu.jpg" alt="Web: Settings, Appearance, Top menu: show, hide and reorder the buttons at the top"><br><sub><b>Your menu:</b> show, hide and reorder the buttons at the top.</sub></td>
 </tr>
 </table>
 
@@ -290,15 +290,15 @@ A fast, installable web app that talks directly from your browser to your Jellyf
 </tr>
 <tr>
 <td><img src="docs/screenshots/web-books.jpg" alt="Web: the Books tab with covers, the kind of each book and its year"><br><sub><b>Books:</b> covers, A–Z and filters, like any other library.</sub></td>
+<td><img src="docs/screenshots/web-book.jpg" alt="Web: a book's page with its author, format, genres and synopsis, and the Read and Download buttons"><br><sub><b>A book:</b> author, format, synopsis, Read and Download.</sub></td>
+</tr>
+<tr>
 <td><img src="docs/screenshots/web-reader.jpg" alt="Web: the book reader on dark pages with a chapter list, text size and page colours"><br><sub><b>The reader:</b> EPUB, PDF and comics, with your place remembered.</sub></td>
-</tr>
-<tr>
 <td><img src="docs/screenshots/web-search.jpg" alt="Web: search results grouped by kind, with the kinds as tabs"><br><sub><b>Search:</b> movies, series, music videos, books and music in one place.</sub></td>
-<td><img src="docs/screenshots/web-anime.jpg" alt="Web: the Anime page with its banner, Continue watching and Next up"><br><sub><b>Anime:</b> its own banner and rows, with the accent you chose.</sub></td>
 </tr>
 <tr>
+<td><img src="docs/screenshots/web-anime.jpg" alt="Web: the Anime page with its banner, Continue watching and Next up"><br><sub><b>Anime:</b> its own banner and rows, with the accent you chose.</sub></td>
 <td><img src="docs/screenshots/web-livetv.jpg" alt="Web: Live TV with the channels, their quality and notes as small tags"><br><sub><b>Live TV:</b> channels with their quality as tags, a guide and favorites.</sub></td>
-<td><img src="docs/screenshots/web-top-menu.jpg" alt="Web: Settings, Appearance, Top menu: show, hide and reorder the buttons at the top"><br><sub><b>Your menu:</b> show, hide and reorder the buttons at the top.</sub></td>
 </tr>
 </table>
 
