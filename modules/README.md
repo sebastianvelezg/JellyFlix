@@ -64,7 +64,8 @@ services:
       JELLYFIN_URL: "http://YOUR-JELLYFIN-IP:8096"
       JELLYFLIX_MODULES_URL: "http://jellyflix-modules:8097"
   jellyflix-modules:
-    build: ./modules          # no published image yet
+    image: ghcr.io/sebastianvelezg/jellyflix-modules:latest
+    # (from a clone of the repository you can build it instead:  build: ./modules)
     environment:
       JELLYFIN_URL: "http://YOUR-JELLYFIN-IP:8096"
     volumes: ["modules-data:/data"]
