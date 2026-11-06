@@ -3,16 +3,16 @@ import { isTrustedModulesAddress, normalizeModulesUrl } from '../../core/modules
 const KEY = 'jellyflix.modulesUrl'
 const SERVER_URL_KEY = 'jellyflix.serverUrl'
 
-/** An address from a link or from this device's storage is only used if it is one a link may name (see isTrustedModulesAddress). */
-function trusted(address: string | null): string | null {
-  if (!address) return null
-  let jellyfin: string | null = null
+/** Whether an address from a link or from this device's storage is one a link may name (see isTrustedModulesAddress). */
+function mayUse(address: string | null): address is string {
+  if (!address) return false
+  let jellyfinAddress: string | null = null
   try {
-    jellyfin = localStorage.getItem(SERVER_URL_KEY)
+    jellyfinAddress = localStorage.getItem(SERVER_URL_KEY)
   } catch {
     // Without storage there is no remembered server to compare with.
   }
-  return isTrustedModulesAddress(address, window.location.hostname, jellyfin) ? address : null
+  return isTrustedModulesAddress(address, window.location.hostname, jellyfinAddress)
 }
 
 /**
@@ -29,12 +29,13 @@ export function readModulesUrl(): string | null {
       if (/^(off|none|no)$/i.test(asked.trim())) localStorage.removeItem(KEY)
       else {
         // A link cannot make the app send the session token to just any address.
-        const url = trusted(normalizeModulesUrl(asked))
-        if (url) localStorage.setItem(KEY, url)
+        const url = normalizeModulesUrl(asked)
+        // (An address, never a credential: it is only kept if a link may name it.)
+        if (mayUse(url)) localStorage.setItem(KEY, url)
       }
     }
-    const remembered = trusted(normalizeModulesUrl(localStorage.getItem(KEY)))
-    if (remembered) return remembered
+    const remembered = normalizeModulesUrl(localStorage.getItem(KEY))
+    if (mayUse(remembered)) return remembered
   } catch {
     // Storage may be blocked; the hosted address below still counts.
   }

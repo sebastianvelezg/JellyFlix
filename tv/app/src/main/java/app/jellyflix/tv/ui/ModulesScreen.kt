@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -467,8 +468,8 @@ private fun MatchDone(vm: AppViewModel, room: MatchRoom) {
                 Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (summary.total != null && summary.both != null) {
                         Text(stringResource(R.string.match_agreed, summary.both, summary.total, summary.percent ?: 0), fontSize = 16.sp, color = Color.White)
-                        val context = LocalContext.current
-                        Text(summary.liked.joinToString("   ") { (name, count) -> context.getString(R.string.match_liked, name, count) }, fontSize = 14.sp, color = Palette.TextDim)
+                        val resources = LocalResources.current
+                        Text(summary.liked.joinToString("   ") { (name, count) -> resources.getString(R.string.match_liked, name, count) }, fontSize = 14.sp, color = Palette.TextDim)
                     }
                     if (summary.picks.isNotEmpty()) {
                         Text(summary.picks.joinToString("   ") { (name, card) -> "$name: $card" }, fontSize = 14.sp, color = Palette.TextDim)
