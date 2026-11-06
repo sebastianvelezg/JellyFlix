@@ -15,9 +15,9 @@ Los módulos que quieres, en el orden en que los nombraste:
 | Módulo | Qué hace | Dónde vive lo que produce |
 |---|---|---|
 | **Canales** ("Retro TV") | Canales de TV "años 2000" armados con tu biblioteca (Canal Anime 24/7, Sábado de Marvel, Cine de terror a medianoche), con guía de programación. **No emiten 24/7**: la parrilla se calcula con el reloj y solo se reproduce algo cuando alguien sintoniza, en el minuto que toca | Una parrilla en la base de datos del módulo + el reproductor normal de Jellyflix. **No se escribe nada en Jellyfin** (detalle completo: [`MODULE-CHANNELS.md`](MODULE-CHANNELS.md)) |
-| **Match** (el "Tinder") | Tú y Daniela deslizan películas; si las dos dan like hay *match* y se reproduce en Jellyflix | Datos propios del módulo (SQLite) |
+| **Match** (el "Tinder") | Tú y otra persona deslizan películas; si las dos dan like hay *match* y se reproduce en Jellyflix | Datos propios del módulo (SQLite) |
 | **Tube** ("YouTube sin YouTube") | Te suscribes a canales; yt-dlp los baja solos, sin anuncios y con SponsorBlock | En una **biblioteca de Jellyfin** (cada canal es una serie) |
-| **Wrapped** (al final) | El "Spotify Wrapped" de Jellyfin: horas, géneros, la serie que te devoraste, hora del día, comparación con Daniela, tarjetas para compartir | Datos propios + imágenes generadas |
+| **Wrapped** (al final) | El "Spotify Wrapped" de Jellyfin: horas, géneros, la serie que te devoraste, hora del día, comparación con otra persona, tarjetas para compartir | Datos propios + imágenes generadas |
 
 ---
 
@@ -171,7 +171,7 @@ JellyFlix/
 
 ### 6.2 Match (el "Tinder" de pareja)
 
-- **Modelo**: una *sala* entre 2+ usuarios **de tu mismo Jellyfin** (Daniela tiene su cuenta). Cada usuario marca por título: `like | pass | skip`. Se crea *match* cuando todos los de la sala dan like. Tablas: `rooms`, `room_members`, `swipes`, `matches`.
+- **Modelo**: una *sala* entre 2+ usuarios **de tu mismo Jellyfin** (cada una con su cuenta). Cada usuario marca por título: `like | pass | skip`. Se crea *match* cuando todos los de la sala dan like. Tablas: `rooms`, `room_members`, `swipes`, `matches`.
 - **Candidatos**, en dos fuentes:
   1. **Tu biblioteca** (MVP, sin nada externo): películas que ninguno ha visto, filtradas por género/clasificación, con el mismo filtro de modo niños que ya existe.
   2. **Cosas que aún no tienes** (fase posterior): TMDB (clave del administrador, guardada en el servidor). Un match de algo que no está se puede enviar a **Seerr/Jellyseerr** (integración opcional) como solicitud.
@@ -196,7 +196,7 @@ JellyFlix/
 ### 6.4 Wrapped (al final)
 
 - **Datos**: `UserData` de Jellyfin (como `core/stats.ts` hoy) + el plugin Playback Reporting si existe (hora del día, duración real). El módulo toma **instantáneas mensuales** para que el Wrapped anual no dependa de cuánto historial conserve el plugin.
-- **Contenido**: horas totales, géneros, la serie que más devoraste, hora/día en que más ves, rachas, y **comparación con Daniela** — solo si ambos activan "compartir mis números" (consentimiento explícito, revocable).
+- **Contenido**: horas totales, géneros, la serie que más devoraste, hora/día en que más ves, rachas, y **comparación con otra persona** — solo si ambos activan "compartir mis números" (consentimiento explícito, revocable).
 - **Salida**: anual, mensual o "en vivo"; tarjetas animadas en la web y **imágenes 1080×1920** generadas en el servidor (SVG → PNG) para Instagram.
 - Se aplaza porque depende de que haya meses de datos y de decisiones de diseño visual (se hará con el skill de diseño cuando llegue).
 

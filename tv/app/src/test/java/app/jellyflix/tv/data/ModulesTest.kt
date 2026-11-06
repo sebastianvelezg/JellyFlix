@@ -113,30 +113,30 @@ class ModulesTest {
     fun `a Match room is read, in the lobby and when it is over with its summary`() {
         val lobby = parseMatchRoom(
             JSONObject(
-                """{"id":"r","code":"ABCDE","mode":"phones","hostId":"h","hostName":"Sebas","version":3,"phase":"lobby","round":1,"me":"h",
-                    "members":[{"id":"d","name":"Dani","done":false}],"filters":{"genre":"Comedy","decade":1990,"series":true},
+                """{"id":"r","code":"ABCDE","mode":"phones","hostId":"h","hostName":"Ana","version":3,"phase":"lobby","round":1,"me":"h",
+                    "members":[{"id":"d","name":"Ben","done":false}],"filters":{"genre":"Comedy","decade":1990,"series":true},
                     "deck":[],"myVotes":{},"remaining":[],"lastLiked":[]}""",
             ),
         )
         assertEquals("lobby", lobby.phase)
-        assertEquals("Dani", lobby.members.single().name)
+        assertEquals("Ben", lobby.members.single().name)
         assertEquals(MatchFilters(genre = "Comedy", decade = 1990, length = null, series = true), lobby.filters)
         assertTrue(lobby.deck.isEmpty())
 
         val done = parseMatchRoom(
             JSONObject(
-                """{"id":"r","code":"ABCDE","mode":"phones","hostId":"h","hostName":"Sebas","version":9,"phase":"done","round":2,"me":"h",
-                    "members":[{"id":"d","name":"Dani","done":true}],"filters":{},"deck":[],
+                """{"id":"r","code":"ABCDE","mode":"phones","hostId":"h","hostName":"Ana","version":9,"phase":"done","round":2,"me":"h",
+                    "members":[{"id":"d","name":"Ben","done":true}],"filters":{},"deck":[],
                     "winner":{"id":"0123abcd0123456789ab0123456789ab","name":"Film","kind":"Series","genres":["Drama"],"runtimeMinutes":42},"winnerBy":"coin",
-                    "summary":{"rounds":3,"firstRound":{"total":6,"both":2,"percent":33,"liked":[{"id":"h","name":"Sebas","count":4},{"id":"d","name":"Dani","count":4}]},
-                               "picks":[{"id":"h","name":"Sebas","card":"A"},{"id":"d","name":"Dani","card":"B"}]}}""",
+                    "summary":{"rounds":3,"firstRound":{"total":6,"both":2,"percent":33,"liked":[{"id":"h","name":"Ana","count":4},{"id":"d","name":"Ben","count":4}]},
+                               "picks":[{"id":"h","name":"Ana","card":"A"},{"id":"d","name":"Ben","card":"B"}]}}""",
             ),
         )
         assertTrue(done.isDone)
         assertTrue(done.winner!!.isSeries)
         assertEquals("coin", done.winnerBy)
         assertEquals(33, done.summary!!.percent)
-        assertEquals(listOf("Sebas" to 4, "Dani" to 4), done.summary!!.liked)
-        assertEquals(listOf("Sebas" to "A", "Dani" to "B"), done.summary!!.picks)
+        assertEquals(listOf("Ana" to 4, "Ben" to 4), done.summary!!.liked)
+        assertEquals(listOf("Ana" to "A", "Ben" to "B"), done.summary!!.picks)
     }
 }

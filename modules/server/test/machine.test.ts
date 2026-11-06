@@ -6,10 +6,10 @@ import { addMember, advance, newRoom, pick, removeMember, restart, RuleError, st
 const card = (id: string): MatchCard => ({ id, name: id, kind: 'Movie', genres: [] })
 const deck = (...ids: string[]): MatchCard[] => ids.map(card)
 const ME = { id: 'me', name: 'Me' }
-const DANI = { id: 'dani', name: 'Dani' }
+const BEN = { id: 'ben', name: 'Ben' }
 
 function room(cards: MatchCard[]): RoomData {
-  return addMember(newRoom({ id: 'r1', code: 'ABCDE', creator: ME, mode: 'local', deck: cards, deckSize: cards.length }), DANI)
+  return addMember(newRoom({ id: 'r1', code: 'ABCDE', creator: ME, mode: 'local', deck: cards, deckSize: cards.length }), BEN)
 }
 
 function swipeAll(r: RoomData, who: string, likes: string[]): RoomData {
@@ -23,7 +23,7 @@ describe('Match rules', () => {
     let r = room(deck('a', 'b', 'c'))
     r = swipeAll(r, 'me', ['a'])
     assert.equal(advance(r).kind, 'waiting')
-    r = vote(r, 'dani', 'a', 'like')
+    r = vote(r, 'ben', 'a', 'like')
     assert.equal(advance(r).kind, 'waiting')
   })
 
@@ -40,18 +40,18 @@ describe('Match rules', () => {
     assert.equal(lobby.phase, 'lobby')
     assert.deepEqual(lobby.members, [])
     assert.deepEqual(lobby.deck, [])
-    assert.throws(() => vote(addMember(lobby, DANI), 'dani', 'a', 'like'), RuleError)
-    assert.equal(advance(addMember(lobby, DANI)).kind, 'waiting')
+    assert.throws(() => vote(addMember(lobby, BEN), 'ben', 'a', 'like'), RuleError)
+    assert.equal(advance(addMember(lobby, BEN)).kind, 'waiting')
     assert.throws(() => startSwiping(lobby, deck('a', 'b', 'c', 'd')), /Nobody has joined/)
-    const started = startSwiping(addMember(lobby, DANI), deck('a', 'b', 'c', 'd'))
+    const started = startSwiping(addMember(lobby, BEN), deck('a', 'b', 'c', 'd'))
     assert.equal(started.phase, 'swipe')
     assert.deepEqual(started.deck.map((c) => c.id), ['a', 'b', 'c', 'd'])
     assert.throws(() => startSwiping(started, deck('x')), /already started/)
-    // The host did not join, so only Dani has to vote.
-    const done = swipeAll(started, 'dani', ['b'])
+    // The host did not join, so only Ben has to vote.
+    const done = swipeAll(started, 'ben', ['b'])
     assert.equal(advance(done).room.winner?.id, 'b')
     // In the lobby the view has no cards.
-    const view = viewFor(addMember(lobby, DANI), 'dani', 1)
+    const view = viewFor(addMember(lobby, BEN), 'ben', 1)
     assert.equal(view.phase, 'lobby')
     assert.equal(view.mode, 'phones')
     assert.equal(view.hostId, 'me')
@@ -61,7 +61,7 @@ describe('Match rules', () => {
   it('has a winner when only one film was liked by both', () => {
     let r = room(deck('a', 'b', 'c'))
     r = swipeAll(r, 'me', ['a', 'b'])
-    r = swipeAll(r, 'dani', ['b', 'c'])
+    r = swipeAll(r, 'ben', ['b', 'c'])
     const step = advance(r)
     assert.equal(step.room.phase, 'done')
     assert.equal(step.room.winner?.id, 'b')
@@ -71,7 +71,7 @@ describe('Match rules', () => {
   it('runs another round with just the films both liked, when there are several', () => {
     let r = room(deck('a', 'b', 'c', 'd'))
     r = swipeAll(r, 'me', ['a', 'b', 'c'])
-    r = swipeAll(r, 'dani', ['a', 'b', 'd'])
+    r = swipeAll(r, 'ben', ['a', 'b', 'd'])
     const step = advance(r)
     assert.equal(step.kind, 'next')
     assert.equal(step.room.phase, 'swipe')
@@ -83,7 +83,7 @@ describe('Match rules', () => {
   it('asks for a fresh set when nothing was liked by both', () => {
     let r = room(deck('a', 'b'))
     r = swipeAll(r, 'me', ['a'])
-    r = swipeAll(r, 'dani', ['b'])
+    r = swipeAll(r, 'ben', ['b'])
     const step = advance(r)
     assert.equal(step.kind, 'needs-fresh')
     const next = startRound(step.room, deck('x', 'y'))
@@ -94,7 +94,7 @@ describe('Match rules', () => {
   it('goes to choosing a favourite when everybody liked everything', () => {
     let r = room(deck('a', 'b'))
     r = swipeAll(r, 'me', ['a', 'b'])
-    r = swipeAll(r, 'dani', ['a', 'b'])
+    r = swipeAll(r, 'ben', ['a', 'b'])
     const step = advance(r)
     assert.equal(step.room.phase, 'pick')
     assert.deepEqual(step.room.deck.map((c) => c.id), ['a', 'b'])
@@ -102,10 +102,10 @@ describe('Match rules', () => {
 
   it('settles a pick by agreement, or by chance when the picks differ', () => {
     const base: RoomData = { ...room(deck('a', 'b')), phase: 'pick' }
-    const same = advance(pick(pick(base, 'me', 'a'), 'dani', 'a'))
+    const same = advance(pick(pick(base, 'me', 'a'), 'ben', 'a'))
     assert.equal(same.room.winner?.id, 'a')
     assert.equal(same.room.winnerBy, 'agreement')
-    const differ = advance(pick(pick(base, 'me', 'a'), 'dani', 'b'))
+    const differ = advance(pick(pick(base, 'me', 'a'), 'ben', 'b'))
     assert.equal(differ.room.phase, 'done')
     assert.equal(differ.room.winnerBy, 'coin')
     assert.ok(['a', 'b'].includes(differ.room.winner?.id ?? ''))
@@ -113,7 +113,7 @@ describe('Match rules', () => {
 
   it('hides the other person’s votes and shows only what is left for me', () => {
     let r = room(deck('a', 'b', 'c'))
-    r = vote(vote(r, 'me', 'a', 'like'), 'dani', 'b', 'pass')
+    r = vote(vote(r, 'me', 'a', 'like'), 'ben', 'b', 'pass')
     const mine = viewFor(r, 'me', 1)
     assert.deepEqual(mine.myVotes, { a: 'like' })
     assert.deepEqual(mine.remaining.map((c) => c.id), ['b', 'c'])
@@ -131,7 +131,7 @@ describe('Match rules', () => {
     let r = room(deck('a', 'b'))
     r = swipeAll(r, 'me', ['a'])
     assert.equal(advance(r).kind, 'waiting')
-    r = removeMember(r, 'dani')
+    r = removeMember(r, 'ben')
     const step = advance(r)
     assert.equal(step.kind, 'next')
     assert.equal(step.room.winner?.id, 'a')
@@ -140,7 +140,7 @@ describe('Match rules', () => {
   it('starts again after a winner with a fresh set', () => {
     let r = room(deck('a', 'b'))
     r = swipeAll(r, 'me', ['a'])
-    r = swipeAll(r, 'dani', ['a'])
+    r = swipeAll(r, 'ben', ['a'])
     const done = advance(r).room
     const again = restart(done, deck('x', 'y'))
     assert.equal(again.phase, 'swipe')

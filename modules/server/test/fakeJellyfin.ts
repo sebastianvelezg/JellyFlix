@@ -7,9 +7,9 @@ export interface FakeUser {
   admin: boolean
 }
 
-export const ADMIN: FakeUser = { id: 'u-admin', name: 'Sebas', admin: true }
-export const DANI: FakeUser = { id: 'u-dani', name: 'Dani', admin: false }
-export const TOKENS: Record<string, FakeUser> = { 'tok-admin': ADMIN, 'tok-dani': DANI }
+export const ADMIN: FakeUser = { id: 'u-admin', name: 'Ana', admin: true }
+export const BEN: FakeUser = { id: 'u-ben', name: 'Ben', admin: false }
+export const TOKENS: Record<string, FakeUser> = { 'tok-admin': ADMIN, 'tok-ben': BEN }
 
 const MIN = 60 * 10_000_000
 
@@ -63,7 +63,7 @@ export interface FakeJellyfin {
 
 export function fakeJellyfin(): FakeJellyfin {
   const calls: FakeJellyfin['calls'] = []
-  const watched: FakeJellyfin['watched'] = { [ADMIN.id]: new Set(), [DANI.id]: new Set() }
+  const watched: FakeJellyfin['watched'] = { [ADMIN.id]: new Set(), [BEN.id]: new Set() }
   const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
   const fetch: FetchLike = async (rawUrl, init) => {

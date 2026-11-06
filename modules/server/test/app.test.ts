@@ -58,7 +58,7 @@ describe('the container', () => {
   })
 
   it('says who is asking and which modules are on', async () => {
-    const { status, body } = await call<Manifest>('GET', '/v1/manifest', 'tok-dani')
+    const { status, body } = await call<Manifest>('GET', '/v1/manifest', 'tok-ben')
     assert.equal(status, 200)
     assert.deepEqual(body.modules.map((m) => m.id), ['channels', 'match'])
     assert.equal(body.user.isAdmin, false)
@@ -81,7 +81,7 @@ describe('channels', () => {
   let id = ''
 
   it('only an administrator creates a channel', async () => {
-    assert.equal((await call('POST', '/v1/channels', 'tok-dani', channelDef())).status, 403)
+    assert.equal((await call('POST', '/v1/channels', 'tok-ben', channelDef())).status, 403)
     const made = await call<{ id: string; poolSize: number }>('POST', '/v1/channels', 'tok-admin', channelDef())
     assert.equal(made.status, 200)
     assert.ok(made.body.poolSize > 0)
@@ -95,7 +95,7 @@ describe('channels', () => {
   })
 
   it('says what is on now, and how far into it, to anybody', async () => {
-    const { status, body } = await call<ChannelWindow>('GET', `/v1/channels/${id}/window?before=1&after=3`, 'tok-dani')
+    const { status, body } = await call<ChannelWindow>('GET', `/v1/channels/${id}/window?before=1&after=3`, 'tok-ben')
     assert.equal(status, 200)
     assert.ok(body.currentIndex >= 0)
     const current = body.programs[body.currentIndex]!
@@ -105,49 +105,49 @@ describe('channels', () => {
   })
 
   it('keeps the schedule the same when asked again, and goes on when time passes', async () => {
-    const a = await call<ChannelWindow>('GET', `/v1/channels/${id}/window`, 'tok-dani')
+    const a = await call<ChannelWindow>('GET', `/v1/channels/${id}/window`, 'tok-ben')
     const b = await call<ChannelWindow>('GET', `/v1/channels/${id}/window`, 'tok-admin')
     assert.deepEqual(a.body.programs, b.body.programs)
     now += 3 * 3600
-    const later = await call<ChannelWindow>('GET', `/v1/channels/${id}/window`, 'tok-dani')
+    const later = await call<ChannelWindow>('GET', `/v1/channels/${id}/window`, 'tok-ben')
     const cur = later.body.programs[later.body.currentIndex]!
     assert.ok(cur.start <= now && now < cur.end)
   })
 
   it('does not ask Jellyfin anything just to say what is on', async () => {
     const before = fake.calls.filter((c) => c.path !== '/Users/Me').length
-    await call('GET', `/v1/channels/${id}/window`, 'tok-dani')
-    await call('GET', '/v1/guide', 'tok-dani')
+    await call('GET', `/v1/channels/${id}/window`, 'tok-ben')
+    await call('GET', '/v1/guide', 'tok-ben')
     assert.equal(fake.calls.filter((c) => c.path !== '/Users/Me').length, before)
   })
 
   it('lists the channels with what is on and what is next', async () => {
-    const { body } = await call<Array<{ number: number; now?: { itemId: string }; next?: unknown }>>('GET', '/v1/channels', 'tok-dani')
+    const { body } = await call<Array<{ number: number; now?: { itemId: string }; next?: unknown }>>('GET', '/v1/channels', 'tok-ben')
     assert.equal(body.length, 1)
     assert.equal(body[0]!.number, 7)
     assert.ok(body[0]!.now && body[0]!.next)
   })
 
   it('shows the guide for all channels', async () => {
-    const { body } = await call<{ channels: Array<{ programs: unknown[] }> }>('GET', `/v1/guide?from=${now - 600}&to=${now + 7200}`, 'tok-dani')
+    const { body } = await call<{ channels: Array<{ programs: unknown[] }> }>('GET', `/v1/guide?from=${now - 600}&to=${now + 7200}`, 'tok-ben')
     assert.equal(body.channels.length, 1)
     assert.ok(body.channels[0]!.programs.length >= 1)
   })
 
   it('keeps what is on when the channel is edited, and changes what is further away', async () => {
-    const before = await call<ChannelWindow>('GET', `/v1/channels/${id}/window?before=0&after=0`, 'tok-dani')
+    const before = await call<ChannelWindow>('GET', `/v1/channels/${id}/window?before=0&after=0`, 'tok-ben')
     const edited = await call('PUT', `/v1/channels/${id}`, 'tok-admin', channelDef({ name: 'Comedy 2', sources: [{ kind: 'rule', name: 'Drama', genres: ['Drama'], types: ['Movie'] }] }))
     assert.equal(edited.status, 200)
-    const after = await call<ChannelWindow>('GET', `/v1/channels/${id}/window?before=0&after=0`, 'tok-dani')
+    const after = await call<ChannelWindow>('GET', `/v1/channels/${id}/window?before=0&after=0`, 'tok-ben')
     assert.equal(after.body.programs[0]!.itemId, before.body.programs[0]!.itemId)
-    const far = await call<ChannelWindow>('GET', `/v1/channels/${id}/window?at=${now + 5 * 3600}&before=0&after=0`, 'tok-dani')
+    const far = await call<ChannelWindow>('GET', `/v1/channels/${id}/window?at=${now + 5 * 3600}&before=0&after=0`, 'tok-ben')
     assert.ok(far.body.programs[0], 'there is a schedule further on')
   })
 
   it('goes through the episodes of a series in order', async () => {
     const made = await call<{ id: string }>('POST', '/v1/channels', 'tok-admin', channelDef({ name: 'Show', number: 9, order: 'sequential', sources: [{ kind: 'item', id: 's1', name: 'The Show', itemType: 'Series' }] }))
     assert.equal(made.status, 200)
-    const w = await call<ChannelWindow>('GET', `/v1/channels/${made.body.id}/window?before=0&after=3`, 'tok-dani')
+    const w = await call<ChannelWindow>('GET', `/v1/channels/${made.body.id}/window?before=0&after=3`, 'tok-ben')
     assert.deepEqual(w.body.programs.map((p) => p.itemId), ['e1', 'e2', 'e3', 'e4'])
     assert.equal(w.body.programs[0]!.subtitle, 'The Show · S01E01')
   })
@@ -155,7 +155,7 @@ describe('channels', () => {
   it('suggests genres and collections, and makes one channel per genre', async () => {
     const s = await call<{ genres: string[] }>('GET', '/v1/channels/suggestions', 'tok-admin')
     assert.deepEqual(s.body.genres, ['Action', 'Comedy', 'Drama'])
-    assert.equal((await call('GET', '/v1/channels/suggestions', 'tok-dani')).status, 403)
+    assert.equal((await call('GET', '/v1/channels/suggestions', 'tok-ben')).status, 403)
     const auto = await call<{ created: Array<{ number: number; name: string }> }>('POST', '/v1/channels/auto', 'tok-admin', { genres: ['Action', 'Drama'], collectionIds: [], types: ['Movie'] })
     assert.deepEqual(auto.body.created.map((c) => c.name), ['Action', 'Drama'])
     assert.equal(new Set(auto.body.created.map((c) => c.number)).size, 2)
@@ -169,21 +169,21 @@ describe('channels', () => {
   })
 
   it('turns a channel off and on, and says how many titles it has', async () => {
-    const list = (await call<Array<{ id: string; enabled: boolean; mode: string; poolSize: number; now?: unknown }>>('GET', '/v1/channels', 'tok-dani')).body
+    const list = (await call<Array<{ id: string; enabled: boolean; mode: string; poolSize: number; now?: unknown }>>('GET', '/v1/channels', 'tok-ben')).body
     const mine = list.find((c) => c.id === id)!
     assert.equal(mine.mode, 'marathon')
     assert.ok(mine.poolSize > 0)
-    assert.equal((await call('POST', `/v1/channels/${id}/enabled`, 'tok-dani', { enabled: false })).status, 403)
+    assert.equal((await call('POST', `/v1/channels/${id}/enabled`, 'tok-ben', { enabled: false })).status, 403)
     assert.equal((await call('POST', `/v1/channels/${id}/enabled`, 'tok-admin', { enabled: 'no' })).status, 400)
     const off = await call<{ enabled: boolean }>('POST', `/v1/channels/${id}/enabled`, 'tok-admin', { enabled: false })
     assert.equal(off.body.enabled, false)
-    const after = (await call<Array<{ id: string; enabled: boolean; now?: unknown }>>('GET', '/v1/channels', 'tok-dani')).body.find((c) => c.id === id)!
+    const after = (await call<Array<{ id: string; enabled: boolean; now?: unknown }>>('GET', '/v1/channels', 'tok-ben')).body.find((c) => c.id === id)!
     assert.equal(after.enabled, false)
     assert.equal(after.now, undefined)
-    assert.equal(((await call<{ channels: Array<{ id: string }> }>('GET', '/v1/guide', 'tok-dani')).body.channels).some((c) => c.id === id), false)
+    assert.equal(((await call<{ channels: Array<{ id: string }> }>('GET', '/v1/guide', 'tok-ben')).body.channels).some((c) => c.id === id), false)
     const on = await call<{ enabled: boolean }>('POST', `/v1/channels/${id}/enabled`, 'tok-admin', { enabled: true })
     assert.equal(on.body.enabled, true)
-    const back = (await call<Array<{ id: string; now?: unknown }>>('GET', '/v1/channels', 'tok-dani')).body.find((c) => c.id === id)!
+    const back = (await call<Array<{ id: string; now?: unknown }>>('GET', '/v1/channels', 'tok-ben')).body.find((c) => c.id === id)!
     assert.ok(back.now)
   })
 
@@ -194,12 +194,12 @@ describe('channels', () => {
 })
 
 describe('match', () => {
-  /** A Match for phones: the host (Sebas) opens it, Sebas and Dani join, and the host starts it. */
+  /** A Match for phones: the host (Ana) opens it, Ana and Ben join, and the host starts it. */
   async function phonesRoom(over: Record<string, unknown> = {}): Promise<MatchRoomView> {
     const made = await call<MatchRoomView>('POST', '/v1/match/rooms', 'tok-admin', { mode: 'phones', deckSize: 6, ...over })
     assert.equal(made.status, 200)
     await call('POST', '/v1/match/join', 'tok-admin', { code: made.body.code })
-    await call('POST', '/v1/match/join', 'tok-dani', { code: made.body.code })
+    await call('POST', '/v1/match/join', 'tok-ben', { code: made.body.code })
     const started = await call<MatchRoomView>('POST', `/v1/match/rooms/${made.body.id}/start`, 'tok-admin')
     assert.equal(started.status, 200)
     return started.body
@@ -213,7 +213,7 @@ describe('match', () => {
     assert.equal(made.body.mode, 'local')
     assert.equal(made.body.phase, 'swipe')
     assert.equal(made.body.deck.length, 4)
-    assert.equal((await call('POST', '/v1/match/join', 'tok-dani', { code: made.body.code })).status, 409)
+    assert.equal((await call('POST', '/v1/match/join', 'tok-ben', { code: made.body.code })).status, 409)
     for (const c of made.body.deck) await swipeAs('tok-admin', made.body.id, c.id, c.id === made.body.deck[2]!.id ? 'like' : 'pass')
     const view = await room('tok-admin', made.body.id)
     assert.equal(view.phase, 'done')
@@ -225,27 +225,27 @@ describe('match', () => {
     assert.equal(lobby.body.phase, 'lobby')
     assert.equal(lobby.body.code.length, 5)
     assert.deepEqual(lobby.body.deck, [])
-    assert.equal(lobby.body.hostName, 'Sebas')
+    assert.equal(lobby.body.hostName, 'Ana')
 
     assert.equal((await call('POST', `/v1/match/rooms/${lobby.body.id}/start`, 'tok-admin')).status, 409, 'nobody has joined')
-    const joined = await call<MatchRoomView>('POST', '/v1/match/join', 'tok-dani', { code: lobby.body.code.toLowerCase() })
+    const joined = await call<MatchRoomView>('POST', '/v1/match/join', 'tok-ben', { code: lobby.body.code.toLowerCase() })
     assert.equal(joined.status, 200)
     assert.equal(joined.body.phase, 'lobby')
-    assert.equal((await call('POST', `/v1/match/rooms/${lobby.body.id}/start`, 'tok-dani')).status, 403, 'only the host starts it')
+    assert.equal((await call('POST', `/v1/match/rooms/${lobby.body.id}/start`, 'tok-ben')).status, 403, 'only the host starts it')
     // The host sees who has joined, without voting.
     const host = await room('tok-admin', lobby.body.id)
-    assert.deepEqual(host.members.map((m) => m.name), ['Dani'])
+    assert.deepEqual(host.members.map((m) => m.name), ['Ben'])
     assert.equal(host.hostId, host.me)
-    assert.equal((await call('POST', `/v1/match/rooms/${lobby.body.id}/swipe`, 'tok-dani', { cardId: 'x', vote: 'like' })).status, 409, 'no swiping in the lobby')
+    assert.equal((await call('POST', `/v1/match/rooms/${lobby.body.id}/swipe`, 'tok-ben', { cardId: 'x', vote: 'like' })).status, 409, 'no swiping in the lobby')
 
     const started = await call<MatchRoomView>('POST', `/v1/match/rooms/${lobby.body.id}/start`, 'tok-admin')
     assert.equal(started.status, 200)
     assert.equal(started.body.phase, 'swipe')
     assert.equal(started.body.deck.length, 6)
     assert.equal((await call('POST', `/v1/match/rooms/${lobby.body.id}/start`, 'tok-admin')).status, 409, 'already started')
-    // The host did not join, so the round ends when Dani finishes.
+    // The host did not join, so the round ends when Ben finishes.
     const ids = started.body.deck.map((c) => c.id)
-    for (const [i, id] of ids.entries()) await swipeAs('tok-dani', lobby.body.id, id, i === 1 ? 'like' : 'pass')
+    for (const [i, id] of ids.entries()) await swipeAs('tok-ben', lobby.body.id, id, i === 1 ? 'like' : 'pass')
     const done = await room('tok-admin', lobby.body.id)
     assert.equal(done.phase, 'done')
     assert.equal(done.winner?.id, ids[1])
@@ -254,20 +254,20 @@ describe('match', () => {
   it('two people swipe the same cards and end with a winner they can play', async () => {
     const started = await phonesRoom()
     const ids = started.deck.map((c) => c.id)
-    // Sebas likes the first three; Dani likes cards 2, 3 and 6.
+    // Ana likes the first three; Ben likes cards 2, 3 and 6.
     for (const [i, id] of ids.entries()) await swipeAs('tok-admin', started.id, id, i < 3 ? 'like' : 'pass')
     let view = await room('tok-admin', started.id)
-    assert.equal(view.round, 1, 'waits for Dani')
+    assert.equal(view.round, 1, 'waits for Ben')
     assert.equal(view.remaining.length, 0)
-    for (const [i, id] of ids.entries()) await swipeAs('tok-dani', started.id, id, i === 1 || i === 2 || i === 5 ? 'like' : 'pass')
-    view = await room('tok-dani', started.id)
+    for (const [i, id] of ids.entries()) await swipeAs('tok-ben', started.id, id, i === 1 || i === 2 || i === 5 ? 'like' : 'pass')
+    view = await room('tok-ben', started.id)
     assert.equal(view.round, 2)
     assert.deepEqual(view.deck.map((c) => c.id), [ids[1], ids[2]])
     assert.deepEqual(view.lastLiked, [ids[1], ids[2]])
     await swipeAs('tok-admin', started.id, ids[1], 'like')
     await swipeAs('tok-admin', started.id, ids[2], 'like')
-    await swipeAs('tok-dani', started.id, ids[1], 'like')
-    await swipeAs('tok-dani', started.id, ids[2], 'pass')
+    await swipeAs('tok-ben', started.id, ids[1], 'like')
+    await swipeAs('tok-ben', started.id, ids[2], 'pass')
     view = await room('tok-admin', started.id)
     assert.equal(view.phase, 'done')
     assert.equal(view.winner?.id, ids[1])
@@ -277,25 +277,25 @@ describe('match', () => {
     const mine = (await call<Array<{ id: string }>>('GET', '/v1/match/rooms', 'tok-admin')).body
     assert.ok(mine.length >= 1)
     const made = await call<MatchRoomView>('POST', '/v1/match/rooms', 'tok-admin', { mode: 'phones', deckSize: 4 })
-    assert.equal((await call('GET', `/v1/match/rooms/${made.body.id}`, 'tok-dani')).status, 403)
-    await call('POST', '/v1/match/join', 'tok-dani', { code: made.body.code })
+    assert.equal((await call('GET', `/v1/match/rooms/${made.body.id}`, 'tok-ben')).status, 403)
+    await call('POST', '/v1/match/join', 'tok-ben', { code: made.body.code })
     await call('POST', '/v1/match/join', 'tok-admin', { code: made.body.code })
     await call('POST', `/v1/match/rooms/${made.body.id}/start`, 'tok-admin')
     const first = (await room('tok-admin', made.body.id)).deck[0]!
     await swipeAs('tok-admin', made.body.id, first.id, 'pass')
-    const dani = await room('tok-dani', made.body.id)
-    assert.deepEqual(dani.myVotes, {})
-    assert.equal(dani.members.find((m) => m.name === 'Sebas')?.done, false)
+    const ben = await room('tok-ben', made.body.id)
+    assert.deepEqual(ben.myVotes, {})
+    assert.equal(ben.members.find((m) => m.name === 'Ana')?.done, false)
   })
 
   it('the host closes a Match for phones for everybody; a person who leaves only leaves', async () => {
     const made = await call<MatchRoomView>('POST', '/v1/match/rooms', 'tok-admin', { mode: 'phones', deckSize: 4 })
-    await call('POST', '/v1/match/join', 'tok-dani', { code: made.body.code })
-    await call('DELETE', `/v1/match/rooms/${made.body.id}`, 'tok-dani')
+    await call('POST', '/v1/match/join', 'tok-ben', { code: made.body.code })
+    await call('DELETE', `/v1/match/rooms/${made.body.id}`, 'tok-ben')
     assert.equal((await call('GET', `/v1/match/rooms/${made.body.id}`, 'tok-admin')).status, 200)
-    await call('POST', '/v1/match/join', 'tok-dani', { code: made.body.code })
+    await call('POST', '/v1/match/join', 'tok-ben', { code: made.body.code })
     await call('DELETE', `/v1/match/rooms/${made.body.id}`, 'tok-admin')
-    assert.equal((await call('GET', `/v1/match/rooms/${made.body.id}`, 'tok-dani')).status, 404)
+    assert.equal((await call('GET', `/v1/match/rooms/${made.body.id}`, 'tok-ben')).status, 404)
   })
 
   it('answers "unchanged" when nothing moved since the version the app has', async () => {
@@ -305,7 +305,7 @@ describe('match', () => {
   })
 
   it('does not know a wrong code and refuses a bad vote', async () => {
-    assert.equal((await call('POST', '/v1/match/join', 'tok-dani', { code: 'ZZZZZ' })).status, 404)
+    assert.equal((await call('POST', '/v1/match/join', 'tok-ben', { code: 'ZZZZZ' })).status, 404)
     const made = await call<MatchRoomView>('POST', '/v1/match/rooms', 'tok-admin', { deckSize: 4 })
     assert.equal((await swipeAs('tok-admin', made.body.id, made.body.deck[0]!.id, 'maybe' as 'like')).status, 400)
   })
@@ -314,7 +314,7 @@ describe('match', () => {
     const started = await phonesRoom({ deckSize: 4, genre: 'Comedy' })
     for (const c of started.deck) {
       await swipeAs('tok-admin', started.id, c.id, 'like')
-      await swipeAs('tok-dani', started.id, c.id, 'pass')
+      await swipeAs('tok-ben', started.id, c.id, 'pass')
     }
     const view = await room('tok-admin', started.id)
     assert.equal(view.round, 2)
@@ -325,7 +325,7 @@ describe('match', () => {
   })
 
   it('only deals the films that fit the filters, and says what they were', async () => {
-    const options = await call<{ genres: string[] }>('GET', '/v1/match/options', 'tok-dani')
+    const options = await call<{ genres: string[] }>('GET', '/v1/match/options', 'tok-ben')
     assert.deepEqual(options.body.genres, ['Action', 'Comedy', 'Drama'])
     const comedy = await call<MatchRoomView>('POST', '/v1/match/rooms', 'tok-admin', { deckSize: 6, genre: 'Comedy' })
     assert.ok(comedy.body.deck.every((c) => c.genres.includes('Comedy')))
@@ -355,34 +355,34 @@ describe('match', () => {
   it('at the end says how much the people agreed and what each chose', async () => {
     const started = await phonesRoom()
     const ids = started.deck.map((c) => c.id)
-    // Sebas likes the first four, Dani the middle four: they agree on two (cards 3 and 4).
+    // Ana likes the first four, Ben the middle four: they agree on two (cards 3 and 4).
     for (const [i, id] of ids.entries()) {
       await swipeAs('tok-admin', started.id, id, i < 4 ? 'like' : 'pass')
-      await swipeAs('tok-dani', started.id, id, i >= 2 && i < 6 ? 'like' : 'pass')
+      await swipeAs('tok-ben', started.id, id, i >= 2 && i < 6 ? 'like' : 'pass')
     }
     // Round 2 has those two; both like both, so each chooses a favourite.
     for (const id of [ids[2]!, ids[3]!]) {
       await swipeAs('tok-admin', started.id, id, 'like')
-      await swipeAs('tok-dani', started.id, id, 'like')
+      await swipeAs('tok-ben', started.id, id, 'like')
     }
     let view = await room('tok-admin', started.id)
     assert.equal(view.phase, 'pick')
     await call('POST', `/v1/match/rooms/${started.id}/pick`, 'tok-admin', { cardId: ids[2] })
-    await call('POST', `/v1/match/rooms/${started.id}/pick`, 'tok-dani', { cardId: ids[3] })
-    view = await room('tok-dani', started.id)
+    await call('POST', `/v1/match/rooms/${started.id}/pick`, 'tok-ben', { cardId: ids[3] })
+    view = await room('tok-ben', started.id)
     assert.equal(view.phase, 'done')
     assert.equal(view.winnerBy, 'coin')
     const s = view.summary!
     assert.equal(s.rounds, 3)
-    assert.deepEqual(s.firstRound, { total: 6, both: 2, percent: 33, liked: [{ id: 'u-admin', name: 'Sebas', count: 4 }, { id: 'u-dani', name: 'Dani', count: 4 }] })
-    assert.deepEqual(s.picks.map((p) => [p.name, p.card]), [['Sebas', started.deck[2]!.name], ['Dani', started.deck[3]!.name]])
+    assert.deepEqual(s.firstRound, { total: 6, both: 2, percent: 33, liked: [{ id: 'u-admin', name: 'Ana', count: 4 }, { id: 'u-ben', name: 'Ben', count: 4 }] })
+    assert.deepEqual(s.picks.map((p) => [p.name, p.card]), [['Ana', started.deck[2]!.name], ['Ben', started.deck[3]!.name]])
   })
 
   it('another round deals a new set with the same filters; the host of a Match for phones can ask for it', async () => {
     const started = await phonesRoom({ deckSize: 4 })
     for (const c of started.deck) {
       await swipeAs('tok-admin', started.id, c.id, c.id === started.deck[0]!.id ? 'like' : 'pass')
-      await swipeAs('tok-dani', started.id, c.id, c.id === started.deck[0]!.id ? 'like' : 'pass')
+      await swipeAs('tok-ben', started.id, c.id, c.id === started.deck[0]!.id ? 'like' : 'pass')
     }
     assert.equal((await room('tok-admin', started.id)).phase, 'done')
     const again = await call<MatchRoomView>('POST', `/v1/match/rooms/${started.id}/again`, 'tok-admin')
@@ -396,18 +396,18 @@ describe('match', () => {
 describe('what the container refuses', () => {
   it('does not let a stranger join a Match that has already started, but gives the room back to somebody already in', async () => {
     const lobby = await call<MatchRoomView>('POST', '/v1/match/rooms', 'tok-admin', { mode: 'phones', deckSize: 6 })
-    await call('POST', '/v1/match/join', 'tok-dani', { code: lobby.body.code })
+    await call('POST', '/v1/match/join', 'tok-ben', { code: lobby.body.code })
     assert.equal((await call('POST', `/v1/match/rooms/${lobby.body.id}/start`, 'tok-admin')).status, 200)
     assert.equal((await call('POST', '/v1/match/join', 'tok-admin', { code: lobby.body.code })).status, 409)
-    assert.equal((await call('POST', '/v1/match/join', 'tok-dani', { code: lobby.body.code })).status, 200)
+    assert.equal((await call('POST', '/v1/match/join', 'tok-ben', { code: lobby.body.code })).status, 200)
   })
 
   it('makes a person wait after too many wrong room codes', async () => {
     now += 61 // (earlier tests also tried a wrong code)
-    for (let i = 0; i < 8; i += 1) assert.equal((await call('POST', '/v1/match/join', 'tok-dani', { code: 'ZZZZZ' })).status, 404)
-    assert.equal((await call('POST', '/v1/match/join', 'tok-dani', { code: 'ZZZZZ' })).status, 429)
+    for (let i = 0; i < 8; i += 1) assert.equal((await call('POST', '/v1/match/join', 'tok-ben', { code: 'ZZZZZ' })).status, 404)
+    assert.equal((await call('POST', '/v1/match/join', 'tok-ben', { code: 'ZZZZZ' })).status, 429)
     now += 61
-    assert.equal((await call('POST', '/v1/match/join', 'tok-dani', { code: 'ZZZZZ' })).status, 404)
+    assert.equal((await call('POST', '/v1/match/join', 'tok-ben', { code: 'ZZZZZ' })).status, 404)
   })
 
   it('refuses a token that is not shaped like one, and an address with broken escapes', async () => {

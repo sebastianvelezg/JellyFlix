@@ -22,7 +22,7 @@ const manifest = (over: Partial<Manifest> = {}): Manifest => ({
   api: 1,
   version: '0.1.0',
   serverTime: 1000,
-  user: { id: 'u', name: 'Sebas', isAdmin: true },
+  user: { id: 'u', name: 'Ana', isAdmin: true },
   modules: [{ id: 'channels', state: 'ready' }],
   serviceKey: false,
   ...over,
