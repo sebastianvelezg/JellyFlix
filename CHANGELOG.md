@@ -5,6 +5,9 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+### Added
+- **Ready-made image of the modules container.** `ghcr.io/sebastianvelezg/jellyflix-modules` is now published with every release (amd64 and arm64, with its build record), next to the web image and the TV APK. It can also be published by hand for an earlier tag (Actions > Modules image > Run workflow).
+
 ## [1.4.0] - 2026-11-06
 
 The first optional extras: a **modules container** with **Retro TV** channels and **Match**, on the web and on the TV. Without the container nothing changes.
