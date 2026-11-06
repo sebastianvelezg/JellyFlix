@@ -104,6 +104,11 @@ Settings → Appearance (the choices stay on the TV):
 - **Continue watching on the Google TV home screen**: what you were watching and the next episodes appear in the TV's own row (written to the TV's local database, nothing is sent anywhere); choosing a card opens the app and plays it.
 - **Instant Home**: the main page is saved on the TV when it settles and drawn straight away the next time the app opens, while the server answers and replaces it. The file holds titles and picture addresses only (no token or password), belongs to one user on one server and is deleted on sign out.
 
+### Modules (optional)
+With the optional `jellyflix-modules` container running (see [`modules/`](../modules/README.md)) a **Modules** button appears in the top bar; without it the app asks for nothing and shows nothing. Set it up in **Settings > Modules**: the container's address (for example `http://192.168.1.10:8097`) and the web app's address (so the QR code of a Match opens it on a phone); both have a "use the suggested one" button built from the server's address.
+- **Retro TV**: channels made from your library, shown as a grid of what is on now and as a guide. Tuning in plays the title that is on, at the right minute. The player shows one glass panel with what is on, start over, previous / next program, go live, channel up/down (the remote's CH keys and Up / Down also change channel) and the guide of the channel over the picture; a card says what is on and next when the program changes, and the next one is prepared before the current one ends. Channels are made on the web app (administrators only).
+- **Match**: the TV is the screen only. It creates the room, shows a QR code and the people who joined, and when the host starts, everybody swipes on their phone; the TV shows the rounds and plays the winner.
+
 ### Settings
 In tabs (left and right move between the tabs, down goes into the open one):
 
@@ -111,6 +116,7 @@ In tabs (left and right move between the tabs, down goes into the open one):
 |---|---|
 | **Playback** | play the next episode automatically (on), skip intros / recaps / credits automatically (off), **maximum quality** (no limit, 40, 20, 10 or 4 Mbps), **only play files as they are** (the server never converts; a title the TV cannot play as it is does not start and says why), **match the screen to the video's frame rate** |
 | **Subtitles** | size, colour (white, yellow, cyan), background (shadow, box, none) and position, with a sample line |
+| **Modules** | address of the optional modules container and of the web app, with a check that says what it found |
 | **Display** | text size (normal, large, larger) and **screen margin** for TVs that cut off the edges of the picture (everything except the video stays inside it), and what this TV plays |
 | **Appearance** | see above |
 | **Plugins** | see above |
@@ -129,7 +135,7 @@ English and Spanish, following the TV's language.
 | A title | hold OK | Opens its menu |
 | Video, controls hidden | OK / Play-Pause | Pause and show the controls |
 | Video | Left / Right | Skip 10 s; held down it grows to 30 s and then 60 s |
-| Video | Up / Down / Menu | Show the controls |
+| Video | Up / Down / Menu | Show the controls (on a Retro TV channel, Up / Down and the CH keys change channel) |
 | Video, "Skip" or "Next episode" showing | OK | Presses it |
 | Music (outside a video) | Play / Pause / Next / Previous / Stop | Drive the music |
 
@@ -253,6 +259,7 @@ Jellyfin returns playlist ids without dashes, so they are never parsed as UUIDs.
   music playback with the now-playing bar, video playback (direct play and the server's HLS conversion), the Info panel, chapters, the Google TV *Continue watching* row and a title started from the web app.
 - **Devices:** Android TV and Google TV running Android 9 or newer. The emulator only offers software decoders and one 60 Hz mode, so a few things can only be confirmed on a real TV: HDR and Dolby decisions, 4K, the automatic frame-rate switch,
   a screen that crops the picture (the *Screen margin* setting) and the version picker for merged titles. If you try one of these, please [open an issue](https://github.com/sebastianvelezg/JellyFlix/issues/new/choose) with what you saw.
+- **Modules on the TV:** the data layer, the QR code and the channel logic have unit tests; the Modules screens and the channel player were compiled and built (debug and release) but **have not been tried on a screen yet**; try them with a container on your network and report what you see.
 - **Servers:** developed against Jellyfin 12.x. Skip intro / recap / credits need segments from the server (for example the Intro Skipper plugin); without them the buttons simply do not appear.
 - **Not built:** voice search, music playing after you leave the app, server discovery on the network, recording and timers for live TV, a reader for books, watching together (SyncPlay), Kids mode, trailers and the first-run setup (web only for now). Administration tools are on the web app only, on purpose.
 
