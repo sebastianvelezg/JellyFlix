@@ -202,10 +202,21 @@ The buttons at the top can show icons and names, only icons or only names, in th
 | Sign in with a code (Quick Connect) | ✅ (and approve a code) | ✅ |
 | Play on another device | ✅ controls and receives | ✅ receives |
 | Plugins page | ✅ run their tasks | ✅ read only |
+| Modules: Retro TV channels (watch, guide) | ✅ (+ set channels up) | ✅ |
+| Modules: Match with friends | ✅ on your phone or one screen | ✅ the screen only (QR code, plays the winner) |
 | **Administration and the title editor** | ✅ | — |
 | Settings export and import, subtitle files from your device, installable (PWA) | ✅ | — |
 | Plays at the picture's own size, frame-rate matching, Info panel, version picker | — | ✅ |
 | Google TV *Continue watching* row, Instant Home | — | ✅ |
+
+## 🧩 Modules (optional)
+
+Extras that live in a small second container, [`jellyflix-modules`](modules/README.md), next to Jellyfin. Run it and a **Modules** button appears on the web and on the TV; leave it out and Jellyflix is exactly what it was: no button, no page, no request.
+
+- **Retro TV.** Channels made from your own library: a marathon of one anime, Saturdays of Marvel, horror at midnight. Nothing is broadcast and nothing runs while nobody watches: a channel is a schedule, and tuning in plays the title that is on, at the right minute, with the normal player. It has a guide, start over, previous and next program, go live and channel up and down. Administrators set channels up on the web (by hand, with rules or one per genre in one click); everybody watches, on the web and on the TV.
+- **Match.** Two or more people, each on their own phone and Jellyfin account, swipe the same films; what everybody liked goes on to the next round until one is left, and it plays on the screen. The TV shows a **QR code** and plays the winner. Filter by genre, decade, length and series, and see at the end how much you agreed.
+
+Set it up in the [modules README](modules/README.md) (one `docker compose up`), then point the web image at it with `JELLYFLIX_MODULES_URL` or the TV at it in **Settings → Modules**. More modules are planned.
 
 ## 📡 Play on another device
 
@@ -438,8 +449,9 @@ No, only Jellyfin.
 
 ## 🛣️ What could come next
 
-Jellyflix 1.3 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
+Jellyflix 1.4 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
 
+- **Modules:** a "YouTube without YouTube" module (subscribe to channels, downloaded without ads), a yearly **Wrapped** of what you watched, and more; see the [module plan](docs/MODULES-PLAN.md).
 - **Playback:** recording and timers for live TV, watch together on the TV app.
 - **Books:** a reader for the TV app, Mobi and RAR comics.
 - **Sign in:** find servers on the network, several servers and users.
@@ -473,7 +485,8 @@ Project files: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURIT
 JellyFlix/
 ├── web/        Jellyflix Web: React + TypeScript + Vite, Dockerfile, tests (Vitest, Playwright) and a mock Jellyfin server
 ├── tv/         Jellyflix TV: Kotlin + Jetpack Compose for TV + Media3, JVM unit tests
-├── docs/       The screenshots used by the READMEs
+├── modules/    The optional modules container (Retro TV, Match): Node 24, no dependencies, SQLite, tests
+├── docs/       The screenshots used by the READMEs and the plan of the modules
 ├── branding/   Logo, wordmark and the scripts that make every icon and the README images
 └── .github/    CI, the release workflow, issue and pull request templates
 ```
