@@ -14,7 +14,6 @@ import {
   type PlayChoice,
   retryRequest,
   ticksToSeconds,
-  withoutAudioCodecs,
   type Movie,
   type PlaybackExtras,
   type PlaybackPlan,
@@ -23,11 +22,12 @@ import {
 } from '../../core'
 import { loadSubtitleFile } from '../../platform/web/browser'
 import { lockPageScroll } from '../../platform/web/scrollLock'
-import { detectCapabilities } from '../../platform/web/capabilities'
 import { readPlayerPrefs, readSeriesPrefs, writePlayerPrefs, writeSeriesPrefs } from '../../platform/web/prefs'
 import { CloseIcon } from '../icons'
 import { DockNotice, DOCK_BUTTON } from './dock'
+import { firstStreamOptions } from './prepareStream'
 import { PlayerStage } from './PlayerStage'
+import type { ChannelChrome } from './Controls'
 import { t } from '../../i18n'
 
 type Request = Partial<StreamRequest> & { nonce: number }
@@ -65,7 +65,13 @@ export function Player({
   onClose,
   onExpand,
   onPlaying,
+  channelChrome,
+  preparedPlan,
 }: {
+  /** The server's answer to "how do I play this", asked for ahead of time (see prepareStream): used for the first stream only. */
+  preparedPlan?: Promise<PlaybackPlan>
+  /** Present when the video is a retro TV channel: its own controls are added (see Controls). */
+  channelChrome?: ChannelChrome
   session: Session
   /** A fresh copy of the title (its resume position is used to start). An episode gets series features. */
   movie: Movie
@@ -137,6 +143,7 @@ export function Player({
   const currentPlan = useRef<PlaybackPlan | null>(null)
   const seriesId = isEpisode(movie) ? movie.seriesId : null
   // What was picked on the title page (the version of the file, the audio, the subtitle); read once, for the first stream.
+  const preparedUsed = useRef(false)
   const choiceRead = useRef(false)
   const choice = useRef<PlayChoice | undefined>(undefined)
 
@@ -165,14 +172,23 @@ export function Player({
           choice.current = takePlayChoice(movie.id)
         }
         const firstStream = !subtitlesInitialised.current
-        const plan = await negotiatePlayback(session, movie.id, {
-          audioStreamIndex: request.audioIndex,
-          mediaSourceId: request.mediaSourceId ?? (firstStream ? choice.current?.mediaSourceId : undefined),
-          forceTranscode: request.forceTranscode,
-          // Audio codecs chosen in Settings are converted by the server even though this browser could play them.
-          capabilities: withoutAudioCodecs(detectCapabilities(), readPlayerPrefs().convertAudio),
-          maxBitrate: readPlayerPrefs().maxBitrateMbps * 1_000_000,
-        })
+        const negotiate = () =>
+          negotiatePlayback(session, movie.id, {
+            audioStreamIndex: request.audioIndex,
+            mediaSourceId: request.mediaSourceId ?? (firstStream ? choice.current?.mediaSourceId : undefined),
+            forceTranscode: request.forceTranscode,
+            ...firstStreamOptions(),
+          })
+        // An answer asked for ahead of time is only good for the plain first stream; anything else (another audio track, a retry) asks again.
+        const usePrepared =
+          !!preparedPlan && firstStream && !preparedUsed.current && request.audioIndex === undefined && !request.forceTranscode && request.mediaSourceId === undefined && !choice.current?.mediaSourceId
+        let plan: PlaybackPlan
+        if (usePrepared) {
+          preparedUsed.current = true
+          plan = await (preparedPlan as Promise<PlaybackPlan>).catch(negotiate)
+        } else {
+          plan = await negotiate()
+        }
         if (cancelled) return
         const remembered = seriesId ? readSeriesPrefs(seriesId) : {}
         // First stream of this viewing: switch on subtitles in the language chosen last time (for this series, if it is one).
@@ -230,7 +246,7 @@ export function Player({
     return () => {
       cancelled = true
     }
-  }, [session, movie, startOver, startAt, request, seriesId])
+  }, [session, movie, startOver, startAt, request, seriesId, preparedPlan])
 
   const retry = useCallback(() => {
     setState({ status: 'loading' })
@@ -304,6 +320,7 @@ export function Player({
         onClose={onClose}
         onExpand={onExpand}
         onPlaying={onPlaying}
+        channelChrome={channelChrome}
       />
     )
   }

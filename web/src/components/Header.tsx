@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
 import type { Section, Session } from '../core'
-import { AnimeIcon, BookIcon, CloseIcon, FilmIcon, HomeIcon, LiveTvIcon, LogoMark, MusicIcon, MusicVideoIcon, SearchIcon, TvIcon, Wordmark } from './icons'
+import { AnimeIcon, BookIcon, CloseIcon, FilmIcon, HomeIcon, LiveTvIcon, LogoMark, ModulesIcon, MusicIcon, MusicVideoIcon, SearchIcon, TvIcon, Wordmark } from './icons'
 import { t, tr } from '../i18n'
 import { useAppearance, type NavStyle } from '../platform/web/appearance'
 import { addRecentSearch, clearRecentSearches, readRecentSearches } from '../platform/web/recentSearches'
@@ -166,7 +166,7 @@ function SearchBox({ query, onSearch }: { query: string; onSearch: (text: string
 }
 
 /** The main page, or one of the sections. */
-export type NavTab = 'home' | Section
+export type NavTab = 'home' | Section | 'modules'
 
 export const TAB_LABELS: Record<NavTab, string> = {
   home: tr('Home'),
@@ -177,6 +177,7 @@ export const TAB_LABELS: Record<NavTab, string> = {
   books: tr('Books'),
   livetv: tr('Live TV'),
   music: tr('Music'),
+  modules: tr('Modules'),
 }
 
 const TAB_ICONS: Record<NavTab, () => ReactElement> = {
@@ -188,6 +189,7 @@ const TAB_ICONS: Record<NavTab, () => ReactElement> = {
   books: BookIcon,
   livetv: LiveTvIcon,
   music: MusicIcon,
+  modules: ModulesIcon,
 }
 
 /**

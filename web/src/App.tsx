@@ -18,6 +18,7 @@ import { HomePage } from './components/HomePage'
 import { BottomNav, Header, type NavTab } from './components/Header'
 import { MiniPlayer } from './components/music/MiniPlayer'
 import { RemoteProvider } from './components/remote/RemoteProvider'
+import { ModulesProvider, useModules } from './components/modules/ModulesProvider'
 import { SyncPlayProvider, useSyncPlay } from './components/syncplay/SyncPlayProvider'
 import { TogetherButton } from './components/syncplay/TogetherDialog'
 import { MusicProvider, useMusic, useMusicState } from './components/music/MusicProvider'
@@ -49,6 +50,7 @@ import { t, tr } from './i18n'
 
 import { loadPlayer, PlayerLoading, PlayerRoute, playKey, queueOf } from './components/PlayerRoute'
 import { useDockedVideo } from './components/shell/useDockedVideo'
+import { leaveFullscreen, pageInFullscreen } from './components/player/fullscreen'
 import { useMusicTab } from './components/shell/useMusicTab'
 import { usePageFocus } from './components/shell/usePageFocus'
 import { sectionRoute, useSectionRedirects } from './components/shell/useSectionRedirects'
@@ -72,6 +74,9 @@ const MusicPage = lazy(() => import('./components/music/MusicPage').then((m) => 
 const AlbumPage = lazy(() => import('./components/music/MusicDetails').then((m) => ({ default: m.AlbumPage })))
 const ArtistPage = lazy(() => import('./components/music/MusicDetails').then((m) => ({ default: m.ArtistPage })))
 const PlaylistPage = lazy(() => import('./components/music/MusicDetails').then((m) => ({ default: m.PlaylistPage })))
+// The extra modules are only downloaded by people who have a modules container (see ModulesProvider).
+const ModulesPage = lazy(() => import('./components/modules/ModulesPage').then((m) => ({ default: m.ModulesPage })))
+const ChannelPlayer = lazy(() => import('./components/modules/channels/ChannelPlayer').then((m) => ({ default: m.ChannelPlayer })))
 
 function PageLoading() {
   return (
@@ -229,6 +234,7 @@ export default function App() {
     <MusicProvider session={session}>
       <RemoteProvider session={session} go={go}>
       <SyncPlayProvider session={session} go={go}>
+      <ModulesProvider token={session.accessToken}>
       <Shell
         key={language}
         session={session}
@@ -240,10 +246,19 @@ export default function App() {
         playbackVersion={playbackVersion}
         onSignOut={() => void signOut()}
       />
+      </ModulesProvider>
       </SyncPlayProvider>
       </RemoteProvider>
     </MusicProvider>
   )
+}
+
+/** Leaves the page it is drawn on for another one (for a link that leads nowhere on this device). */
+function GoTo({ go, to }: { go: Navigate; to: Route }) {
+  useEffect(() => {
+    go(to, { replace: true })
+  }, [go, to])
+  return null
 }
 
 const SECTIONS: Section[] = ['movies', 'series', 'anime', 'musicvideos', 'books', 'livetv', 'music']
@@ -287,7 +302,9 @@ function Shell({
   // The main page is only worth having when there is more than one section to mix.
   const hasHome = available.length >= 2
   const { menu } = useAppearance()
-  const tabs: NavTab[] = arrangeMenu(hasHome ? ['home', ...available] : available, menu)
+  // The modules button exists only when a modules container answered; it goes last and is not part of the arrangeable menu (yet).
+  const modules = useModules().state
+  const tabs: NavTab[] = [...arrangeMenu(hasHome ? ['home', ...available] : available, menu), ...(modules.status === 'ready' ? (['modules'] as const) : [])]
   const current: NavTab | null =
     route.page === 'home'
       ? 'home'
@@ -303,7 +320,9 @@ function Shell({
                 ? 'livetv'
                 : route.page === 'folder'
                   ? 'musicvideos'
-                  : null
+                  : route.page === 'modules' || route.page === 'channel'
+                    ? 'modules'
+                    : null
 
   // With two or more tabs the phone layout needs a second header row for them.
   const hasTabs = tabs.length >= 2
@@ -329,6 +348,17 @@ function Shell({
     kids: kids.enabled,
   })
 
+
+  // Leaving a retro TV channel (the arrow, Escape, the guide's "All channels", the browser's Back) also leaves full screen, as leaving a
+  // movie does. Changing channel stays in it.
+  const wasChannel = useRef(false)
+  useEffect(() => {
+    if (wasChannel.current && route.page !== 'channel' && pageInFullscreen()) leaveFullscreen()
+    wasChannel.current = route.page === 'channel'
+  }, [route.page])
+
+  // A link to a channel on a device that has no modules container (or when it stopped answering) leads to the main page.
+  const channelGone = route.page === 'channel' && modules.status === 'absent'
 
   // The main page is created on first visit and then kept (hidden), like the section pages.
   const [homeSeen, setHomeSeen] = useState(false)
@@ -417,7 +447,7 @@ function Shell({
         sections={tabs}
         current={current}
         onSection={(tab) =>
-          go(tab === 'home' ? { page: 'home' } : tab === 'music' ? { page: 'music', tab: musicTab } : sectionRoute(tab))
+          go(tab === 'home' ? { page: 'home' } : tab === 'modules' ? { page: 'modules' } : tab === 'music' ? { page: 'music', tab: musicTab } : sectionRoute(tab))
         }
         onSearch={(text) =>
           text.trim()
@@ -646,6 +676,11 @@ function Shell({
             <SettingsPage session={session} onBack={() => back(homeRoute)} onSignOut={onSignOut} onStats={() => go({ page: 'stats' })} onAdmin={() => go({ page: 'admin' })} />
           </Suspense>
         )}
+        {route.page === 'modules' && (
+          <Suspense fallback={<PageLoading />}>
+            <ModulesPage session={session} module={route.module} join={route.join} go={go} back={back} homeRoute={homeRoute} />
+          </Suspense>
+        )}
         {route.page === 'person' && (
           <PersonPage
             key={route.id}
@@ -667,7 +702,7 @@ function Shell({
         sections={tabs}
         current={current}
         onSelect={(tab) =>
-          go(tab === 'home' ? { page: 'home' } : tab === 'music' ? { page: 'music', tab: musicTab } : sectionRoute(tab))
+          go(tab === 'home' ? { page: 'home' } : tab === 'modules' ? { page: 'modules' } : tab === 'music' ? { page: 'music', tab: musicTab } : sectionRoute(tab))
         }
       />
       <MiniPlayer session={session} onOpenAlbum={openAlbum} onOpenArtist={openArtist} hidden={barShown} />
@@ -679,6 +714,19 @@ function Shell({
             id={route.id}
             onChannel={(id) => go({ page: 'live', id }, { replace: true })}
             onExit={() => back({ page: 'section', section: 'livetv' })}
+          />
+        </Suspense>
+      )}
+      {channelGone && <GoTo go={go} to={homeRoute} />}
+      {route.page === 'channel' && modules.status === 'checking' && <PlayerLoading />}
+      {route.page === 'channel' && modules.status === 'ready' && (
+        <Suspense fallback={<PlayerLoading />}>
+          <ChannelPlayer
+            key={route.id}
+            session={session}
+            channelId={route.id}
+            onChannel={(id) => go({ page: 'channel', id }, { replace: true })}
+            onExit={() => back({ page: 'modules', module: 'channels' })}
           />
         </Suspense>
       )}

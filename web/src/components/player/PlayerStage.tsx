@@ -27,7 +27,7 @@ import { readPlayerPrefs, readSeriesPrefs, writePlayerPrefs } from '../../platfo
 import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
 import { useSyncPlay, useSyncPlayVideo } from '../syncplay/SyncPlayProvider'
-import { Controls } from './Controls'
+import { Controls, type ChannelChrome } from './Controls'
 import { DOCK_BAR_CLASS, DOCK_THUMB_CLASS } from './dock'
 import { enterFullscreen, inFullscreen, leaveFullscreen } from './fullscreen'
 import { BufferingSpinner, Curtain, ErrorPanel, MiniBar, SkipSegmentButton, SubtitleNotice, SyncNote, UpNextCard } from './PlayerOverlays'
@@ -98,7 +98,10 @@ export function PlayerStage({
   onClose,
   onExpand,
   onPlaying,
+  channelChrome,
 }: {
+  /** Present when the video is a retro TV channel: its own controls are added (see Controls). */
+  channelChrome?: ChannelChrome
   session: Session
   movie: Movie
   plan: PlaybackPlan
@@ -665,6 +668,7 @@ export function PlayerStage({
           )}
 
           <Controls
+            channel={channelChrome}
             title={title}
             visible={controlsVisible}
             paused={paused}

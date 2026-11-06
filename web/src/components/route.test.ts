@@ -47,6 +47,19 @@ describe('routes', () => {
     }
   })
 
+  it('knows the modules pages, the channel being watched, and the link of a Match invitation', () => {
+    expect(parseRoute('#/modules')).toEqual({ page: 'modules' })
+    expect(parseRoute('#/modules/channels')).toEqual({ page: 'modules', module: 'channels' })
+    expect(parseRoute('#/modules/nothing')).toEqual({ page: 'modules' })
+    expect(parseRoute('#/channel/abc')).toEqual({ page: 'channel', id: 'abc' })
+    expect(parseRoute('#/modules/match?join=ABCDE')).toEqual({ page: 'modules', module: 'match', join: 'ABCDE' })
+    // A code that is not a code, or a link to another module, joins nothing.
+    expect(parseRoute('#/modules/match?join=<script>')).toEqual({ page: 'modules', module: 'match' })
+    expect(parseRoute('#/modules/channels?join=ABCDE')).toEqual({ page: 'modules', module: 'channels' })
+    expect(formatRoute({ page: 'modules', module: 'match', join: 'ABCDE' })).toBe('#/modules/match?join=ABCDE')
+    expect(formatRoute({ page: 'channel', id: 'a b' })).toBe('#/channel/a%20b')
+  })
+
   it('keeps movies at #/movies and the main page at #/', () => {
     expect(formatRoute({ page: 'home' })).toBe('#/')
     expect(formatRoute({ page: 'browse' })).toBe('#/movies')

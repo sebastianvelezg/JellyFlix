@@ -37,6 +37,7 @@ export {
   startQuickConnect,
   type QuickConnectRequest,
 } from './quickConnect'
+export { itemImageUrl, type ImageKind } from './images'
 export { CLIENT_NAME, CLIENT_VERSION, setDefaultDeviceName, type Session } from './jellyfin'
 export { restoreSession, resumeSession, toStoredSession, verifySession, type SessionStore, type StoredSession } from './sessionStore'
 export { isPrivateHost, isUnencryptedPublic, normalizeServerUrl, ServerUrlError, tidyServerAddress } from './serverUrl'

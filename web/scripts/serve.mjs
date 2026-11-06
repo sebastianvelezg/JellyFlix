@@ -3,6 +3,8 @@
 //   JELLYFIN_URL    the address the sign-in screen starts with, e.g. http://YOUR-JELLYFIN-IP:8096   (default: empty)
 //   JELLYFLIX_PORT  port to listen on (PORT also works)                                            (default 8080)
 //   HOST            address to listen on; 0.0.0.0 makes it reachable from other devices             (default 0.0.0.0)
+//   JELLYFLIX_MODULES_URL  optional: where the extra modules container is, as the BROWSER reaches it, e.g. http://YOUR-IP:8097.
+//                   Left empty, the app never looks for one and is exactly the app without modules.
 //
 // The same names are read from a file called .env in the web folder (see .env.example), if there is one; real environment variables win.
 // It only sends the files in dist/ plus a generated config.js; it has no other behaviour and talks to no one.
@@ -22,6 +24,9 @@ const root = fileURLToPath(new URL('../dist/', import.meta.url))
 const port = Number(process.env.PORT || process.env.JELLYFLIX_PORT || 8080)
 const host = process.env.HOST ?? '0.0.0.0'
 const serverUrl = (process.env.JELLYFIN_URL ?? '').trim()
+// Only an http(s) address counts; anything else (or nothing) leaves the key out of config.js altogether.
+const modulesAsked = (process.env.JELLYFLIX_MODULES_URL ?? '').trim()
+const modulesUrl = /^https?:\/\/[^\s"'<>\\]+$/i.test(modulesAsked) ? modulesAsked : ''
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -38,7 +43,7 @@ const types = {
   '.woff': 'font/woff',
 }
 
-const configJs = `window.JELLYFLIX_CONFIG = ${JSON.stringify({ serverUrl })}\n`
+const configJs = `window.JELLYFLIX_CONFIG = ${JSON.stringify({ serverUrl, ...(modulesUrl ? { modulesUrl } : {}) })}\n`
 
 const server = createServer(async (req, res) => {
   const headers = {
