@@ -164,9 +164,13 @@ class MainActivity : ComponentActivity() {
                         loadChapters = { vm.chapters(page.plan.item) },
                         loadTrickplay = { vm.trickplay(page.plan) },
                         onEnded = {
-                            val continues = page.plan.item.kind == BaseItemKind.EPISODE || vm.hasNextInPlaylist(page.plan.item)
-                            if (continues && vm.autoplayNext) vm.playNext(page.plan) else vm.back()
+                            // A retro TV channel goes on with its next program; any other video with its next episode, or leaves.
+                            if (!vm.modules.ended(page.plan)) {
+                                val continues = page.plan.item.kind == BaseItemKind.EPISODE || vm.hasNextInPlaylist(page.plan.item)
+                                if (continues && vm.autoplayNext) vm.playNext(page.plan) else vm.back()
+                            }
                         },
+                        channel = vm.modules.uiFor(page.plan),
                         onNextEpisode = { vm.playNext(page.plan) },
                         onExit = { vm.back() },
                         onChannelStep = { vm.stepChannel(page.plan, it) },

@@ -230,7 +230,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (hasCollections) add(MenuItem.Collections)
             }
             // The sections in the order the user chose (the names of both lists are the same), then Search and Settings.
-            return appearance.menu.arrange(available).map { Tab.valueOf(it.name) } + Tab.Search + Tab.Settings
+            return appearance.menu.arrange(available).map { Tab.valueOf(it.name) } + (if (modules.ready != null) listOf(Tab.Modules) else emptyList()) + Tab.Search + Tab.Settings
         }
 
     var tab by mutableStateOf(Tab.Home)
@@ -251,6 +251,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val musicVideos = LibraryState(Section.MusicVideos)
     val books = LibraryState(Section.Books)
     val liveTv = LiveTvState().also { it.category = ChannelCategory.of(store.liveCategory) }
+
+    /** The optional modules container: retro TV channels and Match. With no address set it never makes a request. */
+    val modules = ModulesController(
+        launch = { block -> launchSafe(block) },
+        repo = repo,
+        store = store,
+        session = { session },
+        limits = { settings.limits },
+        showPlayer = { plan ->
+            val top = pages.lastIndex
+            if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(plan) else pages.add(Page.Player(plan))
+        },
+        leavePlayer = { back() },
+        setBusy = { busy = it },
+        notify = { notice = it },
+        fail = { fail(it) },
+        str = { id, args -> str(id, *args) },
+        playById = { id -> launchSafe { session?.let { s -> play(io { repo.details(s, id) }) } } },
+        openById = { id -> launchSafe { session?.let { s -> open(io { repo.details(s, id) }) } } },
+    )
 
     /** The channel watched last, kept across visits (and forgotten on signing out). */
     var lastChannel by mutableStateOf(store.lastChannel?.let { (id, name) -> runCatching { LastChannel(UUID.fromString(id), name) }.getOrNull() })
@@ -392,6 +412,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (session != null) {
             loadHome()
             startRemote()
+            modules.start()
         }
     }
 
@@ -466,6 +487,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 tab = Tab.Home
                 loadHome()
                 startRemote()
+                modules.start()
             } catch (e: Exception) {
                 fail(e, R.string.error_sign_in)
             } finally {
@@ -503,6 +525,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         tab = Tab.Home
                         loadHome()
                         startRemote()
+                        modules.start()
                         return@launchSafe
                     }
                 }
@@ -534,6 +557,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         musicTicker?.cancel()
         resetMusic()
         store.clear()
+        modules.reset()
         session = null
         // The pictures of the screensaver belong to the account that was signed in: the next one asks for its own.
         screensaverShown = false
@@ -1908,10 +1932,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Closes the top page or returns to Home; false when there is nothing left and the system may leave the app. */
     fun back(): Boolean {
         if (pages.isNotEmpty()) {
-            pages.removeAt(pages.lastIndex)
+            val closed = pages.removeAt(pages.lastIndex)
+            // A retro TV channel stops being watched when its player closes.
+            if (closed is Page.Player) modules.playerClosed()
             if (pages.isEmpty()) restoreTarget = lastFocused
             return true
         }
+        // Inside the Modules section Back goes to the page before it (Match to the Modules home).
+        if (tab == Tab.Modules && modules.back()) return true
         if (tab != Tab.Home) {
             tab = Tab.Home
             return true

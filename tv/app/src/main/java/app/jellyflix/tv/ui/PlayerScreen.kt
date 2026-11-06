@@ -76,7 +76,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
+import app.jellyflix.tv.ChannelUi
 import app.jellyflix.tv.PlayerCommand
+import app.jellyflix.tv.data.ModuleProgram
+import app.jellyflix.tv.data.isLive
 import app.jellyflix.tv.R
 import app.jellyflix.tv.data.Chapter
 import app.jellyflix.tv.data.PlaybackPlan
@@ -132,6 +135,8 @@ class PlayerActions(
     val loadEpisodes: suspend (seasonId: java.util.UUID) -> List<MediaItem> = { emptyList() },
     /** An episode was picked from that list. */
     val onPlayEpisode: (MediaItem) -> Unit = {},
+    /** Present when the video is a program of a retro TV channel: the channel's own controls, guide and on-screen graphics are added. */
+    val channel: ChannelUi? = null,
 )
 
 /**
@@ -215,6 +220,25 @@ fun PlayerScreen(
     val root = remember { FocusRequester() }
     val playPause = remember { FocusRequester() }
     val skipFocus = remember { FocusRequester() }
+    val joinFocus = remember { FocusRequester() }
+    // A retro TV channel: what it is showing for a moment (now and next, and the offer to start over when the viewer joined late).
+    val channel = actions.channel
+    val osd = channel?.view?.osd
+    var osdShown by remember { mutableStateOf(osd != null) }
+    LaunchedEffect(osd?.key) {
+        if (osd != null) {
+            osdShown = true
+            delay(if (osd.joinedMinute != null) 10_000L else 6_000L)
+            osdShown = false
+        }
+    }
+    val joinShown = osdShown && osd?.joinedMinute != null
+    // Up and down change channel on a live channel and on a retro TV channel.
+    val zap: ((Int) -> Unit)? = when {
+        plan.liveStreamId != null -> actions.onChannelStep
+        channel != null -> channel.onStep
+        else -> null
+    }
     var segments by remember { mutableStateOf<List<Segment>>(emptyList()) }
     LaunchedEffect(plan.item.id) { segments = actions.loadSegments() }
     var chapters by remember { mutableStateOf<List<Chapter>>(emptyList()) }
@@ -337,6 +361,7 @@ fun PlayerScreen(
             position = player.currentPosition
             duration = if (player.duration > 0) player.duration else duration
             sinceReport += 500
+            channel?.onTick?.invoke(position, duration)
             if (sinceReport >= REPORT_EVERY_MS) {
                 sinceReport = 0
                 actions.onProgress(position, !player.isPlaying)
@@ -367,9 +392,10 @@ fun PlayerScreen(
             player.seekTo(segment.endMs)
         }
     }
-    LaunchedEffect(controlsVisible, panelOpen, askActive?.startMs, nextShown) {
+    LaunchedEffect(controlsVisible, panelOpen, askActive?.startMs, nextShown, joinShown) {
         when {
             controlsVisible && !panelOpen -> playPause.requestFocusSoon()
+            !controlsVisible && !panelOpen && joinShown && askActive == null && !nextShown -> joinFocus.requestFocusSoon()
             !controlsVisible && !panelOpen && (askActive != null || nextShown) -> skipFocus.requestFocusSoon()
             !controlsVisible && !panelOpen -> root.requestFocusSoon()
         }
@@ -403,7 +429,7 @@ fun PlayerScreen(
                 when (event.nativeKeyEvent.keyCode) {
                     // With a "Skip" button on screen, OK presses it.
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                        if (active != null || nextShown) return@onPreviewKeyEvent false
+                        if (active != null || nextShown || joinShown) return@onPreviewKeyEvent false
                         // OK on a live channel only shows the controls (pausing live TV by accident leaves the picture behind); the Pause button pauses.
                         if (plan.liveStreamId == null) {
                             if (player.isPlaying) player.pause() else player.play()
@@ -417,10 +443,10 @@ fun PlayerScreen(
                         true
                     }
                     // A live channel cannot be skipped through; up and down (or the remote's channel keys) change channel.
-                    KeyEvent.KEYCODE_CHANNEL_UP -> { if (plan.liveStreamId != null) actions.onChannelStep(1); plan.liveStreamId != null }
-                    KeyEvent.KEYCODE_CHANNEL_DOWN -> { if (plan.liveStreamId != null) actions.onChannelStep(-1); plan.liveStreamId != null }
-                    KeyEvent.KEYCODE_DPAD_UP -> { if (plan.liveStreamId != null) actions.onChannelStep(-1) else showControls(); true }
-                    KeyEvent.KEYCODE_DPAD_DOWN -> { if (plan.liveStreamId != null) actions.onChannelStep(1) else showControls(); true }
+                    KeyEvent.KEYCODE_CHANNEL_UP -> { zap?.invoke(1); zap != null }
+                    KeyEvent.KEYCODE_CHANNEL_DOWN -> { zap?.invoke(-1); zap != null }
+                    KeyEvent.KEYCODE_DPAD_UP -> { if (zap != null) zap(-1) else showControls(); true }
+                    KeyEvent.KEYCODE_DPAD_DOWN -> { if (zap != null) zap(1) else showControls(); true }
                     KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
                         if (plan.liveStreamId != null) showControls()
                         else {
@@ -480,8 +506,28 @@ fun PlayerScreen(
                     .focusRequester(skipFocus),
             )
         }
+        if (osdShown && osd != null && !controlsVisible && !panelOpen) {
+            ChannelOsdCard(
+                osd = osd,
+                onStartOver = { osdShown = false; channel?.onStartOver?.invoke() },
+                joinFocus = joinFocus,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp),
+            )
+        }
+        if (channel != null && !panelOpen) {
+            // The number of the channel in a corner, like the logo of a television channel.
+            Text(
+                channel.view.number.toString(),
+                fontSize = 26.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
+                color = Color(0x99FFFFFF),
+                modifier = Modifier.align(Alignment.TopEnd).padding(end = 48.dp, top = 28.dp),
+            )
+        }
         if (controlsVisible && !panelOpen) {
             Controls(
+                channel = channel,
+                onGuide = { panel = Panel.Guide },
                 plan = plan,
                 position = { position },
                 duration = duration,
@@ -556,13 +602,23 @@ fun PlayerScreen(
                 },
                 onClose = { panel = Panel.None },
             )
+            Panel.Guide -> if (channel != null) ChannelGuidePanel(
+                channel = channel,
+                onPick = { program ->
+                    panel = Panel.None
+                    controlsVisible = false
+                    channel.onPick(program)
+                },
+                onAll = channel.onAllChannels,
+                onClose = { panel = Panel.None },
+            )
             Panel.None -> Unit
         }
         }
     }
 }
 
-private enum class Panel { None, Tracks, Chapters, Episodes }
+private enum class Panel { None, Tracks, Chapters, Episodes, Guide }
 
 /** The time labels on both sides of the seek bar have one width, so a picture above the bar lines up with it. */
 private val TIME_LABEL_WIDTH = 64.dp
@@ -570,6 +626,8 @@ private val BAR_GAP = 14.dp
 
 @Composable
 private fun Controls(
+    channel: ChannelUi?,
+    onGuide: () -> Unit,
     plan: PlaybackPlan,
     position: () -> Long,
     duration: Long,
@@ -593,80 +651,219 @@ private fun Controls(
     val position = position()
     Box(Modifier.fillMaxSize()) {
         Box(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(300.dp).background(
-                Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(260.dp).background(
+                Brush.verticalGradient(listOf(Color.Transparent, Color(0x99000000))),
             ),
         )
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 48.dp, vertical = 36.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 48.dp, vertical = 28.dp),
         ) {
-            // A channel is named without the quality and notes playlists put in its name; those go beneath.
-            val channelName = remember(plan.item.id) { if (plan.item.isChannel) splitChannelName(plan.item.title) else null }
-            Text(channelName?.title ?: plan.item.title, fontSize = 24.sp, color = Color.White)
-            channelName?.tags?.takeIf { it.isNotEmpty() }?.let { Text(it.joinToString(" · "), fontSize = 15.sp, color = Palette.TextDim) }
-            plan.item.subtitle?.takeIf { plan.item.isEpisodeLike() }?.let { Text(it, fontSize = 15.sp, color = Palette.TextDim) }
-            if (plan.transcoding) Text(stringResource(R.string.player_converting), fontSize = 13.sp, color = Palette.TextDim)
-            currentChapter?.let { chapter ->
-                Text(chapterName(chapters.indexOf(chapter), chapter), fontSize = 14.sp, color = Palette.TextDim)
-            }
+            // One panel of glass: what is playing, the bar and the buttons.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0x99101418))
+                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 28.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (channel != null) {
+                    ChannelInfo(channel, position)
+                } else {
+                    // A channel is named without the quality and notes playlists put in its name; those go beneath.
+                    val channelName = remember(plan.item.id) { if (plan.item.isChannel) splitChannelName(plan.item.title) else null }
+                    Text(channelName?.title ?: plan.item.title, fontSize = 24.sp, color = Color.White)
+                    channelName?.tags?.takeIf { it.isNotEmpty() }?.let { Text(it.joinToString(" · "), fontSize = 15.sp, color = Palette.TextDim) }
+                    plan.item.subtitle?.takeIf { plan.item.isEpisodeLike() }?.let { Text(it, fontSize = 15.sp, color = Palette.TextDim) }
+                }
+                if (plan.transcoding) Text(stringResource(R.string.player_converting), fontSize = 13.sp, color = Palette.TextDim)
+                currentChapter?.let { chapter ->
+                    Text(chapterName(chapters.indexOf(chapter), chapter), fontSize = 14.sp, color = Palette.TextDim)
+                }
 
-            // Where the playhead is, pictured: on the same line as the bar (the time labels have a fixed width on both sides).
-            if (picture != null) {
-                val pictureWidth = 200.dp
-                Row(Modifier.fillMaxWidth().height(pictureWidth * pictureRatio)) {
-                    Spacer(Modifier.width(TIME_LABEL_WIDTH + BAR_GAP))
-                    BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
-                        val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-                        val x = (maxWidth * fraction - pictureWidth / 2).coerceIn(0.dp, (maxWidth - pictureWidth).coerceAtLeast(0.dp))
-                        Image(
-                            bitmap = picture,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .offset(x = x)
-                                .width(pictureWidth)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(2.dp, Color.White, RoundedCornerShape(8.dp)),
-                        )
-                    }
-                    Spacer(Modifier.width(TIME_LABEL_WIDTH + BAR_GAP))
-                }
-            }
-            if (plan.liveStreamId != null) {
-                // A live channel has no length: say so instead of a bar.
-                Text(stringResource(R.string.player_live), fontSize = 14.sp, color = Color.White)
-            } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(BAR_GAP)) {
-                Text(formatTime(position), fontSize = 14.sp, color = Color.White, modifier = Modifier.width(TIME_LABEL_WIDTH))
-                Box(
-                    Modifier.weight(1f).height(5.dp).background(Color(0x55FFFFFF)).drawBehind {
-                        // A thin gap in the bar at every chapter.
-                        if (duration > 0) chapters.drop(1).forEach {
-                            val x = size.width * (it.startMs.toFloat() / duration).coerceIn(0f, 1f)
-                            drawRect(Color.Black, Offset(x - 1.5f, 0f), Size(3f, size.height))
+                // Where the playhead is, pictured: on the same line as the bar (the time labels have a fixed width on both sides).
+                if (picture != null) {
+                    val pictureWidth = 200.dp
+                    Row(Modifier.fillMaxWidth().height(pictureWidth * pictureRatio)) {
+                        Spacer(Modifier.width(TIME_LABEL_WIDTH + BAR_GAP))
+                        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                            val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+                            val x = (maxWidth * fraction - pictureWidth / 2).coerceIn(0.dp, (maxWidth - pictureWidth).coerceAtLeast(0.dp))
+                            Image(
+                                bitmap = picture,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .offset(x = x)
+                                    .width(pictureWidth)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(2.dp, Color.White, RoundedCornerShape(8.dp)),
+                            )
                         }
-                    },
-                ) {
-                    val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-                    Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(Palette.Accent))
+                        Spacer(Modifier.width(TIME_LABEL_WIDTH + BAR_GAP))
+                    }
                 }
-                Text(formatTime(duration), fontSize = 14.sp, color = Color.White, textAlign = TextAlign.End, modifier = Modifier.width(TIME_LABEL_WIDTH))
+                if (plan.liveStreamId != null) {
+                    // A live channel has no length: say so instead of a bar.
+                    Text(stringResource(R.string.player_live), fontSize = 14.sp, color = Color.White)
+                } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(BAR_GAP)) {
+                    Text(formatTime(position), fontSize = 14.sp, color = Color.White, modifier = Modifier.width(TIME_LABEL_WIDTH))
+                    Box(
+                        Modifier.weight(1f).height(5.dp).background(Color(0x55FFFFFF)).drawBehind {
+                            // A thin gap in the bar at every chapter.
+                            if (duration > 0) chapters.drop(1).forEach {
+                                val x = size.width * (it.startMs.toFloat() / duration).coerceIn(0f, 1f)
+                                drawRect(Color.Black, Offset(x - 1.5f, 0f), Size(3f, size.height))
+                            }
+                        },
+                    ) {
+                        val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+                        Box(Modifier.fillMaxHeight().fillMaxWidth(fraction).background(Palette.Accent))
+                    }
+                    Text(formatTime(duration), fontSize = 14.sp, color = Color.White, textAlign = TextAlign.End, modifier = Modifier.width(TIME_LABEL_WIDTH))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Pill(
+                        stringResource(if (playing) R.string.player_pause else R.string.player_play),
+                        onClick = onTogglePlay,
+                        modifier = Modifier.focusRequester(playPause),
+                    )
+                    if (channel != null) {
+                        Pill(stringResource(R.string.modules_player_previous), onClick = channel.onPrevious)
+                        Pill(stringResource(R.string.modules_player_start_over), onClick = channel.onStartOver)
+                        Pill(stringResource(R.string.modules_player_next), onClick = channel.onNext)
+                        if (!isLive(channel.behindSeconds(position))) Pill(stringResource(R.string.modules_player_go_live), onClick = channel.onLive, accent = true)
+                        Pill(stringResource(R.string.modules_player_channel_down), onClick = { channel.onStep(-1) })
+                        Pill(stringResource(R.string.modules_player_channel_up), onClick = { channel.onStep(1) })
+                        Pill(stringResource(R.string.modules_player_guide), onClick = onGuide)
+                    } else if (plan.liveStreamId == null) {
+                        Pill(stringResource(R.string.player_back_10), onClick = onBack)
+                        Pill(stringResource(R.string.player_forward_10), onClick = onForward)
+                    }
+                    Pill(stringResource(R.string.player_audio_subtitles), onClick = onTracks)
+                    if (chapters.size > 1) Pill(stringResource(R.string.player_chapters), onClick = onChapters)
+                    if (onEpisodes != null) Pill(stringResource(R.string.player_episodes), onClick = onEpisodes)
+                    Pill(stringResource(R.string.player_info), onClick = onInfo, selected = showInfo)
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Pill(
-                    stringResource(if (playing) R.string.player_pause else R.string.player_play),
-                    onClick = onTogglePlay,
-                    modifier = Modifier.focusRequester(playPause),
+        }
+    }
+}
+
+/** "5 min", "1 h 05 min": a distance in time, from a number of seconds. */
+@Composable
+private fun spanText(seconds: Long): String {
+    val minutes = (kotlin.math.abs(seconds) / 60).coerceAtLeast(1)
+    return if (minutes < 60) stringResource(R.string.modules_minutes, minutes.toInt()) else "${minutes / 60} h ${"%02d".format(minutes % 60)} min"
+}
+
+/** The line a retro TV channel adds to the controls: its number and name, whether the viewer is live, what is on and what comes next. */
+@Composable
+private fun ChannelInfo(channel: ChannelUi, positionMs: Long) {
+    val view = channel.view
+    val current = view.current
+    val behind = channel.behindSeconds(positionMs)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ChannelBadge(view.number, view.color, size = 34.dp)
+            Text(view.name, fontSize = 18.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = Color.White)
+            val live = isLive(behind)
+            Text(
+                if (live) stringResource(R.string.player_live) else stringResource(if (behind > 0) R.string.modules_behind else R.string.modules_ahead, spanText(behind)),
+                fontSize = 13.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (live) Color(0xFFDC2626) else Color(0x40FFFFFF))
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            view.upNext?.let {
+                Text(stringResource(R.string.modules_next_at, clockOf(it.start), it.title), fontSize = 14.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(0.45f), textAlign = TextAlign.End)
+            }
+        }
+        if (current != null) {
+            Text(current.title, fontSize = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                listOfNotNull(current.subtitle, "${clockOf(current.start)} – ${clockOf(current.end)}").joinToString(" · "),
+                fontSize = 15.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** What a television shows for a moment when the program changes: what is on now and what comes next, and, when the viewer joined late, an offer to start over. */
+@Composable
+private fun ChannelOsdCard(osd: app.jellyflix.tv.ChannelOsdState, onStartOver: () -> Unit, joinFocus: FocusRequester, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .width(720.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xB3101418))
+            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(20.dp))
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.modules_osd_now), fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color.White, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFDC2626)).padding(horizontal = 8.dp, vertical = 3.dp))
+            Text(osd.now.title, fontSize = 22.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        osd.next?.let {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.modules_osd_next), fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color(0xCCFFFFFF), modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0x33FFFFFF)).padding(horizontal = 8.dp, vertical = 3.dp))
+                Text("${clockOf(it.start)}  ${it.title}", fontSize = 17.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        osd.joinedMinute?.let { minute ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 4.dp)) {
+                Text(stringResource(R.string.modules_joined_minute, minute), fontSize = 16.sp, color = Color.White)
+                Pill(stringResource(R.string.modules_start_beginning), onClick = onStartOver, accent = true, modifier = Modifier.focusRequester(joinFocus))
+            }
+        }
+    }
+}
+
+/** The guide of the channel being watched, over the picture: what was on, what is on and what comes next. Picking a program goes to it. */
+@Composable
+private fun ChannelGuidePanel(channel: ChannelUi, onPick: (ModuleProgram) -> Unit, onAll: () -> Unit, onClose: () -> Unit) {
+    val view = channel.view
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) { channel.loadGuide() }
+    val live = channel.liveSeconds()
+    val liveStart = view.programs.firstOrNull { it.start <= live && live < it.end }?.start
+    val shown = view.programs.filter { liveStart == null || it.start >= liveStart - 3 * 3600 }
+    LaunchedEffect(shown.size) { first.requestFocusSoon() }
+    Box(Modifier.fillMaxSize().background(Color(0x99000000))) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(620.dp)
+                .fillMaxHeight()
+                .background(Palette.Surface.copy(alpha = 0.95f))
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(stringResource(R.string.modules_guide_title, view.name), fontSize = 20.sp, color = Color.White)
+            shown.forEach { program ->
+                val isLiveNow = program.start == liveStart
+                val viewing = program.start == view.currentStart
+                val mark = when {
+                    isLiveNow -> "  ·  " + stringResource(R.string.modules_guide_live)
+                    viewing -> "  ·  " + stringResource(R.string.modules_guide_watching)
+                    else -> ""
+                }
+                TrackPill(
+                    "${clockOf(program.start)}  ${program.title}$mark",
+                    selected = viewing,
+                    onClick = { onPick(program) },
+                    modifier = if (viewing || (isLiveNow && view.programs.none { it.start == view.currentStart })) Modifier.focusRequester(first) else Modifier,
                 )
-                if (plan.liveStreamId == null) {
-                    Pill(stringResource(R.string.player_back_10), onClick = onBack)
-                    Pill(stringResource(R.string.player_forward_10), onClick = onForward)
-                }
-                Pill(stringResource(R.string.player_audio_subtitles), onClick = onTracks)
-                if (chapters.size > 1) Pill(stringResource(R.string.player_chapters), onClick = onChapters)
-                if (onEpisodes != null) Pill(stringResource(R.string.player_episodes), onClick = onEpisodes)
-                Pill(stringResource(R.string.player_info), onClick = onInfo, selected = showInfo)
             }
+            Pill(stringResource(R.string.modules_player_all_channels), onClick = onAll, modifier = Modifier.padding(top = 16.dp))
+            Pill(stringResource(R.string.player_close), onClick = onClose)
         }
     }
 }

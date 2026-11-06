@@ -109,6 +109,15 @@ class SessionStore(context: Context, private val vault: TokenVault = KeystoreVau
             }
         }
 
+    /** The optional modules container (retro TV channels, Match): its address, and the web app's, for the QR code of a Match. Empty: not used. */
+    var modulesAddress: String
+        get() = prefs.getString("modulesAddress", "") ?: ""
+        set(value) = prefs.edit { putString("modulesAddress", value) }
+
+    var webAddress: String
+        get() = prefs.getString("webAddress", "") ?: ""
+        set(value) = prefs.edit { putString("webAddress", value) }
+
     /** The last address typed, so signing in again does not mean typing it again. */
     var lastServer: String
         get() = prefs.getString("lastServer", "") ?: ""

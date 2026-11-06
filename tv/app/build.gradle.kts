@@ -96,4 +96,6 @@ dependencies {
     implementation(libs.slf4j.api)
     implementation(libs.logback.android)
     implementation(libs.kotlinx.coroutines.android)
+    // Draws the QR code of a Match invitation (it makes the picture on the device; nothing is sent anywhere).
+    implementation(libs.zxing.core)
 }
