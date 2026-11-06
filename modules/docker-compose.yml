@@ -1,0 +1,33 @@
+# Jellyflix Modules. From this folder:   docker compose up -d --build
+# Settings go in a file called .env next to this one (copy .env.example). Full guide: README.md in this folder.
+services:
+  jellyflix-modules:
+    build: .
+    image: jellyflix-modules:latest
+    container_name: jellyflix-modules
+    restart: unless-stopped
+    ports:
+      - "${MODULES_PORT:-8097}:8097"
+    environment:
+      # The address of Jellyfin as seen from THIS container (the other container's name works when they share a Docker network).
+      JELLYFIN_URL: "${JELLYFIN_URL:?Set JELLYFIN_URL in .env: the address of your Jellyfin as this container reaches it}"
+      # Optional. An API key from Jellyfin (Dashboard > API keys): lets the container refresh the lists of titles of the channels by night
+      # and leave out films the other people of a Match already watched. Without it everything still works.
+      JELLYFIN_API_KEY: "${JELLYFIN_API_KEY:-}"
+      # Which modules are on: channels, match.
+      JELLYFLIX_MODULES: "${JELLYFLIX_MODULES:-channels,match}"
+      # Optional: the sites allowed to call it from a browser, separated by commas. Empty means any (it uses tokens, not cookies).
+      JELLYFLIX_ORIGINS: "${JELLYFLIX_ORIGINS:-*}"
+    volumes:
+      - modules-data:/data
+    # Like the web image: nothing writable but its data and /tmp, no extra privileges.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  modules-data:

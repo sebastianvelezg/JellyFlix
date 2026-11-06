@@ -64,6 +64,7 @@ fun MainScreen(vm: AppViewModel) {
                 Tab.Home -> HomeScreen(vm)
                 Tab.Movies, Tab.Series, Tab.Anime, Tab.MusicVideos, Tab.Books, Tab.Collections -> vm.libraryOf(vm.tab)?.let { LibraryScreen(vm, it) }
                 Tab.LiveTv -> LiveTvScreen(vm)
+                Tab.Modules -> ModulesScreen(vm)
                 Tab.Music -> MusicScreen(vm)
                 Tab.Search -> SearchScreen(vm)
                 Tab.Settings -> SettingsScreen(vm)

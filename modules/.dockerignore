@@ -1,0 +1,10 @@
+node_modules
+data
+server/test
+scripts
+tsconfig.json
+.env
+.env.*
+!.env.example
+*.md
+!README.md

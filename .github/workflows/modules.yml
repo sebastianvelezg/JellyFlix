@@ -1,0 +1,64 @@
+name: Modules
+
+# The optional modules container. It only runs when something in modules/ (or the copy of its contract the web app holds) changes, so a
+# problem here never blocks the web or TV pipelines, and the other way round.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "web/src/core/modules/contract.ts"
+      - ".github/workflows/modules.yml"
+  pull_request:
+    paths:
+      - "modules/**"
+      - "web/src/core/modules/contract.ts"
+      - ".github/workflows/modules.yml"
+
+concurrency:
+  group: modules-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  modules:
+    name: Modules (contract, typecheck, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: modules/package-lock.json
+      - run: npm ci
+      # The web app holds a copy of modules/contract/index.ts; this fails when the two differ.
+      - run: npm run contract:check
+      - run: npm run typecheck
+      - run: npm test
+
+  modules-docker:
+    name: Modules (Docker image builds, starts and answers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build the image and start it as docker-compose.yml says
+        working-directory: modules
+        env:
+          JELLYFIN_URL: http://jellyfin.local:8096
+        run: docker compose up -d --build
+      - name: It answers
+        run: |
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8097/v1/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8097/v1/health | grep -q '"status":"ok"'
+      - name: It refuses a request without a session
+        run: test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8097/v1/manifest)" = "401"
+      - name: Show its log if something failed
+        if: failure()
+        working-directory: modules
+        run: docker compose logs

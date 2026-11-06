@@ -15,6 +15,8 @@ This list names the main direct dependencies. It is a courtesy summary, not a le
 | [fflate](https://github.com/101arrowz/fflate) (opens EPUB and comic archives) | MIT |
 | [hls.js](https://github.com/video-dev/hls.js) | Apache-2.0 |
 | [pdf.js](https://github.com/mozilla/pdf.js) (`pdfjs-dist`, draws PDF books; it carries the OpenJPEG and qcms decoders, BSD-2-Clause and MIT) | Apache-2.0 |
+| [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (draws the QR code of a Match invitation in the browser; it contacts no one) | MIT |
+| [ZXing core](https://github.com/zxing/zxing) (draws the QR code of a Match invitation in the Android TV app; it contacts no one) | Apache-2.0 |
 | [Inter](https://rsms.me/inter/) font, through `@fontsource-variable/inter` | SIL Open Font License 1.1 |
 | [Tailwind CSS](https://tailwindcss.com) (build time) | MIT |
 | [Vite](https://vite.dev), [Vitest](https://vitest.dev), [Testing Library](https://testing-library.com), ESLint, TypeScript (development only) | MIT / Apache-2.0 |

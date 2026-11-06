@@ -374,7 +374,7 @@ Prebuilt downloads (a web bundle, a Docker image and a TV APK) are attached to e
 
 These are rules of the project, not just how it behaves today. A contribution that breaks one will not be merged.
 
-- **Talks only to your Jellyfin server.** No analytics, no crash reporting, no ads, no third-party calls unless *you* turn on something that needs one.
+- **Talks only to servers you run.** Your Jellyfin server and, if you choose to install it, your own [modules container](modules/README.md). No analytics, no crash reporting, no ads, no third-party calls unless *you* turn on something that needs one.
 - **No credentials or server addresses in the source.** Your password is sent once to your server and never stored; only a revocable session token is kept.
 - **No backend of ours.** The web app is static files and the TV app is a single APK. There is nothing to sign up for.
 - **Your server does the heavy lifting.** The apps never transcode.
@@ -462,6 +462,7 @@ Reports from different servers, libraries, browsers and TVs are very welcome. If
 | [web/README.md](web/README.md) | Jellyflix Web: every feature, hosting step by step, the security model, administration, plugins, architecture and testing |
 | [tv/README.md](tv/README.md) | Jellyflix TV: every feature, the remote control, installing it on a TV, how it is built, testing and compatibility |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, tests, the rules of the project, adding a language |
+| [modules/README.md](modules/README.md) | The optional modules container (Retro TV channels, Match): how to run it and how Jellyflix finds it |
 | [CHANGELOG.md](CHANGELOG.md) | What changed in each version |
 
 Project files: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURITY.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) · [LICENSE](LICENSE)

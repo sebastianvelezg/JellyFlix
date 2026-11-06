@@ -88,6 +88,7 @@ private enum class SettingsTab(val label: Int) {
     Display(R.string.settings_tab_display),
     Appearance(R.string.settings_tab_appearance),
     Plugins(R.string.settings_tab_plugins),
+    Modules(R.string.settings_tab_modules),
     Account(R.string.settings_tab_account),
 }
 
@@ -123,6 +124,7 @@ fun SettingsScreen(vm: AppViewModel) {
             SettingsTab.Display -> DisplayTab(vm, firstControl)
             SettingsTab.Appearance -> AppearanceTab(vm, firstControl)
             SettingsTab.Plugins -> PluginsTab(vm, firstControl)
+            SettingsTab.Modules -> ModulesTab(vm, firstControl)
             SettingsTab.Account -> AccountTab(vm, firstControl)
         }
     }

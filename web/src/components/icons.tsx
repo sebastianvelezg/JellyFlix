@@ -22,6 +22,16 @@ function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: Reac
   )
 }
 
+/** Four tiles, one of them lifted: the extra modules. */
+export const ModulesIcon = () => (
+  <Icon>
+    <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+    <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+    <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+    <path d="M17 13.5v7M13.5 17h7" />
+  </Icon>
+)
+
 export const PeopleIcon = () => (
   <Icon>
     <circle cx="9" cy="8" r="3.2" />
@@ -216,6 +226,44 @@ export const NextEpisodeIcon = () => (
   <Icon fill="currentColor" stroke="none">
     <path d="M5 5.2v13.6a.9.9 0 0 0 1.4.75l9-6.8a.9.9 0 0 0 0-1.5l-9-6.8A.9.9 0 0 0 5 5.2z" />
     <rect x="17" y="5" width="2.4" height="14" rx="1.1" />
+  </Icon>
+)
+
+/** The program before: the "next" icon turned around. */
+export const PreviousProgramIcon = () => (
+  <Icon fill="currentColor" stroke="none">
+    <path d="M19 5.2v13.6a.9.9 0 0 1-1.4.75l-9-6.8a.9.9 0 0 1 0-1.5l9-6.8A.9.9 0 0 1 19 5.2z" />
+    <rect x="4.6" y="5" width="2.4" height="14" rx="1.1" />
+  </Icon>
+)
+
+/** An arrow that goes round to the start: play this program again from its beginning. */
+export const StartOverIcon = () => (
+  <Icon>
+    <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />
+    <path d="M3.5 4.5v4.8h4.8" />
+  </Icon>
+)
+
+export const ChannelUpIcon = () => (
+  <Icon>
+    <path d="m6 15 6-6 6 6" />
+  </Icon>
+)
+
+export const ChannelDownIcon = () => (
+  <Icon>
+    <path d="m6 9 6 6 6-6" />
+  </Icon>
+)
+
+/** A list of programmes. */
+export const GuideIcon = () => (
+  <Icon>
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <circle cx="4.5" cy="6" r=".6" fill="currentColor" />
+    <circle cx="4.5" cy="12" r=".6" fill="currentColor" />
+    <circle cx="4.5" cy="18" r=".6" fill="currentColor" />
   </Icon>
 )
 

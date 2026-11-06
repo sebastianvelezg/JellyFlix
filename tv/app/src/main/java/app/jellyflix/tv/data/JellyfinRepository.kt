@@ -787,6 +787,15 @@ class JellyfinRepository(context: Context) {
     }
 
     /** The full record of one title (the lists leave out the overview and genres). */
+    /** Puts a title's saved place back (a retro TV channel does not leave titles half-watched in "Continue watching"). */
+    suspend fun setResumePosition(session: Session, id: UUID, ticks: Long) {
+        api(session).userDataApi.updateItemUserData(
+            itemId = id,
+            userId = userId(session),
+            data = org.jellyfin.sdk.model.api.UpdateUserItemDataDto(playbackPositionTicks = ticks),
+        )
+    }
+
     suspend fun details(session: Session, id: UUID): MediaItem {
         val api = api(session)
         return toItem(api, api.libraryApi.getItem(itemId = id, userId = userId(session)).content)

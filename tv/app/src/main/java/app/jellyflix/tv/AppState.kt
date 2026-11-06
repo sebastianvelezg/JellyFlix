@@ -47,6 +47,8 @@ enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
     LiveTv(R.string.nav_live_tv, R.drawable.ic_nav_live_tv),
     Music(R.string.nav_music, R.drawable.ic_nav_music),
     Collections(R.string.nav_collections, R.drawable.ic_nav_collections),
+    /** Only there when a modules container answers (see [ModulesController]); not part of the menu the viewer arranges. */
+    Modules(R.string.nav_modules, R.drawable.ic_nav_modules),
     Search(R.string.nav_search, R.drawable.ic_nav_search),
     Settings(R.string.nav_settings, R.drawable.ic_nav_settings),
 }

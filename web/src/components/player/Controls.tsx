@@ -21,7 +21,7 @@ import { PlayOnButton } from '../remote/PlayOnButton'
 import { EpisodesMenu, type EpisodesControl } from './EpisodesMenu'
 import { SettingsMenu } from './SettingsMenu'
 
-const iconButton =
+export const iconButton =
   'relative inline-flex h-11 w-11 items-center justify-center rounded-full text-white/90 transition duration-150 hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-90 aria-pressed:text-[var(--color-accent)]'
 
 function IconButton(props: { label: string; onClick: () => void; children: ReactNode; pressed?: boolean }) {
@@ -39,7 +39,20 @@ function IconButton(props: { label: string; onClick: () => void; children: React
   )
 }
 
+/**
+ * What a retro TV channel adds to the controls (the three parts are drawn by the channel, in the places the controls give them): a line
+ * about what is on above the progress bar, the buttons that move about the timeline of the channel beside play, and the buttons that
+ * change channel and open the guide on the right. A channel is a television: no title at the top, no ten-second jumps.
+ */
+export interface ChannelChrome {
+  info: ReactNode
+  transport: ReactNode
+  extras: ReactNode
+}
+
 export interface ControlsProps {
+  /** Present when the video is a retro TV channel: see {@link ChannelChrome}. */
+  channel?: ChannelChrome
   title: string
   visible: boolean
   paused: boolean
@@ -130,13 +143,19 @@ export function Controls(p: ControlsProps) {
       <IconButton label={p.paused ? t('Play') : t('Pause')} onClick={p.onTogglePlay}>
         {p.paused ? <PlayIcon /> : <PauseIcon />}
       </IconButton>
-      <IconButton label={t('Back 10 seconds')} onClick={() => p.onSkip(-10)}>
-        <Rewind10Icon />
-      </IconButton>
-      <IconButton label={t('Forward 10 seconds')} onClick={() => p.onSkip(10)}>
-        <Forward10Icon />
-      </IconButton>
-      {p.nextEpisode && (
+      {p.channel ? (
+        p.channel.transport
+      ) : (
+        <>
+          <IconButton label={t('Back 10 seconds')} onClick={() => p.onSkip(-10)}>
+            <Rewind10Icon />
+          </IconButton>
+          <IconButton label={t('Forward 10 seconds')} onClick={() => p.onSkip(10)}>
+            <Forward10Icon />
+          </IconButton>
+        </>
+      )}
+      {!p.channel && p.nextEpisode && (
         <IconButton label={t('Next episode: {label}', { label: p.nextEpisode.label })} onClick={p.nextEpisode.onPlay}>
           <NextEpisodeIcon />
         </IconButton>
@@ -163,17 +182,23 @@ export function Controls(p: ControlsProps) {
   return (
     <>
       <div
-        className={`absolute inset-x-0 top-0 flex items-center gap-2 bg-gradient-to-b from-black/80 via-black/30 to-transparent pb-14 pl-[max(1rem,var(--safe-x))] pr-[max(1rem,var(--safe-x))] pt-[max(1rem,var(--safe-top))] transition-opacity duration-200 ${hidden}`}
+        className={`absolute inset-x-0 top-0 flex bg-gradient-to-b from-black/55 via-black/15 to-transparent pb-12 pl-[max(1rem,var(--safe-x))] pr-[max(1rem,var(--safe-x))] pt-[max(1rem,var(--safe-top))] transition-opacity duration-200 ${hidden}`}
       >
-        <IconButton label={t('Back')} onClick={p.onBack}>
-          <BackIcon />
-        </IconButton>
-        <h2 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">{p.title}</h2>
+        {/* The way back (and the title) in a small glass capsule, like the controls below. */}
+        <div className={`flex min-w-0 max-w-full items-center gap-1 rounded-full border border-white/12 bg-black/45 p-1 shadow-xl backdrop-blur-md ${p.channel ? '' : 'pr-4'}`}>
+          <IconButton label={t('Back')} onClick={p.onBack}>
+            <BackIcon />
+          </IconButton>
+          {!p.channel && <h2 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">{p.title}</h2>}
+        </div>
       </div>
 
       <div
-        className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent pb-[max(0.75rem,var(--safe-bottom))] pl-[max(1rem,var(--safe-x))] pr-[max(1rem,var(--safe-x))] pt-20 transition-opacity duration-200 ${hidden}`}
+        className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent pb-[max(0.75rem,var(--safe-bottom))] pl-[max(1rem,var(--safe-x))] pr-[max(1rem,var(--safe-x))] pt-16 transition-opacity duration-200 ${hidden}`}
       >
+        {/* The controls are one glass panel: (for a channel, what is on,) the progress bar and the buttons. */}
+        <div className="mx-auto max-w-5xl rounded-2xl border border-white/12 bg-black/45 px-4 pb-2 pt-3 shadow-2xl backdrop-blur-md">
+        {p.channel?.info}
         <div className="flex items-center gap-3">
           <span className="min-w-12 shrink-0 text-right text-xs font-medium tabular-nums text-white/90" aria-hidden="true">
             {leftLabel}
@@ -196,12 +221,13 @@ export function Controls(p: ControlsProps) {
             {formatTime(p.currentTime)} / {formatTime(p.duration)}
           </span>
         </div>
-        <div className="mt-0.5 flex items-center gap-1">
+        <div className={`mt-0.5 flex items-center gap-1 ${p.channel ? 'flex-wrap' : ''}`}>
           {iconsLeft}
           {endsAt && !endsAtShown && <span className="ml-3 hidden text-xs text-white/60 lg:inline">{t('Ends at {time}', { time: endsAt })}</span>}
 
           <div className="ml-auto flex items-center gap-0.5">
             {p.speed !== 1 && <span className="mr-1 rounded-full bg-white/12 px-2 py-0.5 text-xs font-semibold tabular-nums text-white">{p.speed}×</span>}
+            {p.channel?.extras}
             {p.episodes && <EpisodesMenu control={p.episodes} iconButton={iconButton} onOpenChange={p.onMenuOpenChange} />}
             <PlayOnButton current up className={iconButton} onOpenChange={p.onMenuOpenChange} />
             <SettingsMenu {...p} iconButton={iconButton} />
@@ -222,6 +248,7 @@ export function Controls(p: ControlsProps) {
               {p.fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
             </IconButton>
           </div>
+        </div>
         </div>
       </div>
     </>

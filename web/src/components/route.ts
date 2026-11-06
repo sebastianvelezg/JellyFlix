@@ -16,6 +16,9 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/search/<text>     search results
  *   #/movie/<id>        movie page
  *   #/live/<id>         a live channel being watched
+ *   #/modules[/<module>]  the extra modules (only there when a modules container is running): channels, match
+ *   #/modules/match?join=<code>  the link in a Match invitation: it joins the room with that code
+ *   #/channel/<id>      a retro TV channel being watched (a module channel, not Live TV)
  *   #/book/<id>         book page (read it, listen to it, download it); #/read/<id> the reader
  *   #/person/<id>?name= a person's filmography
  *   #/play/<id>         player (add ?start=0 to start over instead of resuming, or ?start=<seconds> to begin there;
@@ -24,6 +27,8 @@ import { useCallback, useEffect, useState } from 'react'
  *                       memory, so only until a reload); &shuffle=<seed> plays that queue in a random order)
  *   #/folder/<id>       a folder of music videos
  */
+export const MODULE_KEYS = ['channels', 'match'] as const
+export type ModuleKey = (typeof MODULE_KEYS)[number]
 export const MUSIC_TABS = ['home', 'albums', 'artists', 'songs'] as const
 export type MusicTab = (typeof MUSIC_TABS)[number]
 
@@ -64,6 +69,8 @@ export type Route =
   | { page: 'book'; id: string }
   | { page: 'read'; id: string }
   | { page: 'live'; id: string }
+  | { page: 'modules'; module?: ModuleKey; join?: string }
+  | { page: 'channel'; id: string }
   | { page: 'person'; id: string; name: string }
   | ({ page: 'play'; id: string; startOver: boolean; startAt?: number } & PlayQueueRef)
 
@@ -110,6 +117,10 @@ export function formatRoute(route: Route): string {
     case 'read':
     case 'live':
       return `#/${route.page}/${encodeURIComponent(route.id)}`
+    case 'modules':
+      return route.module ? `#/modules/${route.module}${route.join ? `?join=${encodeURIComponent(route.join)}` : ''}` : '#/modules'
+    case 'channel':
+      return `#/channel/${encodeURIComponent(route.id)}`
     case 'person':
       return `#/person/${encodeURIComponent(route.id)}?name=${encodeURIComponent(route.name)}`
     case 'play':
@@ -138,6 +149,12 @@ export function parseRoute(hash: string): Route {
     if (kind === 'search' && decoded.trim()) return { page: 'search', q: decoded }
     if (kind === 'movie' && decoded) return { page: 'movie', id: decoded }
     if ((kind === 'book' || kind === 'read' || kind === 'live') && decoded) return { page: kind, id: decoded }
+    if (kind === 'modules') {
+      const module = MODULE_KEYS.find((m) => m === decoded)
+      const join = new URLSearchParams(query).get('join')
+      return module ? { page: 'modules', module, ...(module === 'match' && join && /^[A-Za-z0-9]{3,12}$/.test(join) ? { join } : {}) } : { page: 'modules' }
+    }
+    if (kind === 'channel' && decoded) return { page: 'channel', id: decoded }
     if (kind === 'movies' && !decoded) return { page: 'browse' }
     if (kind === 'collections' && !decoded) return { page: 'collections' }
     if (kind === 'collection' && decoded) return { page: 'collection', id: decoded }
