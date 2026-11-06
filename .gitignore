@@ -32,3 +32,6 @@ Thumbs.db
 # Local tooling caches
 .impeccable/
 /graft/
+
+# Modules container: local data
+/modules/data/
