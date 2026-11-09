@@ -5,6 +5,10 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-08
+
+Five languages on the web, the audio and subtitles of each series remembered on the TV, the fixes of a security audit of the web app and a lighter first visit.
+
 ### Added
 - **Portuguese, French and German in the web app.** The interface now speaks five languages (English, Spanish, Brazilian Portuguese, French and German). It follows the browser's languages (the first one it has texts for) and can be switched in Settings without signing out. Each language is a file of its own that is downloaded only when it is used, so the first screen does not grow. The i18n test checks that every language has exactly the same texts and placeholders as the Spanish reference, and an end-to-end test switches between them. The subtitle search also starts in the language of the interface. (The TV app stays in English and Spanish for now.)
 - **Jellyflix TV remembers the audio and subtitles of each series.** Pick Japanese audio with English subtitles (or no subtitles) on one episode and the next episodes of that series start the same way, by language, like the web app already did. It also applies to an episode picked from the player's list and to the next episode of autoplay, and a subtitle saved from the internet is remembered too. The choices stay on the TV and are forgotten on sign out.
