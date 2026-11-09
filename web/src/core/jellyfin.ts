@@ -5,7 +5,7 @@ import { BlockedTitle, getKidsGuard, guardResponse, guardUrl } from './parental'
 import { createGate, priorityOf } from './requestGate'
 
 export const CLIENT_NAME = 'Jellyflix Web'
-export const CLIENT_VERSION = '1.4.0'
+export const CLIENT_VERSION = '1.5.0'
 
 const REQUEST_TIMEOUT_MS = 15_000
 
