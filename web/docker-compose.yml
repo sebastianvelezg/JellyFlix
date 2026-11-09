@@ -17,6 +17,8 @@ services:
       # Optional, empty by default: the extra modules container (see ../modules/README.md).
       JELLYFLIX_MODULES_URL: "${JELLYFLIX_MODULES_URL:-}"
       JELLYFLIX_MODULES_PUBLIC_URL: "${JELLYFLIX_MODULES_PUBLIC_URL:-}"
+      # Optional: 1 lets the page reach only this site, JELLYFIN_URL and the modules container (see "Host it" in README.md).
+      JELLYFLIX_STRICT_CSP: "${JELLYFLIX_STRICT_CSP:-}"
     # It only serves files, so it is given as little as it can work with: a read-only disk (the few folders nginx writes to are in memory),
     # no extra privileges, and only the four capabilities nginx's start needs (port 80, then drop to its own user).
     read_only: true

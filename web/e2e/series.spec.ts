@@ -122,7 +122,7 @@ test('series: the audio language you pick is kept for the rest of the series', a
   await waitPlaying(page)
   const again = await openSettings(page, 'Audio')
   await expect(again.getByLabel('Spanish · AAC Stereo')).toBeChecked()
-  const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.series') ?? '{}'))
+  const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.series:user1') ?? '{}'))
   expect(prefs.s0001).toMatchObject({ audioLanguage: 'spa' })
 
   // Another series is not affected.

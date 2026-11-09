@@ -12,6 +12,11 @@ export interface Config {
   dataDir: string
   /** The sites allowed to call the API from a browser. "*" is fine: the API uses a token in a header, not cookies. */
   origins: string[]
+  /**
+   * Whether `X-Forwarded-For` tells who is calling. Only for a container reached through a proxy that writes that header itself (the
+   * web image's `/modules/` proxy) and not published on a port of its own: otherwise anybody could write it.
+   */
+  trustProxy: boolean
   version: string
 }
 
@@ -39,6 +44,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     modules: [...new Set(asked)] as ModuleId[],
     dataDir: clean(env.DATA_DIR) || './data',
     origins: (clean(env.JELLYFLIX_ORIGINS) || '*').split(',').map((x) => x.trim()).filter(Boolean),
+    trustProxy: /^(1|true|yes)$/i.test(clean(env.JELLYFLIX_TRUST_PROXY)),
     version: '0.1.0',
   }
 }

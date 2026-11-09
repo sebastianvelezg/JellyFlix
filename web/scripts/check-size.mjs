@@ -34,7 +34,8 @@ for (const [path, size] of rows.slice(0, 6)) console.log(`${kb(size).padStart(7)
 console.log(`first screen: ${kb(js)} kB of JavaScript (budget ${kb(budget.firstScreenJsGzip)}), ${kb(css)} kB of CSS (budget ${kb(budget.firstScreenCssGzip)})`)
 
 // Nothing that is only needed later may sneak into the first download.
-const never = ['es-', 'hls-', 'pdf-', 'pdf.worker']
+// extra-: the administration, Live TV, plugins and statistics part of the core (src/core/extra.ts).
+const never = ['es-', 'pt-', 'fr-', 'de-', 'hls-', 'pdf-', 'pdf.worker', 'extra-']
 const leaked = [...wanted].filter((p) => never.some((n) => p.split('/').pop().startsWith(n)))
 const problems = []
 if (leaked.length) problems.push(`these files are loaded at once but only some people need them: ${leaked.join(', ')}`)

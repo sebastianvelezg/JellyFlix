@@ -1,23 +1,6 @@
 import { useEffect, useState } from 'react'
-import {
-  CHANNEL_CATEGORIES,
-  channelLogoUrl,
-  CHANNEL_PAGE_SIZE,
-  CHANNEL_SEARCH_LIMIT,
-  getChannels,
-  getGuide,
-  guideBlocks,
-  guideStart,
-  isOnNow,
-  matchesChannel,
-  programProgress,
-  setFavorite,
-  splitChannelName,
-  type Channel,
-  type ChannelCategory,
-  type Program,
-  type Session,
-} from '../../core'
+import { CHANNEL_CATEGORIES, setFavorite, type Channel, type ChannelCategory, type Program, type Session } from '../../core'
+import { channelLogoUrl, CHANNEL_PAGE_SIZE, CHANNEL_SEARCH_LIMIT, getChannels, getGuide, guideBlocks, guideStart, isOnNow, matchesChannel, programProgress, splitChannelName } from '../../core/extra'
 import { readUiPrefs, writeUiPrefs } from '../../platform/web/prefs'
 import { HeartIcon, PlayIcon, SearchIcon } from '../icons'
 import { Img } from '../Img'

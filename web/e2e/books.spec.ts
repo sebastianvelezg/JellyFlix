@@ -126,7 +126,7 @@ test('books: a PDF is read in pages of its own, with the browser viewer one clic
   // Turning the page scrolls to the next one, and the place is remembered.
   await shell.getByRole('button', { name: 'Next page' }).click()
   await expect(pageNumber).toHaveValue('2')
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.books') ?? '{}').bk0002?.place)).toBe('2')
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.books:user1') ?? '{}').bk0002?.place)).toBe('2')
   // The colours of the page are the reader's choice, and are kept.
   await shell.getByLabel('Page colours').selectOption('sepia')
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.reader') ?? '{}').theme)).toBe('sepia')

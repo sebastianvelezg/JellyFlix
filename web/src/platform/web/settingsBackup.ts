@@ -1,5 +1,6 @@
 import { MAX_SETTINGS_CHARS } from '../../core'
 import { KEY as APPEARANCE_KEY, sanitizeAppearance } from './appearance'
+import { sanitizeBrowsePrefs, sanitizePlayerPrefs, sanitizeUiPrefs } from './prefs'
 
 /**
  * Your settings as one small file, to keep, to move to another browser, or to put on the server. Only the preferences of this app
@@ -7,6 +8,21 @@ import { KEY as APPEARANCE_KEY, sanitizeAppearance } from './appearance'
  * Whatever is read back is checked, so a file that was edited or is not one of ours cannot put anything else in storage.
  */
 const ALLOWED = [APPEARANCE_KEY, 'jellyflix.ui', 'jellyflix.player', 'jellyflix.browse', 'jellyflix.browse.series', 'jellyflix.browse.anime'] as const
+
+/** How each preference is checked before it is stored: whatever is not a valid choice goes back to its default. */
+const SANITIZE: Record<(typeof ALLOWED)[number], (value: unknown) => object> = {
+  [APPEARANCE_KEY]: sanitizeAppearance,
+  'jellyflix.ui': (value) => {
+    // The last Live TV channel belongs to the device it was watched on, not to a settings file.
+    const prefs: Partial<ReturnType<typeof sanitizeUiPrefs>> = sanitizeUiPrefs(value)
+    delete prefs.lastChannel
+    return prefs
+  },
+  'jellyflix.player': sanitizePlayerPrefs,
+  'jellyflix.browse': sanitizeBrowsePrefs,
+  'jellyflix.browse.series': sanitizeBrowsePrefs,
+  'jellyflix.browse.anime': sanitizeBrowsePrefs,
+}
 
 export interface SettingsFile {
   app: 'jellyflix'
@@ -48,7 +64,7 @@ export function parseSettings(text: string): ParsedSettings {
   const settings: Record<string, object> = {}
   for (const key of ALLOWED) {
     const value = (file.settings as Record<string, unknown>)[key]
-    if (value && typeof value === 'object' && !Array.isArray(value)) settings[key] = key === APPEARANCE_KEY ? sanitizeAppearance(value) : value
+    if (value && typeof value === 'object' && !Array.isArray(value)) settings[key] = SANITIZE[key](value)
   }
   return Object.keys(settings).length === 0 ? { ok: false, error: 'That file has no settings in it.' } : { ok: true, settings }
 }

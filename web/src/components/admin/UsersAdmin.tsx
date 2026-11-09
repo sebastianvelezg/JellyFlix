@@ -1,25 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import {
-  applyPolicyFields,
-  createUser,
-  diffPolicy,
-  getAdminUsers,
-  getLibraries,
-  getParentalRatingOptions,
-  getUserPolicy,
-  isLastAdmin,
-  MIN_PASSWORD,
-  newUserProblems,
-  policyFieldsOf,
-  policyProblems,
-  savePolicy,
-  setUserPassword,
-  type AdminUser,
-  type LibraryInfo,
-  type ParentalRatingOption,
-  type PolicyFields,
-  type Session,
-} from '../../core'
+import { getParentalRatingOptions, type AdminUser, type LibraryInfo, type ParentalRatingOption, type PolicyFields, type Session } from '../../core'
+import { applyPolicyFields, createUser, diffPolicy, getAdminUsers, getLibraries, getUserPolicy, isLastAdmin, MIN_PASSWORD, newUserProblems, policyFieldsOf, policyProblems, savePolicy, setUserPassword } from '../../core/extra'
 import { t } from '../../i18n'
 import { Card, Toggle } from '../SettingsParts'
 import { StateMessage } from '../StateMessage'

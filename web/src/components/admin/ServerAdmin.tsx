@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { ACTIVITY_PAGE, getActivity, getServerSummary, getTasks, startTask, stopTask, type ActivityLine, type ServerTask, type Session } from '../../core'
+import { type ActivityLine, type ServerTask, type Session } from '../../core'
+import { ACTIVITY_PAGE, getActivity, getServerSummary, getTasks, startTask, stopTask } from '../../core/extra'
 import { t, tr } from '../../i18n'
 import { Card } from '../SettingsParts'
 import { StateMessage } from '../StateMessage'

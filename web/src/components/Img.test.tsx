@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '../core'
-import { Img } from './Img'
+import { Img, isOnServer } from './Img'
 
-const session = { api: { authorizationHeader: 'MediaBrowser Token="t"' } } as unknown as Session
+const session = { serverUrl: 'http://jf.test', api: { authorizationHeader: 'MediaBrowser Token="t"' } } as unknown as Session
 const SRC = 'http://jf.test/Items/1/Images/Backdrop?fillWidth=1600&quality=90&tag=x'
 
 afterEach(() => {
@@ -40,6 +40,28 @@ describe('Img', () => {
       headers: { Authorization: 'MediaBrowser Token="t"' },
     })
     await waitFor(() => expect(onFail).toHaveBeenCalledTimes(1))
+  })
+
+  it('never sends the Authorization header (the session token) to a picture on another server', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const onFail = vi.fn()
+    render(<Img session={session} src="https://images.example.com/poster.jpg" fallback={<p>none</p>} onFail={onFail} />)
+    fireEvent.error(image())
+    fireEvent.error(image())
+    expect(await screen.findByText('none')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+    await waitFor(() => expect(onFail).toHaveBeenCalledTimes(1))
+  })
+
+  it('knows which pictures are on the session server', () => {
+    expect(isOnServer(SRC, 'http://jf.test')).toBe(true)
+    expect(isOnServer(SRC, 'http://jf.test/jellyfin')).toBe(true)
+    expect(isOnServer('https://jf.test/x', 'http://jf.test')).toBe(false)
+    expect(isOnServer('http://jf.test:8096/x', 'http://jf.test')).toBe(false)
+    expect(isOnServer('http://jf.test.evil.com/x', 'http://jf.test')).toBe(false)
+    expect(isOnServer('blob:abc', 'http://jf.test')).toBe(false)
+    expect(isOnServer('not a url', 'http://jf.test')).toBe(false)
   })
 
   it('does not add a second format parameter', () => {

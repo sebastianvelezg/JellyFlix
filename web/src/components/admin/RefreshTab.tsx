@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { refreshItem, type EditableItem, type RefreshMode, type Session } from '../../core'
+import { type EditableItem, type RefreshMode, type Session } from '../../core'
+import { refreshItem } from '../../core/extra'
 import { t, tr } from '../../i18n'
 import { recordActivity } from '../../platform/web/adminActivity'
 import { showToast } from '../toast'

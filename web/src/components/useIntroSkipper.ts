@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { findPlugin, getPlugins, isAdministrator, type Session } from '../core'
+import { isAdministrator, type Session } from '../core'
+import { findPlugin, getPlugins } from '../core/extra'
 
 const known = new Map<string, Promise<boolean>>()
 

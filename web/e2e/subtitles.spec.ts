@@ -45,7 +45,7 @@ test('sync: moving the subtitles later hides them until their new time, earlier 
   await expect(lines(page)).toContainText('Mock subtitle line')
 
   // The saved value is per movie, and the menu shows it.
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.subsync') ?? '{}'))
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.subsync:user1') ?? '{}'))
   expect(saved).toEqual({ m0001: 10 })
   await openSettings(page, 'Subtitles')
   await expect(page.getByRole('dialog', { name: 'Playback settings' }).getByLabel('Subtitle sync', { exact: true })).toHaveText('+10.0 s')
@@ -53,7 +53,7 @@ test('sync: moving the subtitles later hides them until their new time, earlier 
   // Reset puts it back, and forgets it.
   await page.getByRole('dialog', { name: 'Playback settings' }).getByRole('button', { name: 'Reset' }).click()
   await expect(page.getByRole('dialog', { name: 'Playback settings' }).getByLabel('Subtitle sync', { exact: true })).toHaveText('0.0 s')
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.subsync') ?? '{}'))).toEqual({})
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.subsync:user1') ?? '{}'))).toEqual({})
   void settings
 })
 
@@ -68,7 +68,7 @@ test('sync: a key held down (many presses before the screen updates) still adds 
     for (let i = 0; i < 10; i += 1) region?.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }))
   })
   await expect(page.getByRole('status').filter({ hasText: 'Subtitles:' })).toContainText('+1.0 s (later)')
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.subsync') ?? '{}'))
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.subsync:user1') ?? '{}'))
   expect(saved).toEqual({ m0001: 1 })
 })
 

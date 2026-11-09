@@ -25,7 +25,7 @@ A change that breaks one of these will not be merged, however good it is:
 4. **The apps never transcode.** They tell Jellyfin what the device can play and use what it answers.
 5. **Both apps stay equivalent.** If you change a rule (how the home banner is chosen, how a stream is requested) check the other app and change both, or say in the pull
    request why not.
-6. **English and Spanish together.** Every user-visible text exists in both languages.
+6. **Every language together.** Every user-visible text exists in English and in the web app's other languages (Spanish, Portuguese, French and German, in `web/src/i18n/`), and in English and Spanish on the TV. Tests fail when a text is missing or a `{placeholder}` differs.
 
 ## Setting up
 

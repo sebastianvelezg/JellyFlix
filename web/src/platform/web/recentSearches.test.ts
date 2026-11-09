@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { setStorageOwner } from './owner'
 import { RECENT_LIMIT, addRecentSearch, clearRecentSearches, readRecentSearches } from './recentSearches'
 
-afterEach(() => localStorage.clear())
+beforeEach(() => setStorageOwner('tester'))
+afterEach(() => {
+  setStorageOwner(null)
+  localStorage.clear()
+})
 
 describe('recent searches', () => {
   it('starts empty and keeps the newest first', () => {
@@ -32,9 +37,9 @@ describe('recent searches', () => {
     addRecentSearch('alien')
     expect(clearRecentSearches()).toEqual([])
     expect(readRecentSearches()).toEqual([])
-    localStorage.setItem('jellyflix.recentSearches', '{nope')
+    localStorage.setItem('jellyflix.recentSearches:tester', '{nope')
     expect(readRecentSearches()).toEqual([])
-    localStorage.setItem('jellyflix.recentSearches', JSON.stringify([1, 'ok', '', null]))
+    localStorage.setItem('jellyflix.recentSearches:tester', JSON.stringify([1, 'ok', '', null]))
     expect(readRecentSearches()).toEqual(['ok'])
   })
 })

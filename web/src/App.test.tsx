@@ -510,7 +510,7 @@ function episodeIds(show: string): string[] {
 
 describe('settings', () => {
   it('shows the account, saves playback and banner choices, forgets remembered series choices, and signs out', async () => {
-    localStorage.setItem('jellyflix.series', JSON.stringify({ s1: { audioLanguage: 'jpn' }, s2: { subtitleLanguage: 'eng' } }))
+    localStorage.setItem('jellyflix.series:user1', JSON.stringify({ s1: { audioLanguage: 'jpn' }, s2: { subtitleLanguage: 'eng' } }))
     localStorage.setItem('jellyflix.player', JSON.stringify({ subtitleLanguage: 'eng' }))
     const ui = await signIn(mock.url)
     await ui.click(await screen.findByRole('button', { name: 'Settings' }))
@@ -543,7 +543,7 @@ describe('settings', () => {
     const saved = within(screen.getByRole('region', { name: 'Saved on this device' }))
     expect(saved.getByText(/remembered for 2 series/)).toBeInTheDocument()
     await ui.click(saved.getByRole('button', { name: 'Forget them' }))
-    expect(localStorage.getItem('jellyflix.series')).toBeNull()
+    expect(localStorage.getItem('jellyflix.series:user1')).toBeNull()
     expect(saved.getByText(/remembered for 0 series/)).toBeInTheDocument()
 
     await ui.click(screen.getByRole('button', { name: 'Back' }))

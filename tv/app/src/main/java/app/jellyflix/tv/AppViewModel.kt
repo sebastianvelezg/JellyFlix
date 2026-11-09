@@ -62,7 +62,10 @@ import app.jellyflix.tv.data.ScreensaverSource
 import app.jellyflix.tv.data.TvSettings
 import app.jellyflix.tv.data.Segment
 import app.jellyflix.tv.data.Session
+import app.jellyflix.tv.data.SUBTITLES_OFF
+import app.jellyflix.tv.data.SeriesTracks
 import app.jellyflix.tv.data.SessionStore
+import app.jellyflix.tv.data.withSeriesTracks
 import app.jellyflix.tv.data.Song
 import app.jellyflix.tv.data.SortOption
 import app.jellyflix.tv.music.MusicPlayer
@@ -1721,7 +1724,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     errorRes = R.string.error_nothing_to_play
                 } else {
                     val resume = if (target === item) startMs else target.resumeMs
-                    val plan = io { repo.plan(s, target, null, null, resume, mediaSourceId = mediaSourceId.takeIf { target === item }, limits = settings.limits) }
+                    val plan = io { repo.plan(s, target, null, null, resume, mediaSourceId = mediaSourceId.takeIf { target === item }, limits = settings.limits, remembered = rememberedFor(target)) }
                     if (target.isChannel) rememberChannel(target)
                     val top = pages.lastIndex
                     if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(plan) else pages.add(Page.Player(plan))
@@ -1758,7 +1761,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val s = session ?: return
         launchSafe {
             try {
-                val plan = io { repo.plan(s, episode, null, null, episode.resumeMs, limits = settings.limits) }
+                val plan = io { repo.plan(s, episode, null, null, episode.resumeMs, limits = settings.limits, remembered = rememberedFor(episode)) }
                 val top = pages.lastIndex
                 if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(plan)
             } catch (e: DirectOnlyException) {
@@ -1780,7 +1783,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             try {
                 val top = pages.lastIndex
-                val nextPlan = io { repo.plan(s, next, null, null, 0, limits = settings.limits) }
+                val nextPlan = io { repo.plan(s, next, null, null, 0, limits = settings.limits, remembered = rememberedFor(next)) }
                 if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(nextPlan)
             } catch (e: DirectOnlyException) {
                 errorRes = R.string.error_direct_only
@@ -1852,6 +1855,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val refreshed = io { repo.plan(s, plan.item, plan.audioIndex, plan.subtitleIndex, positionMs, plan.directAllowed, plan.mediaSourceId, settings.limits) }
                 val added = newSubtitleIndex(before, refreshed.subtitleTracks.map { it.index })
                 val next = if (added == null) refreshed else io { repo.plan(s, plan.item, plan.audioIndex, added, positionMs, plan.directAllowed, plan.mediaSourceId, settings.limits) }
+                if (added != null) rememberChoice(refreshed, null, added)
                 val top = pages.lastIndex
                 if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(next)
                 notice = str(R.string.subtitles_saved)
@@ -1869,6 +1873,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         else -> str(R.string.subtitles_unreachable)
     }
 
+    /** What was chosen last for the series [item] belongs to, or null (a film, or nothing chosen yet). */
+    private fun rememberedFor(item: MediaItem): SeriesTracks? =
+        item.seriesId?.let { store.seriesTracks[it.toString()] }?.takeIf { !it.isEmpty }
+
+    /**
+     * A new audio track or subtitle picked while watching an episode is kept for the whole series, by language (-1 is "no
+     * subtitles"). Picking what is already playing, or a track without a language, changes nothing.
+     */
+    private fun rememberChoice(plan: PlaybackPlan, audio: Int?, subtitle: Int?) {
+        val seriesId = plan.item.seriesId?.toString() ?: return
+        val audioLanguage = audio?.takeIf { it != plan.audioIndex }?.let { index -> plan.audioTracks.firstOrNull { it.index == index }?.language }
+        val subtitleLanguage = when {
+            subtitle == null || subtitle == (plan.subtitleIndex ?: -1) -> null
+            subtitle < 0 -> SUBTITLES_OFF
+            else -> plan.subtitleTracks.firstOrNull { it.index == subtitle }?.language
+        }
+        if (audioLanguage == null && subtitleLanguage == null) return
+        store.seriesTracks = withSeriesTracks(store.seriesTracks, seriesId) {
+            SeriesTracks(audioLanguage ?: it.audioLanguage, subtitleLanguage ?: it.subtitleLanguage)
+        }
+    }
+
     /** Swaps the playing stream for one with other audio or subtitles, continuing from [positionMs]. */
     fun changeTracks(plan: PlaybackPlan, audio: Int?, subtitle: Int?, positionMs: Long, directAllowed: Boolean = plan.directAllowed) {
         val s = session ?: return
@@ -1878,6 +1904,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             back()
             return
         }
+        rememberChoice(plan, audio, subtitle)
         launchSafe {
             try {
                 val next = io {

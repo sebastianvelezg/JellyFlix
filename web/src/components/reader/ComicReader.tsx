@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { openComic, type ComicPage } from '../../core'
+import { type ComicPage } from '../../core'
+import { openComic } from '../../core/extra'
 import { readReaderPrefs, readResumePlace, writeBookProgress, writeReaderPrefs } from '../../platform/web/prefs'
 import { t } from '../../i18n'
 import { ReadProgress, ReaderShell } from './ReaderShell'

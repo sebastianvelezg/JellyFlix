@@ -3,29 +3,8 @@ import { EditButton } from './admin/EditButton'
 import { useReloadOnEdit } from './admin/editorEvents'
 import { PlayOnButton } from './remote/PlayOnButton'
 import { useCallback, useEffect, useState } from 'react'
-import {
-  backdropImageUrl,
-  episodeCode,
-  formatRuntime,
-  formatTime,
-  getEpisodes,
-  getScanStatus,
-  getSeasons,
-  getSeriesPlayTarget,
-  getShowDetails,
-  getSimilarShows,
-  posterUrl,
-  scanSeason,
-  setWatched,
-  ticksToSeconds,
-  wideImageUrl,
-  type Episode,
-  type Movie,
-  type MovieDetails,
-  type Person,
-  type Season,
-  type Session,
-} from '../core'
+import { backdropImageUrl, episodeCode, formatRuntime, formatTime, getEpisodes, getSeasons, getSeriesPlayTarget, getShowDetails, getSimilarShows, posterUrl, setWatched, ticksToSeconds, wideImageUrl, type Episode, type Movie, type MovieDetails, type Person, type Season, type Session } from '../core'
+import { getScanStatus, scanSeason } from '../core/extra'
 import { CheckIcon, HeartIcon, PlayIcon, StarIcon } from './icons'
 import { Img } from './Img'
 import { useIntroSkipper } from './useIntroSkipper'

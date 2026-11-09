@@ -5,6 +5,7 @@ import { SortOrder } from '@jellyfin/sdk/lib/generated-client/models/sort-order'
 import { getLiveTvApi } from '@jellyfin/sdk/lib/utils/api/live-tv-api'
 import { itemImageUrl } from './images'
 import type { Session } from './jellyfin'
+import type { ChannelCategory } from './channelCategories'
 import { plainText } from './plainText'
 
 /** A programme on a channel: what is on, from when to when. */
@@ -125,10 +126,7 @@ export interface ChannelPage {
 }
 
 /** The ways the channels can be narrowed: the server tells a channel's kind from what it broadcasts, favourites are the account's own. */
-export const CHANNEL_CATEGORIES = ['all', 'favorites', 'movies', 'series', 'sports', 'news', 'kids'] as const
-export type ChannelCategory = (typeof CHANNEL_CATEGORIES)[number]
-
-export const isChannelCategory = (value: unknown): value is ChannelCategory => CHANNEL_CATEGORIES.includes(value as ChannelCategory)
+export { CHANNEL_CATEGORIES, isChannelCategory, type ChannelCategory } from './channelCategories'
 
 /** The filter the server takes for a category (nothing for "all"). */
 export function categoryFilter(category: ChannelCategory): { isFavorite?: true; isMovie?: true; isSeries?: true; isSports?: true; isNews?: true; isKids?: true } {

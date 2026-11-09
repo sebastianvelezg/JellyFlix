@@ -6,7 +6,6 @@ import { getAuthenticationApi } from '@jellyfin/sdk/lib/utils/api/authentication
 import { getDeviceApi } from '@jellyfin/sdk/lib/utils/api/device-api'
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api'
 import { getLibraryStructureApi } from '@jellyfin/sdk/lib/utils/api/library-structure-api'
-import { getLocalizationApi } from '@jellyfin/sdk/lib/utils/api/localization-api'
 import { getSessionApi } from '@jellyfin/sdk/lib/utils/api/session-api'
 import { getSystemApi } from '@jellyfin/sdk/lib/utils/api/system-api'
 import { getUserApi } from '@jellyfin/sdk/lib/utils/api/user-api'
@@ -398,20 +397,7 @@ export async function savePolicy(session: Session, id: string, policy: UserPolic
   await getUserApi(session.api).updateUserPolicy({ userId: id, userPolicy: policy })
 }
 
-export interface ParentalRatingOption {
-  name: string
-  value: number
-}
-
-export async function getParentalRatingOptions(session: Session): Promise<ParentalRatingOption[]> {
-  const { data } = await getLocalizationApi(session.api).getParentalRatings()
-  const seen = new Set<number>()
-  return data
-    .filter((r) => r.Name && r.Value != null)
-    .map((r) => ({ name: r.Name as string, value: r.Value as number }))
-    .sort((a, b) => a.value - b.value)
-    .filter((r) => (seen.has(r.value) ? false : (seen.add(r.value), true)))
-}
+export { getParentalRatingOptions, type ParentalRatingOption } from './parentalServer'
 
 // A name Jellyfin accepts: letters, digits, spaces and - ' . _ @ +
 const USER_NAME = /^[\p{L}\p{N} \-'._@+]+$/u

@@ -1,4 +1,4 @@
-import { textOf, unpack } from '../../core'
+import { textOf, unpack } from '../../core/extra'
 
 /**
  * Reading an EPUB: the file is a zip with a list of chapters (the "spine"), a table of contents and the pictures, fonts and style
@@ -270,7 +270,9 @@ export function chapterPage(book: EpubBook, index: number, extraCss: string): st
     }
   }
 
-  const styles = Array.from(doc.querySelectorAll('style')).map((s) => `<style>${s.textContent ?? ''}</style>`).join('')
+  // A style sheet of the book is written back as text, so a "</style" inside it (from a linked sheet) must not close the element and
+  // turn the rest into markup. In CSS "<\/style" means the same.
+  const styles = Array.from(doc.querySelectorAll('style')).map((s) => `<style>${(s.textContent ?? '').replace(/<\/(style)/gi, '<\\/$1')}</style>`).join('')
   const body = doc.body
   const attributes = ['class', 'lang', 'dir'].map((name) => (body.getAttribute(name) ? ` ${name}="${body.getAttribute(name)?.replace(/"/g, '&quot;')}"` : '')).join('')
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${CSP}">${styles}<style>${extraCss}</style></head><body${attributes}>${body.innerHTML}</body></html>`

@@ -85,6 +85,9 @@ export const es: Record<string, string> = {
   'Off: you stay signed in across reloads until you close the tab. On: until you sign out.':
     'Desactivado: sigues con la sesión al recargar, hasta que cierres la pestaña. Activado: hasta que cierres sesión.',
   Connect: 'Conectar',
+  'Connect to the modules at this address?': '¿Conectar con los módulos de esta dirección?',
+  'A link asked to use the modules container at this address of your network. Jellyflix would send it your session. Connect only if you know it is yours or your household’s.': 'Un enlace pidió usar el contenedor de módulos de esta dirección de tu red. Jellyflix le enviaría tu sesión. Conecta solo si sabes que es tuyo o de tu casa.',
+  'Not now': 'Ahora no',
   'Connecting…': 'Conectando…',
   'Could not connect.': 'No se pudo conectar.',
   'Your password is sent only to the server above and is never stored. Only a revocable session token is kept (see the README for details).':

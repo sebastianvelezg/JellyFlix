@@ -63,7 +63,8 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [{ group: ['**/core/*', '!**/core/modules'], message: "Import from the core index ('../core'), not its internal files." }] },
+        // core/extra: the part of the core only screens loaded later use (see the top of core/index.ts).
+        { patterns: [{ group: ['**/core/*', '!**/core/modules', '!**/core/extra'], message: "Import from the core index ('../core') or core/extra, not its internal files." }] },
       ],
     },
   },

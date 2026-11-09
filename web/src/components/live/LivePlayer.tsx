@@ -1,19 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  channelLogoUrl,
-  closeLiveStream,
-  getChannel,
-  getChannels,
-  negotiatePlayback,
-  neighbourChannel,
-  PlaybackError,
-  PlaybackSession,
-  programProgress,
-  splitChannelName,
-  type Channel,
-  type DeviceState,
-  type Session,
-} from '../../core'
+import { closeLiveStream, negotiatePlayback, PlaybackError, PlaybackSession, type Channel, type DeviceState, type Session } from '../../core'
+import { channelLogoUrl, getChannel, getChannels, neighbourChannel, programProgress, splitChannelName } from '../../core/extra'
 import { reportStopOnPageHide } from '../../platform/web/browser'
 import { detectCapabilities } from '../../platform/web/capabilities'
 import { attachMedia } from '../../platform/web/mediaAttach'

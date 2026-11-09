@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
-import { buildStats, getPlayHistory, getWatchedTitles, type PlayHistory, type Session, type WatchStats } from '../core'
+import { type PlayHistory, type Session, type WatchStats } from '../core'
+import { buildStats, getPlayHistory, getWatchedTitles } from '../core/extra'
 import { getLanguage, t } from '../i18n'
 import { BackIcon } from './icons'
 import { StateMessage } from './StateMessage'

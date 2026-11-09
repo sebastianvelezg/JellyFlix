@@ -12,7 +12,10 @@ RUN npm run build
 
 FROM nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY docker/security-headers.conf /etc/nginx/snippets/security-headers.conf
+# The headers are written to /tmp at each start (40-runtime-config.sh, which can make the policy stricter); nginx reads them there
+# through this link, so the image itself stays read-only.
+COPY docker/security-headers.conf /etc/nginx/snippets/security-headers.default.conf
+RUN ln -s /tmp/jellyflix/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY docker/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
 RUN chmod +x /docker-entrypoint.d/40-runtime-config.sh
 COPY --from=build /app/dist /usr/share/nginx/html

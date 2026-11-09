@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { applyFields, diffFields, FIELD_LIMITS, LOCKABLE_FIELDS, saveItem, validateFields, type EditableItem, type LockableField, type MetadataFields, type Session } from '../../core'
+import { applyFields, diffFields, FIELD_LIMITS, LOCKABLE_FIELDS, validateFields, type EditableItem, type LockableField, type MetadataFields, type Session } from '../../core'
+import { saveItem } from '../../core/extra'
 import { t, tr } from '../../i18n'
 import { recordActivity } from '../../platform/web/adminActivity'
 import { Toggle } from '../SettingsParts'

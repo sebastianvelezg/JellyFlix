@@ -59,3 +59,19 @@ export async function checkKidsSetup(session: Session, maxName: string): Promise
   if (found.length > 0 && !found.some((item) => item.OfficialRating)) return { ok: false, reason: 'no-ratings-reported' }
   return { ok: true, ratings, maxValue, allowedSeries }
 }
+
+/** The age ratings the server knows, lowest first, one per value. */
+export interface ParentalRatingOption {
+  name: string
+  value: number
+}
+
+export async function getParentalRatingOptions(session: Session): Promise<ParentalRatingOption[]> {
+  const { data } = await getLocalizationApi(session.api).getParentalRatings()
+  const seen = new Set<number>()
+  return data
+    .filter((r) => r.Name && r.Value != null)
+    .map((r) => ({ name: r.Name as string, value: r.Value as number }))
+    .sort((a, b) => a.value - b.value)
+    .filter((r) => (seen.has(r.value) ? false : (seen.add(r.value), true)))
+}
