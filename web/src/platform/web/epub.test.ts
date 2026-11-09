@@ -1,7 +1,7 @@
 import { strToU8, zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { epubBytes, EPUB_CHAPTERS, cbzBytes } from '../../../test/mock/bookFiles'
-import { openComic, unpack } from '../../core'
+import { openComic, unpack } from '../../core/extra'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { chapterPage, openEpub, resolveLink, resolvePath, runsAsScript } from './epub'
@@ -174,5 +174,26 @@ describe('the frame the chapters are shown in', () => {
     const source = readFileSync(resolve(import.meta.dirname, '../../components/reader/EpubReader.tsx'), 'utf8')
     const sandbox = /sandbox="([^"]*)"/.exec(source)?.[1]
     expect(sandbox).toBe('allow-same-origin')
+  })
+})
+
+describe('a style sheet that tries to close its own element', () => {
+  it('stays a style sheet: nothing after "</style" becomes markup', () => {
+    const files = {
+      mimetype: [strToU8('application/epub+zip'), { level: 0 as const }],
+      'META-INF/container.xml': strToU8(
+        '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="c.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+      ),
+      'c.opf': strToU8(
+        '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Sheet</dc:title><dc:identifier id="id">x</dc:identifier></metadata><manifest><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c1"/></spine></package>',
+      ),
+      'c1.xhtml': strToU8('<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" href="s.css"/></head><body><p>text</p></body></html>'),
+      's.css': strToU8('p { color: red } </STYLE><img src="x" id="escaped"/><style>'),
+    }
+    const page = chapterPage(openEpub(buffer(zipSync(files as never))), 0, '')
+    const doc = new DOMParser().parseFromString(page, 'text/html')
+    expect(doc.getElementById('escaped')).toBeNull()
+    expect(doc.querySelectorAll('img')).toHaveLength(0)
+    expect(doc.querySelector('style')?.textContent).toContain('p { color: red }')
   })
 })

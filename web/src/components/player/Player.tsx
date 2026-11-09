@@ -201,6 +201,10 @@ export function Player({
           const first =
             picked === null ? null : picked !== undefined && plan.subtitleTracks.some((s) => s.index === picked) ? picked : pickSubtitle(plan.subtitleTracks, language)
           setSubtitleIndex(first)
+          // A subtitle (or "none") picked on the title page counts as the series' choice from now on.
+          if (seriesId && picked !== undefined) {
+            writeSeriesPrefs(seriesId, { subtitleLanguage: first === null ? null : (plan.subtitleTracks.find((s) => s.index === first)?.language ?? null) })
+          }
           // ...and the second one, in the language chosen last time, when there is a first one to put it under.
           setSecondSubtitleIndex(
             first === null ? null : pickSubtitle(plan.subtitleTracks.filter((track) => track.index !== first), readPlayerPrefs().secondSubtitleLanguage),
@@ -210,6 +214,9 @@ export function Player({
         if (!audioInitialised.current) {
           audioInitialised.current = true
           const chosenAudio = choice.current?.audioIndex
+          // An audio track picked on the title page counts as the series' choice from now on.
+          const titlePageAudio = chosenAudio !== undefined ? plan.audioTracks.find((a) => a.index === chosenAudio) : undefined
+          if (seriesId && titlePageAudio) writeSeriesPrefs(seriesId, { audioLanguage: titlePageAudio.language ?? null })
           const wanted =
             chosenAudio !== undefined && plan.audioTracks.some((a) => a.index === chosenAudio) ? chosenAudio : pickAudio(plan.audioTracks, remembered.audioLanguage)
           if (wanted !== undefined && wanted !== plan.audioIndex) {

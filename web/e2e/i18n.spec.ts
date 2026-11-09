@@ -94,6 +94,30 @@ test('a browser set to English shows English, and Settings can switch it to Span
   await expect(page.locator('html')).toHaveAttribute('lang', 'es')
 })
 
+test.describe('a browser set to French', () => {
+  test.use({ locale: 'fr-FR' })
+
+  test('opens in French, and Settings switches it to German and to Portuguese', async ({ page }) => {
+    mock = await startMock(everything)
+    await page.addInitScript(() => localStorage.setItem('jellyflix.setup', '1'))
+    await page.goto('/#/settings')
+    await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
+    await page.getByLabel('Adresse du serveur').fill(mock.url)
+    await page.getByLabel('Nom d’utilisateur').fill('tester')
+    await page.getByLabel('Mot de passe').fill('secret')
+    await page.getByRole('button', { name: 'Se connecter', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Paramètres', level: 1 })).toBeVisible()
+
+    await page.getByLabel('Langue').selectOption('de')
+    await expect(page.getByRole('heading', { name: 'Einstellungen', level: 1 })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('lang', 'de')
+    await page.getByLabel('Sprache').selectOption('pt')
+    await expect(page.getByRole('heading', { name: 'Configurações', level: 1 })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('lang', 'pt')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('jellyflix.ui') ?? '{}').language)).toBe('pt')
+  })
+})
+
 /** The Spanish texts are a file of their own: whoever reads English never downloads them. (Dev server: src/i18n/es.ts; build: assets/es-<hash>.js.) */
 const isSpanishFile = (url: string) => /\/i18n\/es(\.ts)?(\?|$)|\/assets\/es-[\w-]+\.js/.test(url)
 

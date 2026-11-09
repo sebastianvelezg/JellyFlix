@@ -29,15 +29,23 @@ function isLocalHost(host: string): boolean {
 }
 
 /**
- * Whether an address that came in a LINK (`?modules=`) may be used. The app sends the person's Jellyfin session token to the modules
- * container, so a link must not be able to point it at somebody else's server. A link may name this same site's host, the host of the
- * person's Jellyfin server, or an address inside their own network; any other address has to be set by whoever hosts the app (`config.js`).
+ * What to do with an address that came in a LINK (`?modules=`). The app sends the person's Jellyfin session token to the modules
+ * container, so a link must not be able to point it at somebody else's server:
+ * - `trusted`: this same site, or the host of the person's Jellyfin server (the address a Match QR code carries);
+ * - `ask`: another address inside their network. Somebody else on the same network (a guest Wi-Fi, a shared flat) could have sent
+ *   the link, so the person is asked first;
+ * - `refused`: anything else, which only whoever hosts the app can set (`config.js`).
  */
-export function isTrustedModulesAddress(address: string, pageHost: string, jellyfinUrl: string | null | undefined): boolean {
-  if (address.startsWith('/')) return true
+export function modulesLinkTrust(address: string, pageHost: string, jellyfinUrl: string | null | undefined): 'trusted' | 'ask' | 'refused' {
+  if (address.startsWith('/')) return 'trusted'
   const host = hostOf(address)
-  if (!host) return false
-  if (host === pageHost.toLowerCase()) return true
-  if (jellyfinUrl && host === hostOf(jellyfinUrl)) return true
-  return isLocalHost(host)
+  if (!host) return 'refused'
+  if (host === pageHost.toLowerCase()) return 'trusted'
+  if (jellyfinUrl && host === hostOf(jellyfinUrl)) return 'trusted'
+  return isLocalHost(host) ? 'ask' : 'refused'
+}
+
+/** Whether an address may be used at all (one in the local network once the person said yes to it). */
+export function isTrustedModulesAddress(address: string, pageHost: string, jellyfinUrl: string | null | undefined): boolean {
+  return modulesLinkTrust(address, pageHost, jellyfinUrl) !== 'refused'
 }

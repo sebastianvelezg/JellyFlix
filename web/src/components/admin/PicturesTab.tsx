@@ -1,20 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
-import {
-  checkPictureFile,
-  deletePicture,
-  downloadPicture,
-  getPictureChoices,
-  getPictures,
-  PICTURE_KINDS,
-  PICTURE_TYPES,
-  pictureShapeWarning,
-  uploadPicture,
-  type EditableItem,
-  type PictureChoice,
-  type PictureSlot,
-  type PictureType,
-  type Session,
-} from '../../core'
+import { type EditableItem, type PictureChoice, type PictureSlot, type PictureType, type Session } from '../../core'
+import { checkPictureFile, deletePicture, downloadPicture, getPictureChoices, getPictures, PICTURE_KINDS, PICTURE_TYPES, pictureShapeWarning, uploadPicture } from '../../core/extra'
 import { t } from '../../i18n'
 import { recordActivity } from '../../platform/web/adminActivity'
 import { showToast } from '../toast'

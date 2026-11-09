@@ -4,27 +4,33 @@
  * never a blank or a key. Placeholders are written `{name}` and filled from the second argument:
  * `t('Open {title}', { title })`. A test checks that every text used in the code has a Spanish entry.
  *
- * English is the text in the code, so it needs no dictionary. The Spanish one is a file of its own (about 67 kB compressed) that is
- * only downloaded when the language is Spanish; see [setLanguage].
+ * English is the text in the code, so it needs no dictionary. Every other language is a file of its own (about 60 kB compressed
+ * each) that is only downloaded when that language is the one in use; see [setLanguage].
  */
-export type Language = 'en' | 'es'
+export type Language = 'en' | 'es' | 'pt' | 'fr' | 'de'
 export type LanguageChoice = 'auto' | Language
 
+/** The languages of the interface, each named in itself. */
 export const LANGUAGES: Array<[Language, string]> = [
   ['en', 'English'],
   ['es', 'Español'],
+  ['pt', 'Português'],
+  ['fr', 'Français'],
+  ['de', 'Deutsch'],
 ]
 
-const dictionaries: Record<Language, Record<string, string>> = { en: {}, es: {} }
-const patterns: Record<Language, Array<[RegExp, string]>> = { en: [], es: [] }
-/** How each language's texts are fetched (the dynamic import makes the bundler put them in a file of their own). */
-const loaders: Record<Language, () => Promise<void>> = {
-  en: () => Promise.resolve(),
-  es: async () => {
-    const spanish = await import('./es')
-    dictionaries.es = spanish.es
-    patterns.es = spanish.esPatterns
-  },
+type Texts = Record<string, string>
+type Patterns = Array<[RegExp, string]>
+
+const dictionaries: Record<Language, Texts> = { en: {}, es: {}, pt: {}, fr: {}, de: {} }
+const patterns: Record<Language, Patterns> = { en: [], es: [], pt: [], fr: [], de: [] }
+/** How each language's texts are fetched (the dynamic import makes the bundler put each in a file of its own). */
+const loaders: Record<Language, () => Promise<{ texts: Texts; patterns: Patterns }>> = {
+  en: async () => ({ texts: {}, patterns: [] }),
+  es: async () => import('./es').then((m) => ({ texts: m.es, patterns: m.esPatterns })),
+  pt: async () => import('./pt').then((m) => ({ texts: m.pt, patterns: m.ptPatterns })),
+  fr: async () => import('./fr').then((m) => ({ texts: m.fr, patterns: m.frPatterns })),
+  de: async () => import('./de').then((m) => ({ texts: m.de, patterns: m.dePatterns })),
 }
 const loaded = new Set<Language>(['en'])
 
@@ -38,14 +44,16 @@ export function getLanguage(): Language {
 }
 
 /**
- * Switches the texts to `language`. The Spanish dictionary is fetched the first time it is needed, so the promise resolves when the
+ * Switches the texts to `language`. A dictionary is fetched the first time it is needed, so the promise resolves when the
  * switch has happened (at once when the texts are already here). A download that fails leaves the language as it was.
  */
 export async function setLanguage(language: Language): Promise<void> {
   wanted = language
   if (!loaded.has(language)) {
     try {
-      await loaders[language]()
+      const found = await loaders[language]()
+      dictionaries[language] = found.texts
+      patterns[language] = found.patterns
       loaded.add(language)
     } catch {
       return
@@ -61,13 +69,13 @@ export function subscribeLanguage(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-/** "auto" follows the browser's preferred languages (Spanish if the first one we know is Spanish), else what was chosen. */
+/** "auto" follows the browser's preferred languages (the first one we have texts for), else what was chosen. */
 export function resolveLanguage(choice: LanguageChoice, preferred: readonly string[]): Language {
   if (choice !== 'auto') return choice
   for (const tag of preferred) {
     const base = tag.toLowerCase().split('-')[0]
-    if (base === 'es') return 'es'
-    if (base === 'en') return 'en'
+    const known = LANGUAGES.find(([code]) => code === base)
+    if (known) return known[0]
   }
   return 'en'
 }

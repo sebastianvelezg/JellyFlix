@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ModulesProvider, useModules } from './ModulesProvider'
 
@@ -58,16 +58,17 @@ describe('ModulesProvider', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('remembers an address given as ?modules= and forgets it with ?modules=off', async () => {
-    window.history.replaceState(null, '', '/?modules=http://192.168.1.20:8097')
+  it('remembers an address of this same site given as ?modules= at once, and forgets it with ?modules=off', async () => {
+    window.history.replaceState(null, '', '/?modules=http://localhost:8097')
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(manifest), { status: 200 }))
     render(
       <ModulesProvider token="tok">
         <Status />
       </ModulesProvider>,
     )
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByText('ready')).toBeInTheDocument())
-    expect(localStorage.getItem('jellyflix.modulesUrl')).toBe('http://192.168.1.20:8097')
+    expect(localStorage.getItem('jellyflix.modulesUrl')).toBe('http://localhost:8097')
     cleanup()
     window.history.replaceState(null, '', '/?modules=off')
     render(
@@ -76,6 +77,56 @@ describe('ModulesProvider', () => {
       </ModulesProvider>,
     )
     expect(screen.getByText('absent')).toBeInTheDocument()
+    expect(localStorage.getItem('jellyflix.modulesUrl')).toBeNull()
+  })
+
+  it('asks before using another address of the local network from a link, and sends nothing there until the person says yes', async () => {
+    window.history.replaceState(null, '', '/?modules=http://192.168.1.20:8097')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(manifest), { status: 200 }))
+    render(
+      <ModulesProvider token="tok">
+        <Status />
+      </ModulesProvider>,
+    )
+    const prompt = screen.getByRole('alertdialog', { name: 'Connect to the modules at this address?' })
+    expect(prompt).toHaveTextContent('http://192.168.1.20:8097')
+    expect(screen.getByText('absent')).toBeInTheDocument()
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(localStorage.getItem('jellyflix.modulesUrl')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('ready')).toBeInTheDocument())
+    expect(localStorage.getItem('jellyflix.modulesUrl')).toBe('http://192.168.1.20:8097')
+    // Opened again with the same link, it is the address in use: nothing to ask.
+    cleanup()
+    render(
+      <ModulesProvider token="tok">
+        <Status />
+      </ModulesProvider>,
+    )
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('changes nothing when the person says no to an address from a link, and does not ask again in this page load', async () => {
+    window.history.replaceState(null, '', '/?modules=http://192.168.1.30:8097')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    render(
+      <ModulesProvider token="secret-token">
+        <Status />
+      </ModulesProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByText('absent')).toBeInTheDocument()
+    cleanup()
+    render(
+      <ModulesProvider token="secret-token">
+        <Status />
+      </ModulesProvider>,
+    )
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(fetchSpy).not.toHaveBeenCalled()
     expect(localStorage.getItem('jellyflix.modulesUrl')).toBeNull()
   })
 

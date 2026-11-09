@@ -1392,20 +1392,36 @@ class JellyfinRepository(context: Context) {
         directAllowed: Boolean = true,
         mediaSourceId: String? = null,
         limits: PlayLimits = PlayLimits(),
+        remembered: SeriesTracks? = null,
     ): PlaybackPlan {
         // A live channel is never played as a file: the server opens the stream and sends it as HLS.
         val directAllowed = directAllowed && !item.isChannel
         var response = requestPlaybackInfo(session, item, audioIndex, subtitleIndex, startMs, directAllowed, mediaSourceId, limits)
         Log.i(TAG, "PlaybackInfo for ${item.id}: sources=${response.mediaSources.size} error=${response.errorCode} session=${response.playSessionId}")
         var source = response.mediaSources.firstOrNull() ?: error("This title has nothing to play")
+        var audio = audioIndex
+        var subtitle = subtitleIndex
+        // First start of an episode whose series has remembered choices: ask for the audio and subtitles of the same language.
+        if (remembered != null && audioIndex == null && subtitleIndex == null && !item.isChannel) {
+            val streams = source.mediaStreams.orEmpty()
+            val picks = rememberedPicks(
+                streams.filter { it.type == MediaStreamType.AUDIO }.map { it.toTrack() },
+                streams.filter { it.type == MediaStreamType.SUBTITLE }.map { it.toTrack() },
+                source.defaultAudioStreamIndex,
+                remembered,
+            )
+            audio = picks.audio
+            subtitle = picks.subtitle
+        }
         // First start: the server knows the user's subtitle preference, but only delivers a file once a stream is asked for.
-        if (subtitleIndex == null && source.defaultSubtitleStreamIndex != null && !item.isChannel) {
-            response = requestPlaybackInfo(session, item, audioIndex, source.defaultSubtitleStreamIndex, startMs, directAllowed, mediaSourceId, limits)
+        if (subtitle == null && source.defaultSubtitleStreamIndex != null && !item.isChannel) subtitle = source.defaultSubtitleStreamIndex
+        if (audio != audioIndex || subtitle != subtitleIndex) {
+            response = requestPlaybackInfo(session, item, audio, subtitle, startMs, directAllowed, mediaSourceId, limits)
             source = response.mediaSources.firstOrNull() ?: source
         }
         val streams = source.mediaStreams.orEmpty()
-        val chosenAudio = audioIndex ?: source.defaultAudioStreamIndex
-        val chosenSubtitle = (subtitleIndex ?: source.defaultSubtitleStreamIndex)?.takeIf { it >= 0 }
+        val chosenAudio = audio ?: source.defaultAudioStreamIndex
+        val chosenSubtitle = (subtitle ?: source.defaultSubtitleStreamIndex)?.takeIf { it >= 0 }
         val transcodingUrl = source.transcodingUrl
         val direct = source.supportsDirectPlay
         val url = when {

@@ -59,6 +59,34 @@ elif [ -n "$modules_public" ]; then
   fi
 fi
 
+# The security headers nginx sends (docker/security-headers.conf, kept in the image as security-headers.default.conf). nginx reads them
+# from /tmp, through a link the image has at /etc/nginx/snippets/security-headers.conf, so they can be adjusted here at each start.
+cp /etc/nginx/snippets/security-headers.default.conf /tmp/jellyflix/security-headers.conf
+
+# Optional: JELLYFLIX_STRICT_CSP=1 lets the page reach only this site, the server in JELLYFIN_URL and the modules container (the open
+# policy lets it reach any address, because the server can be anywhere). Then, even if a fault in the app ever let a script run, the
+# session could not be sent anywhere else. With it, signing in to a server other than JELLYFIN_URL does not work, and the previews of
+# pictures from the internet in Administration (Identify, Pictures) do not show.
+case "${JELLYFLIX_STRICT_CSP:-}" in
+  1|true|yes)
+    # Only scheme, host and port: "http://192.168.1.10:8096/jellyfin" gives "http://192.168.1.10:8096".
+    origin=$(printf '%s' "$url" | sed -E 's|^(https?://[^/?#]+).*$|\1|')
+    if printf '%s' "$origin" | grep -Eq '^https?://[][A-Za-z0-9.:-]+$'; then
+      # The server's socket (remote control, SyncPlay) is the same address with ws:// or wss://.
+      sources="'self' $origin $(printf '%s' "$origin" | sed -E 's|^http|ws|')"
+      # The modules container at an address of its own (behind the /modules/ proxy it is this same site).
+      if [ -z "$modules_target" ] && [ -n "$modules_config" ]; then
+        modules_origin=$(printf '%s' "$modules_public" | sed -E 's|^(https?://[^/?#]+).*$|\1|')
+        if printf '%s' "$modules_origin" | grep -Eq '^https?://[][A-Za-z0-9.:-]+$'; then sources="$sources $modules_origin"; fi
+      fi
+      sed -i -E "s#(img-src|media-src|connect-src) \* data: blob:#\1 $sources data: blob:#g" /tmp/jellyflix/security-headers.conf
+      echo "jellyflix-web: strict policy: the page only reaches $sources"
+    else
+      echo "jellyflix-web: JELLYFLIX_STRICT_CSP needs JELLYFIN_URL (an http:// or https:// address); keeping the open policy." >&2
+    fi
+    ;;
+esac
+
 cat > /tmp/jellyflix/config.js <<CONFIG
 window.JELLYFLIX_CONFIG = { serverUrl: "$url"$modules_config };
 CONFIG

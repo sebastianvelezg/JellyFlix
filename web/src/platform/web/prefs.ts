@@ -1,5 +1,6 @@
 import { isChannelCategory, sanitizeFilters, type AdvancedFilters, type ChannelCategory, type Section, type SortKey, type WatchFilter } from '../../core'
-import type { LanguageChoice } from '../../i18n'
+import { LANGUAGES, type LanguageChoice } from '../../i18n'
+import { ownedKey } from './owner'
 
 /** Per-device preferences. Harmless to lose; every read falls back to a default. */
 export type SubtitleSize = 'small' | 'medium' | 'large'
@@ -134,11 +135,30 @@ function write(key: string, value: object): void {
   }
 }
 
+/** The same, for what belongs to the account signed in (see owner.ts): nothing is read or written with nobody signed in. */
+function readOwned<T extends object>(base: string, defaults: T): T {
+  const key = ownedKey(base)
+  return key ? read(key, defaults) : defaults
+}
+
+function writeOwned(base: string, value: object): void {
+  const key = ownedKey(base)
+  if (key) write(key, value)
+}
+
 export function readPlayerPrefs(): PlayerPrefs {
-  const p = read(PLAYER_KEY, PLAYER_DEFAULTS)
+  return sanitizePlayerPrefs(read(PLAYER_KEY, PLAYER_DEFAULTS))
+}
+
+/**
+ * Every value that is not a valid choice goes back to its default. Used when the preferences are read and when a settings file is
+ * imported, so a file that was edited by hand cannot put anything the player does not expect in storage.
+ */
+export function sanitizePlayerPrefs(value: unknown): PlayerPrefs {
+  const p = { ...PLAYER_DEFAULTS, ...(value && typeof value === 'object' && !Array.isArray(value) ? value : {}) } as PlayerPrefs
   return {
-    volume: Number.isFinite(p.volume) ? Math.min(1, Math.max(0, p.volume)) : 1,
-    muted: !!p.muted,
+    volume: typeof p.volume === 'number' && Number.isFinite(p.volume) ? Math.min(1, Math.max(0, p.volume)) : 1,
+    muted: p.muted === true,
     subtitleSize: ['small', 'medium', 'large'].includes(p.subtitleSize) ? p.subtitleSize : 'medium',
     subtitleColor: SUBTITLE_COLORS.includes(p.subtitleColor) ? p.subtitleColor : 'white',
     subtitleBackground: SUBTITLE_BACKGROUNDS.includes(p.subtitleBackground) ? p.subtitleBackground : 'shadow',
@@ -157,7 +177,10 @@ export function readPlayerPrefs(): PlayerPrefs {
     timeLeft: TIME_LABELS.includes(p.timeLeft) ? p.timeLeft : 'elapsed',
     timeRight: TIME_LABELS.includes(p.timeRight) ? p.timeRight : 'total',
     skipActions: Object.fromEntries(
-      SKIP_KINDS.map((kind) => [kind, SKIP_ACTIONS.includes(p.skipActions?.[kind] as SkipAction) ? p.skipActions[kind] : 'ask']),
+      SKIP_KINDS.map((kind) => {
+        const chosen = (p.skipActions as Partial<Record<SkipKind, unknown>> | null | undefined)?.[kind]
+        return [kind, SKIP_ACTIONS.includes(chosen as SkipAction) ? chosen : 'ask']
+      }),
     ) as Record<SkipKind, SkipAction>,
     secondSubtitleLanguage: typeof p.secondSubtitleLanguage === 'string' ? p.secondSubtitleLanguage : null,
     convertAudio: Array.isArray(p.convertAudio) ? CONVERTIBLE_AUDIO.filter((codec) => (p.convertAudio as string[]).includes(codec)) : [],
@@ -172,8 +195,21 @@ export function writePlayerPrefs(patch: Partial<PlayerPrefs>): void {
 const browseKey = (section: Section) => (section === 'movies' ? BROWSE_KEY : `${BROWSE_KEY}.${section}`)
 
 export function readBrowsePrefs(section: Section = 'movies'): BrowsePrefs {
-  const saved = read(browseKey(section), BROWSE_DEFAULTS)
-  return saved.advanced === undefined ? saved : { ...saved, advanced: sanitizeFilters(saved.advanced) }
+  return sanitizeBrowsePrefs(read(browseKey(section), BROWSE_DEFAULTS))
+}
+
+const SORT_KEYS: readonly SortKey[] = ['title', 'added', 'released', 'rating']
+const WATCH_FILTERS: readonly WatchFilter[] = ['all', 'unwatched', 'watched', 'favorites', 'liked', 'disliked']
+
+/** The same for the sort, filter and library of a section (an unknown sort would leave the library unable to load). */
+export function sanitizeBrowsePrefs(value: unknown): BrowsePrefs {
+  const p = (value && typeof value === 'object' && !Array.isArray(value) ? value : {}) as Partial<Record<keyof BrowsePrefs, unknown>>
+  return {
+    ...(typeof p.libraryId === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(p.libraryId) ? { libraryId: p.libraryId } : {}),
+    sort: SORT_KEYS.includes(p.sort as SortKey) ? (p.sort as SortKey) : 'title',
+    filter: WATCH_FILTERS.includes(p.filter as WatchFilter) ? (p.filter as WatchFilter) : 'all',
+    ...(p.advanced === undefined ? {} : { advanced: sanitizeFilters(p.advanced) }),
+  }
 }
 
 export function writeBrowsePrefs(patch: Partial<BrowsePrefs>, section: Section = 'movies'): void {
@@ -222,43 +258,44 @@ const SYNC_LIMIT = 200
  * buttons. Series share one value across their episodes. 0 when none was saved.
  */
 export function readSubtitleOffset(titleId: string): number {
-  const all = read<Record<string, number>>(SYNC_KEY, {})
+  const all = readOwned<Record<string, number>>(SYNC_KEY, {})
   const value = all[titleId]
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 /** Saves the offset; 0 forgets it. The oldest entries are dropped so this never grows without bound. */
 export function writeSubtitleOffset(titleId: string, seconds: number): void {
-  const others = Object.entries(read<Record<string, number>>(SYNC_KEY, {})).filter(([id]) => id !== titleId)
+  const others = Object.entries(readOwned<Record<string, number>>(SYNC_KEY, {})).filter(([id]) => id !== titleId)
   const kept = others.slice(-(SYNC_LIMIT - 1))
-  write(SYNC_KEY, Object.fromEntries(seconds === 0 ? kept : [...kept, [titleId, seconds]]))
+  writeOwned(SYNC_KEY, Object.fromEntries(seconds === 0 ? kept : [...kept, [titleId, seconds]]))
 }
 
 export function countSeriesPrefs(): number {
-  return Object.keys(read<Record<string, SeriesPrefs>>(SERIES_KEY, {})).length
+  return Object.keys(readOwned<Record<string, SeriesPrefs>>(SERIES_KEY, {})).length
 }
 
 export function clearSeriesPrefs(): void {
   try {
-    localStorage.removeItem(SERIES_KEY)
-    localStorage.removeItem(SYNC_KEY)
-    localStorage.removeItem(BOOKS_KEY)
+    for (const base of [SERIES_KEY, SYNC_KEY, BOOKS_KEY]) {
+      const key = ownedKey(base)
+      if (key) localStorage.removeItem(key)
+    }
   } catch {
     // Preferences are a convenience only.
   }
 }
 
 export function readSeriesPrefs(seriesId: string): SeriesPrefs {
-  const all = read<Record<string, SeriesPrefs>>(SERIES_KEY, {})
+  const all = readOwned<Record<string, SeriesPrefs>>(SERIES_KEY, {})
   return all[seriesId] ?? {}
 }
 
 export function writeSeriesPrefs(seriesId: string, patch: SeriesPrefs): void {
-  const all = read<Record<string, SeriesPrefs>>(SERIES_KEY, {})
+  const all = readOwned<Record<string, SeriesPrefs>>(SERIES_KEY, {})
   const { [seriesId]: previous, ...others } = all
   // Most recently used last; the oldest entries are dropped so this never grows without bound.
   const kept = Object.entries(others).slice(-(SERIES_LIMIT - 1))
-  write(SERIES_KEY, Object.fromEntries([...kept, [seriesId, { ...previous, ...patch }]]))
+  writeOwned(SERIES_KEY, Object.fromEntries([...kept, [seriesId, { ...previous, ...patch }]]))
 }
 
 const BOOKS_KEY = 'jellyflix.books'
@@ -279,7 +316,7 @@ function cleanProgress(value: unknown): BookProgress | undefined {
 }
 
 export function readBookProgress(bookId: string): BookProgress | undefined {
-  return cleanProgress(read<Record<string, unknown>>(BOOKS_KEY, {})[bookId])
+  return cleanProgress(readOwned<Record<string, unknown>>(BOOKS_KEY, {})[bookId])
 }
 
 /** A book counts as finished from here on: it is opened at the beginning again, and is no longer in "Continue reading". */
@@ -293,7 +330,7 @@ export function readResumePlace(bookId: string): string | undefined {
 
 /** Every book with a place saved, the most recently read first. */
 export function readAllBookProgress(): Array<[string, BookProgress]> {
-  return Object.entries(read<Record<string, unknown>>(BOOKS_KEY, {}))
+  return Object.entries(readOwned<Record<string, unknown>>(BOOKS_KEY, {}))
     .map(([id, value]) => [id, cleanProgress(value)] as const)
     .filter((entry): entry is [string, BookProgress] => entry[1] !== undefined)
     .sort((a, b) => b[1].at - a[1].at)
@@ -301,8 +338,8 @@ export function readAllBookProgress(): Array<[string, BookProgress]> {
 
 /** Remembers the place in a book. The oldest are dropped so this never grows without bound. */
 export function writeBookProgress(bookId: string, progress: Omit<BookProgress, 'at'>): void {
-  const others = Object.entries(read<Record<string, unknown>>(BOOKS_KEY, {})).filter(([id]) => id !== bookId)
-  write(BOOKS_KEY, Object.fromEntries([...others.slice(-(BOOKS_LIMIT - 1)), [bookId, { ...progress, at: Date.now() }]]))
+  const others = Object.entries(readOwned<Record<string, unknown>>(BOOKS_KEY, {})).filter(([id]) => id !== bookId)
+  writeOwned(BOOKS_KEY, Object.fromEntries([...others.slice(-(BOOKS_LIMIT - 1)), [bookId, { ...progress, at: Date.now() }]]))
 }
 
 export type ReaderTheme = 'dark' | 'light' | 'sepia'
@@ -348,11 +385,16 @@ const UI_KEY = 'jellyflix.ui'
 const UI_DEFAULTS: UiPrefs = { autoRotateBanner: true, language: 'auto', liveCategory: 'all', lastChannel: null }
 
 export function readUiPrefs(): UiPrefs {
-  const p = read(UI_KEY, UI_DEFAULTS)
+  return sanitizeUiPrefs(read(UI_KEY, UI_DEFAULTS))
+}
+
+/** The same for the interface preferences. */
+export function sanitizeUiPrefs(value: unknown): UiPrefs {
+  const p = { ...UI_DEFAULTS, ...(value && typeof value === 'object' && !Array.isArray(value) ? value : {}) } as UiPrefs
   const last = p.lastChannel as { id?: unknown; name?: unknown } | null | undefined
   return {
     autoRotateBanner: p.autoRotateBanner !== false,
-    language: p.language === 'en' || p.language === 'es' ? p.language : 'auto',
+    language: LANGUAGES.some(([code]) => code === p.language) ? (p.language as LanguageChoice) : 'auto',
     liveCategory: isChannelCategory(p.liveCategory) ? p.liveCategory : 'all',
     lastChannel: last && typeof last.id === 'string' && typeof last.name === 'string' && last.id ? { id: last.id, name: last.name } : null,
   }

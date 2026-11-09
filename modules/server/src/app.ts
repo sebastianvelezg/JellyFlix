@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { API_VERSION, type Manifest, type ModuleInfo } from '../../contract/index.ts'
-import { createAuthenticator, tokenFrom } from './auth/auth.ts'
+import { clientOf, createAuthenticator, tokenFrom } from './auth/auth.ts'
 import type { Config } from './config.ts'
 import type { Db } from './db/db.ts'
 import { corsHeaders, HttpError, readJson, Router, send, type Ctx } from './http/router.ts'
@@ -58,7 +58,7 @@ export function createApp({ config, db, jellyfin, clock = nowSeconds }: AppDeps)
       if (found === null) throw new HttpError(404, 'Not found.')
       if (found === 'wrong-method') throw new HttpError(405, 'That method is not allowed here.')
       const { route, params } = found
-      const user = route.access === 'public' ? undefined : await authenticate(tokenFrom(req))
+      const user = route.access === 'public' ? undefined : await authenticate(tokenFrom(req), clientOf(req, config.trustProxy))
       if (route.access === 'admin' && !user?.isAdmin) throw new HttpError(403, 'Only an administrator can do that.')
       const body = method === 'GET' || method === 'DELETE' ? undefined : await readJson(req)
       const ctx: Ctx = { method, path: url.pathname, params, query: url.searchParams, body, user }

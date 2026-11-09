@@ -18,6 +18,9 @@ services:
       JELLYFLIX_MODULES: "${JELLYFLIX_MODULES:-channels,match}"
       # Optional: the sites allowed to call it from a browser, separated by commas. Empty means any (it uses tokens, not cookies).
       JELLYFLIX_ORIGINS: "${JELLYFLIX_ORIGINS:-*}"
+      # Optional: 1 only when this container is reached through the web image's /modules/ proxy and the port above is removed. It
+      # then tells callers apart by the address the proxy saw (to slow down whoever keeps sending tokens Jellyfin refuses).
+      JELLYFLIX_TRUST_PROXY: "${JELLYFLIX_TRUST_PROXY:-}"
     volumes:
       - modules-data:/data
     # Like the web image: nothing writable but its data and /tmp, no extra privileges.

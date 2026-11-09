@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { canIdentify, diffFields, getEditableItem, type EditableItem, type MetadataFields, type Session } from '../../core'
+import { canIdentify, diffFields, type EditableItem, type MetadataFields, type Session } from '../../core'
+import { getEditableItem } from '../../core/extra'
 import { t, tr } from '../../i18n'
 import { DetailsTab } from './DetailsTab'
 import { HistoryTab } from './HistoryTab'

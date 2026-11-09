@@ -29,7 +29,7 @@ A streaming-service experience (mixed banner, Discover, rows that follow what yo
 
 ## Capabilities and Constraints
 
-- Hard rules of the project (a contribution that breaks one is not merged): talks only to the user's Jellyfin server; no analytics, telemetry, crash reporting, ads or unrequested third-party calls; no credentials or server addresses in source; no backend of ours; the apps never transcode; both apps stay equivalent where the platform allows; every user-facing text exists in English and Spanish (a test enforces it).
+- Hard rules of the project (a contribution that breaks one is not merged): talks only to the user's Jellyfin server; no analytics, telemetry, crash reporting, ads or unrequested third-party calls; no credentials or server addresses in source; no backend of ours; the apps never transcode; both apps stay equivalent where the platform allows; every user-facing text exists in every language of its app (English, Spanish, Portuguese, French and German on the web; English and Spanish on the TV), and a test enforces it.
 - Core Jellyfin API logic is kept independent of UI and platform (`web/src/core`, no DOM or React); the two apps share no code, only design, rules and API behaviour.
 - Administration is safe by construction: nothing changes without a review, destructive actions need a typed name, anything that would lock the admin out is refused, API keys show only their last four characters, and the server stays the authority. Restart/shutdown, plugin install and account deletion are deliberately left out.
 - Appearance is user-owned and applies to both apps: backgrounds, accent colours (text on the accent is derived to stay readable), poster size, the top menu (icons and/or names, order, hide) and the Home rows (show/hide/reorder), with an optional backup to the user's own server.
@@ -61,5 +61,5 @@ A streaming-service experience (mixed banner, Discover, rows that follow what yo
 ## Accessibility & Inclusion
 
 - Target WCAG 2.1 A and AA, checked automatically (axe in Playwright); accent and background combinations are tested for contrast.
-- Bilingual UI (English and Spanish) with switching in Settings; any new text must be translatable.
+- Multilingual UI (web: English, Spanish, Portuguese, French, German; TV: English, Spanish) with switching in Settings; any new text must be translatable.
 - Touch targets are enlarged on coarse pointers; TV is fully operable with a D-pad and a screen margin and text size setting for TVs that crop the picture.

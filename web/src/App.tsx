@@ -27,6 +27,7 @@ import { PersonPage } from './components/PersonPage'
 import { formatRoute, useRoute, type Navigate, type PlayRoute, type Route } from './components/route'
 import { writeUiPrefs } from './platform/web/prefs'
 import { clearRecentSearches } from './platform/web/recentSearches'
+import { setStorageOwner } from './platform/web/owner'
 import { SearchPage } from './components/SearchPage'
 import { useLanguage } from './components/useLanguage'
 import { clearSwr, swrKey, swrScope, useSwr } from './components/useSwr'
@@ -115,6 +116,7 @@ export default function App() {
     clearSwr()
     clearActivity()
     forgetTraces()
+    setStorageOwner(null)
     setSession(null)
     setNotice(t(EXPIRED))
     setOverrides({})
@@ -135,6 +137,7 @@ export default function App() {
       .then((resumed) => {
         if (cancelled) return
         if (resumed) webSessionStore.persistent = localStorage.getItem('jellyflix.session') !== null
+        setStorageOwner(resumed?.userId ?? null)
         setSession(resumed)
         if (resumed) {
           void verifySession(resumed).then((result) => {
@@ -196,6 +199,7 @@ export default function App() {
     clearSwr()
     clearActivity()
     forgetTraces()
+    setStorageOwner(null)
     navigate({ page: 'home' }, { replace: true })
     await webSessionStore.clear()
     if (current) await logout(current)
@@ -224,6 +228,7 @@ export default function App() {
           webSessionStore.persistent = keep
           void webSessionStore.save(toStoredSession(next))
           setNotice(null)
+          setStorageOwner(next.userId)
           setSession(next)
         }}
       />

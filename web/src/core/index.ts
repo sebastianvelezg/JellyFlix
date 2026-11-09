@@ -9,6 +9,10 @@
  *    storage, unload handling) lives in `src/platform/<name>` and is passed in as plain data.
  *
  * UI and platform code should import from here, not from the individual files.
+ *
+ * Everything this file exports (as a value) is loaded with the first screen, with the parts of the Jellyfin API client it uses. What
+ * only some screens need (administration, Live TV, plugins, statistics, the comic reader) exports its values from `core/extra.ts`
+ * instead; their types stay here. `npm run size` fails if that part reaches the first screen.
  */
 export { connect, logout, ConnectionError, type ConnectOptions } from './auth'
 export {
@@ -280,79 +284,48 @@ export * from './lyrics'
 export * from './subtitleSearch'
 export * from './upNext'
 export * from './mixes'
-export {
-  findPlugin,
-  getPlugins,
-  getScanStatus,
-  getTasks,
-  isAdministrator,
-  scanSeason,
-  startTask,
-  stopTask,
-  SUPPORTED_PLUGINS,
-  tasksOf,
-  type ScanStatus,
-  type ServerPlugin,
-  type ServerTask,
-  type SupportedPluginKind,
+export type {
+  ScanStatus,
+  ServerPlugin,
+  ServerTask,
+  SupportedPluginKind,
 } from './plugins'
 export {
-  ACTIVITY_PAGE,
-  ADMIN_SERVER_TEXTS,
-  BATCH_LIMIT,
-  MESSAGE_LIMIT,
-  MIN_PASSWORD,
-  POLICY_LABELS,
-  TITLE_PAGE,
-  applyPolicyFields,
-  batchProblem,
-  cleanTag,
-  confirmsName,
-  createUser,
-  deleteTitle,
-  describeBatch,
-  diffPolicy,
-  findTitles,
-  getActivity,
-  getAdminDevices,
-  getAdminSessions,
-  getAdminUsers,
-  getApiKeys,
-  getLibraries,
-  getParentalRatingOptions,
-  getServerSummary,
-  getUserPolicy,
-  isLastAdmin,
-  newUserProblems,
-  performFor,
-  policyFieldsOf,
-  policyProblems,
-  removeDevice,
-  revokeApiKey,
-  runBatch,
-  savePolicy,
-  scanAllLibraries,
-  secretHint,
-  sendSessionMessage,
-  setUserPassword,
-  stopSessionPlayback,
-  toAdminSession,
-  type ActivityLine,
-  type AdminDevice,
-  type AdminKey,
-  type AdminSession,
-  type AdminUser,
-  type BatchAction,
-  type BatchProgress,
-  type BatchResult,
-  type LibraryInfo,
-  type ParentalRatingOption,
-  type PolicyChange,
-  type PolicyFields,
-  type ServerSummary,
-  type TitleQuery,
-  type TitleRow,
+  isAdministrator,
+} from './me'
+export type {
+  ActivityLine,
+  AdminDevice,
+  AdminKey,
+  AdminSession,
+  AdminUser,
+  BatchAction,
+  BatchProgress,
+  BatchResult,
+  LibraryInfo,
+  ParentalRatingOption,
+  PolicyChange,
+  PolicyFields,
+  ServerSummary,
+  TitleQuery,
+  TitleRow,
 } from './adminServer'
+export {
+  getParentalRatingOptions,
+} from './parentalServer'
+export type {
+  EditableItem,
+  EditableType,
+  FieldChange,
+  FieldErrors,
+  IdentityCandidate,
+  LockableField,
+  MetadataFields,
+  PictureChoice,
+  PictureSlot,
+  PictureType,
+  RefreshMode,
+} from './admin'
 export {
   ADMIN_TEXTS,
   EDITABLE_TYPES,
@@ -360,45 +333,17 @@ export {
   FIELD_LIMITS,
   IDENTIFIABLE_TYPES,
   LOCKABLE_FIELDS,
-  MAX_PICTURE_BYTES,
-  PICTURE_KINDS,
-  PICTURE_TYPES,
   applyFields,
-  applyIdentity,
   canAdminister,
   canIdentify,
-  checkPictureFile,
-  deletePicture,
-  describeProviderIds,
   diffFields,
-  downloadPicture,
   fieldsOf,
   formatList,
-  getEditableItem,
-  getPictureChoices,
-  getPictures,
   isEditableType,
   parseList,
-  pictureShapeWarning,
-  refreshItem,
   restoreFields,
-  saveItem,
-  searchIdentity,
-  toCandidate,
-  uploadPicture,
   validateFields,
-  type EditableItem,
-  type EditableType,
-  type FieldChange,
-  type FieldErrors,
-  type IdentityCandidate,
-  type LockableField,
-  type MetadataFields,
-  type PictureChoice,
-  type PictureSlot,
-  type PictureType,
-  type RefreshMode,
-} from './admin'
+} from './adminFields'
 export { MAX_SETTINGS_CHARS, loadSettingsFromServer, saveSettingsToServer } from './displayPrefs'
 export {
   MIN_RATINGS,
@@ -458,21 +403,19 @@ export {
   type PlaylistEntry,
   type VideoPlaylist,
 } from './playlists'
-export {
-  buildPlayHistory,
-  cleanUserId,
-  getPlayHistory,
-  isConverted,
-  parseTable,
-  playbackQueries,
-  windowStart,
-  type PlayHistory,
-  type PlayHistoryTables,
-  type QueryTable,
-  type RecordedDevice,
-  type RecordedMonth,
+export type {
+  PlayHistory,
+  PlayHistoryTables,
+  QueryTable,
+  RecordedDevice,
+  RecordedMonth,
 } from './playbackReporting'
-export { MONTHS_SHOWN, STATS_LIMIT, buildStats, getWatchedTitles, type MonthStat, type WatchStats, type WatchedTitle, type WatchedTitles } from './stats'
+export type {
+  MonthStat,
+  WatchStats,
+  WatchedTitle,
+  WatchedTitles,
+} from './stats'
 export { getTrickplay, pickTrickplay, trickplaySheetUrl, trickplayTile, type TrickplayInfo, type TrickplayTile } from './trickplay'
 export {
   audiobookStart,
@@ -484,8 +427,9 @@ export {
   readableFormat,
   type ReadableFormat,
 } from './books'
-export { openComic, type ComicPage } from './comic'
-export { textOf, unpack } from './zip'
+export type {
+  ComicPage,
+} from './comic'
 export {
   bestOffset,
   createGroup,
@@ -521,31 +465,17 @@ export {
   type SyncState,
   type TimeSample,
 } from './syncplay'
+export type {
+  ChannelCategory,
+  Channel,
+  ChannelName,
+  ChannelPage,
+  GuideBlock,
+  Program,
+} from './liveTv'
 export {
-  categoryFilter,
   CHANNEL_CATEGORIES,
   isChannelCategory,
-  type ChannelCategory,
-  channelLogoUrl,
-  CHANNEL_PAGE_SIZE,
-  getChannel,
-  CHANNEL_SEARCH_LIMIT,
-  getChannels,
-  getGuide,
-  guideBlocks,
-  guideStart,
-  isOnNow,
-  matchesChannel,
-  neighbourChannel,
-  programProgress,
-  splitChannelName,
-  toChannel,
-  toProgram,
-  type Channel,
-  type ChannelName,
-  type ChannelPage,
-  type GuideBlock,
-  type Program,
-} from './liveTv'
+} from './channelCategories'
 export * from './musicVideos'
 export { checkKidsSetup, getAllowedSeries, getRatingTable, type KidsCheck } from './parentalServer'

@@ -1,7 +1,7 @@
 # Jellyflix Web
 
 An independent, open-source web client for your own [Jellyfin](https://jellyfin.org) server: movies, series, anime, music videos, books (with a reader), live TV, music and collections, a streaming-style home page, a full player,
-tools for server administrators and an English / Spanish interface. It is a static single-page app with no backend, no database, no analytics and no cloud dependency:
+tools for server administrators and an interface in English, Spanish, Portuguese, French and German. It is a static single-page app with no backend, no database, no analytics and no cloud dependency:
 your browser talks directly to the Jellyfin server you type in.
 
 Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md) with the same sections, the same look and the same rules, written for a remote control.
@@ -104,7 +104,7 @@ Settings → Appearance, all stored on this device:
 ### Sign in, language, access
 - **Sign in with a code (Quick Connect)**: ask the server for a six-digit code and approve it from a device that is already signed in. The password never travels. The server needs Quick Connect on (Dashboard → General).
   **Approve a code from here** in Settings → Devices lets a TV sign in as you.
-- **English and Spanish**, following your browser and switchable in Settings without signing out. A test fails if any text lacks a translation.
+- **English, Spanish, Portuguese, French and German**, following your browser and switchable in Settings without signing out. A test fails if any text lacks a translation.
 - Checked automatically with axe (WCAG 2.1 A and AA) on every kind of page, the player and the music player, plus a keyboard-only walk; touch targets are at least 44 px on a touchscreen.
 - **Installable (PWA)**: a manifest, icons and a small service worker that keeps the app's own files so it opens with no network (the library still needs the server). It never stores anything from your Jellyfin server.
   Browsers only offer to install over `https://` or `localhost`; iPhones and iPads can still add it to the home screen from plain `http://`.
@@ -187,6 +187,8 @@ Run `npm ci && npm run build` and copy the **contents of `dist/`** (or the `jell
 (the file addresses are relative and the pages live after a `#`, so no rewrite rules are needed). To pre-fill the Jellyfin address edit `config.js` in that folder:
 `window.JELLYFLIX_CONFIG = { serverUrl: 'http://192.168.x.x:8096' }`. Cache `assets/` for a long time (the file names carry a hash) but not `index.html`, `config.js` or `sw.js`.
 `docker/nginx.conf` (with `docker/security-headers.conf`) is a complete nginx example. The Docker image and `npm run serve` send a strict `Content-Security-Policy` (the text is in `scripts/csp.mjs`): the app runs only its own scripts. If you serve the files some other way, send the same header (it is a good idea, not a requirement), and keep the `<script>` files next to `index.html` (`paint.js`, `config.js`) since nothing inline is allowed.
+
+Because your server can be at any address, that policy lets the page load pictures and video from, and send requests to, any address. If the image always talks to one server, set `JELLYFLIX_STRICT_CSP=1` next to `JELLYFIN_URL`: the page may then reach only this site, that server (and its `ws://`/`wss://` socket) and the modules container, so even a fault in the app could not send your session anywhere else. What you give up: signing in to a server other than `JELLYFIN_URL` stops working, and in Administration the previews of pictures found on the internet (Identify, Pictures) do not show. Without `JELLYFIN_URL` the setting is ignored (the log says so).
 
 ### HTTPS, CORS and reverse proxies
 
@@ -345,8 +347,8 @@ src/core                       Jellyfin logic, no UI          runs in the browse
 - **`src/components`** is presentational and glue. It holds UI state; it does **not** build API payloads, decide report timing or pick direct play versus conversion.
 - The Android TV app is native Kotlin and does not import `core`; what the two share are the *rules* `core` documents and tests (device profile, stream replacement, report timing, the banner line-up, the look).
 
-**Adding a feature:** put the Jellyfin logic in `src/core` (typed, no UI) and export it from `core/index.ts`; test it in Node against the mock server (`test/mock/mockJellyfin.ts`, extend it if needed); then build the UI on top. A new browser API goes in `src/platform/web`.
-Every user-visible text goes through `t('English text')` and needs an entry in `src/i18n/es.ts`.
+**Adding a feature:** put the Jellyfin logic in `src/core` (typed, no UI) and export it from `core/index.ts` (or from `core/extra.ts` when only a screen loaded later uses it, like the administration or Live TV: whatever `core/index.ts` exports is downloaded with the first screen); test it in Node against the mock server (`test/mock/mockJellyfin.ts`, extend it if needed); then build the UI on top. A new browser API goes in `src/platform/web`.
+Every user-visible text goes through `t('English text')` and needs an entry in `src/i18n/es.ts` (the reference) and in `pt.ts`, `fr.ts` and `de.ts` with the same `{placeholders}`: a test fails otherwise.
 
 ## Testing
 

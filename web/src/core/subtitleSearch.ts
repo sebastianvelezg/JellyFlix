@@ -47,8 +47,11 @@ export const SUBTITLE_SEARCH_LANGUAGES: ReadonlyArray<readonly [string, string]>
 export function defaultSearchLanguage(remembered: string | null | undefined, interfaceLanguage: string): string {
   const known = (code: string | null | undefined) => SUBTITLE_SEARCH_LANGUAGES.some(([c]) => c === code)
   if (known(remembered)) return remembered as string
-  return interfaceLanguage === 'es' ? 'spa' : 'eng'
+  return INTERFACE_TO_SUBTITLE[interfaceLanguage] ?? 'eng'
 }
+
+/** The subtitle language that goes with each language of the interface. */
+const INTERFACE_TO_SUBTITLE: Record<string, string> = { es: 'spa', pt: 'por', fr: 'fra', de: 'deu' }
 
 /**
  * Best first: a match of the file itself, then the ones people rate and download most. Subtitles made by a machine come last

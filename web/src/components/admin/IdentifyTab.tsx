@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { applyIdentity, describeProviderIds, diffFields, getEditableItem, searchIdentity, type EditableItem, type IdentityCandidate, type Session } from '../../core'
+import { diffFields, type EditableItem, type IdentityCandidate, type Session } from '../../core'
+import { applyIdentity, describeProviderIds, getEditableItem, searchIdentity } from '../../core/extra'
 import { t } from '../../i18n'
 import { recordActivity } from '../../platform/web/adminActivity'
 import { showToast } from '../toast'

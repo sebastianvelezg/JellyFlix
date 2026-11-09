@@ -1,19 +1,6 @@
 import { useCallback, useState } from 'react'
-import {
-  getAdminDevices,
-  getAdminSessions,
-  getApiKeys,
-  MESSAGE_LIMIT,
-  removeDevice,
-  revokeApiKey,
-  sendSessionMessage,
-  stopSessionPlayback,
-  transcodeReasonText,
-  type AdminDevice,
-  type AdminKey,
-  type AdminSession,
-  type Session,
-} from '../../core'
+import { transcodeReasonText, type AdminDevice, type AdminKey, type AdminSession, type Session } from '../../core'
+import { getAdminDevices, getAdminSessions, getApiKeys, MESSAGE_LIMIT, removeDevice, revokeApiKey, sendSessionMessage, stopSessionPlayback } from '../../core/extra'
 import { t } from '../../i18n'
 import { Card } from '../SettingsParts'
 import { StateMessage } from '../StateMessage'

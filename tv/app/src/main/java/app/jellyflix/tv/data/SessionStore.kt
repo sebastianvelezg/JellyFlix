@@ -56,7 +56,13 @@ class SessionStore(context: Context, private val vault: TokenVault = KeystoreVau
         remove("userName")
         remove("lastChannelId")
         remove("lastChannelName")
+        remove("seriesTracks")
     }
+
+    /** The audio and subtitle language chosen for each series (keyed by the series id), so the next episode starts the same way. */
+    var seriesTracks: Map<String, SeriesTracks>
+        get() = decodeSeriesTracks(prefs.getString("seriesTracks", null))
+        set(value) = prefs.edit { putString("seriesTracks", encodeSeriesTracks(value)) }
 
     /**
      * Starts a visit (or carries on with the current one) and says when the previous visit was last seen, or null the first time.

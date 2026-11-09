@@ -41,6 +41,8 @@ const SUBTITLE_LANGUAGES: Array<[string, string]> = [
   ['eng', tr('English')],
   ['spa', tr('Spanish')],
   ['por', tr('Portuguese')],
+  ['fra', tr('French')],
+  ['deu', tr('German')],
   ['ita', tr('Italian')],
   ['jpn', tr('Japanese')],
 ]

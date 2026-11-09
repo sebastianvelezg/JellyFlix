@@ -1,7 +1,6 @@
 import { getPluginApi } from '@jellyfin/sdk/lib/utils/api/plugin-api'
 import { getScheduledTaskApi } from '@jellyfin/sdk/lib/utils/api/scheduled-task-api'
 import type { Session } from './jellyfin'
-import { currentUser } from './me'
 
 /**
  * Jellyfin plugins this app knows how to use, and the server tasks they bring. Everything here is the server's own API; the
@@ -56,11 +55,8 @@ export function tasksOf(kind: SupportedPluginKind, tasks: ServerTask[]): ServerT
   return rule ? tasks.filter((t) => rule.task.test(t.name) || rule.task.test(t.category)) : []
 }
 
-/** Whether this account is a server administrator (the plugins page only works for one). */
-export async function isAdministrator(session: Session): Promise<boolean> {
-  const me = await currentUser(session)
-  return me.Policy?.IsAdministrator === true
-}
+// Whether this account is a server administrator: in me.ts (the first screen needs it without the plugin API).
+export { isAdministrator } from './me'
 
 export async function getPlugins(session: Session): Promise<ServerPlugin[]> {
   const { data } = await getPluginApi(session.api).getPlugins()

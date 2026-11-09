@@ -4,6 +4,15 @@ import type { Session } from '../core'
 /** Where an image is in its loading attempts (see {@link Img}). */
 type Step = 'plain' | 'jpeg' | 'authorized' | 'failed'
 
+/** Whether `src` is on the session's own server: the only place the session's Authorization header may ever be sent. */
+export function isOnServer(src: string, serverUrl: string): boolean {
+  try {
+    return new URL(src).origin === new URL(serverUrl).origin
+  } catch {
+    return false
+  }
+}
+
 function withJpeg(src: string): string {
   return /[?&]format=/i.test(src) ? src : `${src}${src.includes('?') ? '&' : '?'}format=jpg`
 }
@@ -13,7 +22,8 @@ function withJpeg(src: string): string {
  * <img> works. If that fails it tries, in order:
  *  1. the same image as JPEG (some servers return an empty body when asked to encode WebP, which
  *     browsers prefer), then
- *  2. a fetch that carries the Authorization header, shown as a blob.
+ *  2. a fetch that carries the Authorization header, shown as a blob (only for a picture on the session's own server: the header
+ *     holds the session token, which must never go anywhere else).
  * If all of that fails, `fallback` is shown and `onFail` is called once.
  */
 export function Img({
@@ -66,7 +76,7 @@ export function Img({
       onError={() => {
         if (step === 'plain') {
           setAttempt({ forSrc: src, step: 'jpeg' })
-        } else if (step === 'jpeg') {
+        } else if (step === 'jpeg' && isOnServer(src, session.serverUrl)) {
           fetch(withJpeg(src), { headers: { Authorization: session.api.authorizationHeader } })
             .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('image'))))
             .then((data) => {

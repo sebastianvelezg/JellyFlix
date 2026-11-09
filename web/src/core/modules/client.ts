@@ -21,7 +21,7 @@ export interface ModulesClient {
   del<T>(path: string): Promise<T>
 }
 
-export { isTrustedModulesAddress, normalizeModulesUrl } from './url'
+export { isTrustedModulesAddress, modulesLinkTrust, normalizeModulesUrl } from './url'
 
 const REQUEST_TIMEOUT_MS = 15_000
 

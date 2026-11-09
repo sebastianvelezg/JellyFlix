@@ -1,17 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  findPlugin,
-  getPlugins,
-  getTasks,
-  isAdministrator,
-  startTask,
-  stopTask,
-  tasksOf,
-  type ServerPlugin,
-  type ServerTask,
-  type Session,
-  type SupportedPluginKind,
-} from '../core'
+import { isAdministrator, type ServerPlugin, type ServerTask, type Session, type SupportedPluginKind } from '../core'
+import { findPlugin, getPlugins, getTasks, startTask, stopTask, tasksOf } from '../core/extra'
 import { t } from '../i18n'
 
 /** What each supported plugin gives the apps, and what its tasks do to the server, in plain words. */

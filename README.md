@@ -139,9 +139,9 @@ A tiny Docker image (`amd64` and `arm64`), `docker compose up`, plain Node, or a
 </td>
 <td valign="top">
 
-**English and Spanish**
+**Five languages on the web, two on the TV**
 
-Switchable in Settings in both apps, with a test that keeps every text translated. Accessibility is checked automatically (WCAG 2.1 A and AA).
+The web app speaks English, Spanish, Portuguese, French and German; the TV app English and Spanish. Switchable in Settings, with a test that keeps every text translated. Accessibility is checked automatically (WCAG 2.1 A and AA).
 
 </td>
 </tr>
@@ -389,7 +389,7 @@ These are rules of the project, not just how it behaves today. A contribution th
 - **No credentials or server addresses in the source.** Your password is sent once to your server and never stored; only a revocable session token is kept.
 - **No backend of ours.** The web app is static files and the TV app is a single APK. There is nothing to sign up for.
 - **Your server does the heavy lifting.** The apps never transcode.
-- **Both apps stay equivalent**, and every text exists in English and Spanish.
+- **Both apps stay equivalent**, and every text exists in English and Spanish (and, on the web, in Portuguese, French and German).
 
 ## ❓ FAQ
 

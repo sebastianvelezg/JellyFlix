@@ -127,7 +127,7 @@ test('watch later and playlists: add from the card menu, see them at home, renam
 test('home: what is new since your last visit, and what is coming up', async ({ page }) => {
   mock = await startMock(everything)
   // Last here on 10 January 2024: movies 10 to 12 (added 11 to 13 January) and every series are newer than that.
-  await page.addInitScript(() => localStorage.setItem('jellyflix.visit', JSON.stringify({ since: Date.UTC(2024, 0, 10), seen: Date.now() })))
+  await page.addInitScript(() => localStorage.setItem('jellyflix.visit:user1', JSON.stringify({ since: Date.UTC(2024, 0, 10), seen: Date.now() })))
   await signIn(page, mock, { start: '/' })
   const fresh = page.getByRole('region', { name: 'New since your last visit' })
   await expect(fresh.getByRole('button', { name: /^Open Test Movie 012/ })).toBeVisible()
@@ -186,7 +186,7 @@ test('settings backup: export to a file, import it, and keep the settings on the
 
 test('the new screens pass the automatic accessibility checks', async ({ page }) => {
   mock = await startMock(everything)
-  await page.addInitScript(() => localStorage.setItem('jellyflix.visit', JSON.stringify({ since: Date.UTC(2024, 0, 10), seen: Date.now() })))
+  await page.addInitScript(() => localStorage.setItem('jellyflix.visit:user1', JSON.stringify({ since: Date.UTC(2024, 0, 10), seen: Date.now() })))
   await signIn(page, mock, { start: '/#/movies' })
   const problems: string[] = []
   const check = async (label: string) => {

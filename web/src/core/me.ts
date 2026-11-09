@@ -26,3 +26,9 @@ export function currentUser(session: Session, { fresh = false }: { fresh?: boole
 export function rememberUser(session: Session, me: UserDto): void {
   known.set(session, Promise.resolve(me))
 }
+
+/** Whether this account is a server administrator (the plugins page and the title tools only work for one). */
+export async function isAdministrator(session: Session): Promise<boolean> {
+  const me = await currentUser(session)
+  return me.Policy?.IsAdministrator === true
+}

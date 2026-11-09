@@ -9,17 +9,24 @@ import { CSP } from './scripts/csp.mjs'
  * Writes `sw.js` next to the built app: the service worker (scripts/sw.template.js) with the list of files to keep for opening the
  * app without a network, and a version made from their content so a new build is noticed by the browser.
  */
+/** Built files the service worker does not download up front (see serviceWorker): hls.js, pdf.js and the texts of each language. */
+function isFetchedWhenUsed(file: string): boolean {
+  return /(^|\/)(hls|pdf|es|pt|fr|de)-[^/]*\.js$/.test(file)
+}
+
 function serviceWorker(): Plugin {
   return {
     name: 'jellyflix-service-worker',
     apply: 'build',
     generateBundle(_options, bundle) {
       const files = Object.keys(bundle)
-      // The video library (hls.js) is only needed for some streams, the PDF library (pdf.js) for some books, and the non-Latin fonts for
-      // some languages: they are kept the first time they are used instead of being downloaded up front.
-      const upFront = files.filter((f) => /\.(js|css)$/.test(f) && !/(^|\/)(hls|pdf)-/.test(f)).concat(files.filter((f) => /inter-latin-wght/.test(f)))
+      // The video library (hls.js) is only needed for some streams, the PDF library (pdf.js) for some books, the texts of each language
+      // other than English (about 35 kB each) for the people who use that language, and the non-Latin fonts for some languages: they are
+      // kept the first time they are used instead of being downloaded up front.
+      const upFront = files.filter((f) => /\.(js|css)$/.test(f) && !isFetchedWhenUsed(f)).concat(files.filter((f) => /inter-latin-wght/.test(f)))
+      // The version changes with any file of the build, also one that is only kept when used, so the old copies are cleared out.
       const hash = createHash('sha256')
-      for (const f of upFront.sort()) hash.update(f)
+      for (const f of files.filter((f) => f.startsWith('assets/')).sort()) hash.update(f)
       const list = ['./index.html', ...upFront.map((f) => './' + f)]
       const source = readFileSync(new URL('./scripts/sw.template.js', import.meta.url), 'utf8')
         .replace('__VERSION__', hash.digest('hex').slice(0, 12))
@@ -69,6 +76,9 @@ export default defineConfig({
         manualChunks(id) {
           const inPackage = (names: string[]) => names.some((name) => id.includes(`/node_modules/${name}/`))
           if (inPackage(['react', 'react-dom', 'scheduler'])) return 'react'
+          // The client of each part of the Jellyfin API (images, Live TV, plugins, SyncPlay...) goes with the screens that use it, so the
+          // first screen does not carry the administration's or Live TV's. Only the shared base (axios, the SDK's core) stays together.
+          if (inPackage(['@jellyfin']) && /\/(generated-client|utils)\/api\//.test(id)) return undefined
           if (inPackage(['axios', '@jellyfin'])) return 'jellyfin'
           return undefined
         },

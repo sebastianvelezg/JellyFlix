@@ -9,7 +9,7 @@ import { createJellyfinClient } from '../src/jellyfin/client.ts'
 import type { Config } from '../src/config.ts'
 import { fakeJellyfin } from './fakeJellyfin.ts'
 
-const config: Config = { port: 0, host: '127.0.0.1', jellyfinUrl: 'http://jellyfin.test', apiKey: undefined, modules: ['channels', 'match'], dataDir: ':memory:', origins: ['*'], version: '0.0.0-test' }
+const config: Config = { port: 0, host: '127.0.0.1', jellyfinUrl: 'http://jellyfin.test', apiKey: undefined, modules: ['channels', 'match'], dataDir: ':memory:', origins: ['*'], trustProxy: false, version: '0.0.0-test' }
 
 let server: Server
 let base = ''

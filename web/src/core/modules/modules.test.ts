@@ -9,6 +9,7 @@ import {
   joinLink,
   mergePrograms,
   isTrustedModulesAddress,
+  modulesLinkTrust,
   normalizeModulesUrl,
   probeModules,
   whatIsWaiting,
@@ -54,6 +55,15 @@ describe('addresses a link may name', () => {
     for (const bad of ['https://evil.example', 'http://172.32.0.1:8097', 'http://192.169.1.1', 'http://8.8.8.8:8097', 'https://flix.example.com.evil.example', 'http://localhost.evil.example']) {
       expect(trust(bad), bad).toBe(false)
     }
+  })
+})
+
+describe('what a link may do on its own', () => {
+  const link = (address: string) => modulesLinkTrust(address, 'flix.example.com', 'https://jellyfin.example.com')
+  it('uses this site and the Jellyfin server at once, asks first for another address of the network, and refuses the rest', () => {
+    for (const ok of ['/modules', 'https://flix.example.com:8097', 'http://jellyfin.example.com:8097']) expect(link(ok), ok).toBe('trusted')
+    for (const ask of ['http://192.168.1.10:8097', 'http://10.0.0.5:8097', 'http://nas.local:8097', 'http://localhost:8097']) expect(link(ask), ask).toBe('ask')
+    for (const bad of ['https://evil.example', 'http://8.8.8.8:8097', 'not an address']) expect(link(bad), bad).toBe('refused')
   })
 })
 
