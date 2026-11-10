@@ -54,6 +54,16 @@ describe('browsing', () => {
     expect((await getMoviePage(session, { libraryId: 'lib-movies', startIndex: 0, filter: 'unwatched' })).total).toBe(129)
   })
 
+  it('narrows a page by name and by genre at once', async () => {
+    const page = await getMoviePage(session, { startIndex: 0, genre: 'Action', search: ' Movie 07 ', limit: 50 })
+    expect(lastItemsQuery()).toMatchObject({ searchTerm: 'Movie 07' })
+    expect(lastItemsAll().genres).toEqual(['Action'])
+    expect(lastItemsQuery().parentId).toBeUndefined()
+    expect(page.movies.map((m) => m.id)).toEqual(['m0072', 'm0075', 'm0078'])
+    await getMoviePage(session, { startIndex: 0, search: '   ' })
+    expect(lastItemsQuery().searchTerm).toBeUndefined()
+  })
+
   it('lists genres alphabetically', async () => {
     expect(await getMovieGenres(session, 'lib-movies')).toEqual(['Action', 'Comedy', 'Drama'])
   })

@@ -12,6 +12,7 @@ interface Dto {
   SeriesName?: string
   ParentIndexNumber?: number
   IndexNumber?: number
+  ProductionYear?: number
   RunTimeTicks?: number
 }
 
@@ -22,6 +23,8 @@ interface ItemsAnswer {
 export const TICKS_PER_SECOND = 10_000_000
 /** The most titles one source may bring (a whole library is fine; this only stops a mistake from reading a huge one). */
 const SOURCE_LIMIT = 5000
+/** The most titles one channel keeps in all (sources can be 500, each of them a library): past this the rest are left out and it is said. */
+export const POOL_LIMIT = 20_000
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
@@ -43,6 +46,7 @@ export function toPoolItem(dto: Dto, source: number, ord: number): PoolItem | nu
     ...(dto.SeriesId ? { seriesId: dto.SeriesId } : {}),
     ...(dto.ParentIndexNumber !== undefined ? { season: dto.ParentIndexNumber } : {}),
     ...(dto.IndexNumber !== undefined ? { episode: dto.IndexNumber } : {}),
+    ...(dto.ProductionYear ? { year: dto.ProductionYear } : {}),
     runtime: dto.RunTimeTicks / TICKS_PER_SECOND,
   }
 }
@@ -58,9 +62,29 @@ async function items(reader: Reader, path: string, query: Record<string, string 
   return answer.Items ?? []
 }
 
-async function expandItem(reader: Reader, source: ItemSource): Promise<Dto[]> {
-  const found = await items(reader, '/Items', { ids: [source.id] })
-  const dto = found[0]
+/** Plain films and episodes need no more than the item itself, so they come in batches this big instead of one request each. */
+const BATCH = 50
+
+/** Jellyfin answers ids as 32 letters and digits, whichever way they were asked for (with dashes or not, in capitals or not). */
+const keyOf = (id: string): string => id.replace(/-/g, '').toLowerCase()
+
+/** The items Jellyfin gives for these ids, and the ids of the batches it could not answer (a refused sign-in stops everything). */
+async function itemsByIds(reader: Reader, ids: readonly string[]): Promise<{ found: Map<string, Dto>; failed: Set<string> }> {
+  const found = new Map<string, Dto>()
+  const failed = new Set<string>()
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH)
+    try {
+      for (const dto of await items(reader, '/Items', { ids: batch, limit: BATCH })) if (dto.Id) found.set(keyOf(dto.Id), dto)
+    } catch (e) {
+      if (e instanceof HttpError && (e.status === 401 || e.status === 403)) throw e
+      for (const id of batch) failed.add(id)
+    }
+  }
+  return { found, failed }
+}
+
+async function expandItem(reader: Reader, source: ItemSource, dto: Dto | undefined): Promise<Dto[]> {
   if (!dto) throw new HttpError(404, `“${source.name}” is not in Jellyfin (or this account cannot see it).`)
   switch (dto.Type) {
     case 'Movie':
@@ -116,14 +140,25 @@ async function expandRule(reader: Reader, rule: RuleSource): Promise<Dto[]> {
 export async function loadPool(reader: Reader, sources: readonly ChannelSource[]): Promise<{ items: PoolItem[]; warnings: string[] }> {
   const out: PoolItem[] = []
   const warnings: string[] = []
+  const wanted = [...new Set(sources.flatMap((s) => (s.kind === 'item' ? [s.id] : [])))]
+  const { found, failed } = await itemsByIds(reader, wanted)
   for (let index = 0; index < sources.length; index += 1) {
+    if (out.length >= POOL_LIMIT) {
+      warnings.push(`A channel keeps up to ${POOL_LIMIT} titles; the sources from “${(sources[index] as ChannelSource).name}” on were left out.`)
+      break
+    }
     const source = sources[index] as ChannelSource
     try {
-      const dtos = source.kind === 'item' ? await expandItem(reader, source) : await expandRule(reader, source)
+      if (source.kind === 'item' && failed.has(source.id)) throw new HttpError(502, `“${source.name}” could not be read.`)
+      const dtos = source.kind === 'item' ? await expandItem(reader, source, found.get(keyOf(source.id))) : await expandRule(reader, source)
       let ord = 0
       for (const dto of dtos) {
         const item = toPoolItem(dto, index, ord)
         if (item) {
+          if (out.length >= POOL_LIMIT) {
+            warnings.push(`A channel keeps up to ${POOL_LIMIT} titles; the rest of “${source.name}” and the sources after it were left out.`)
+            return { items: out, warnings }
+          }
           out.push(item)
           ord += 1
         }

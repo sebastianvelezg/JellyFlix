@@ -112,6 +112,36 @@ test('with the container: a Modules tab, channels made in one go, and tuning in 
   await expect(page.getByRole('button', { name: 'Edit channel Comedy' })).toBeVisible()
   await axe(page, 'set up channels')
 
+  // A channel can be filled from a wall of posters: pick them all (or the genre as a rule), name it, save it (and take it away again).
+  await page.getByRole('button', { name: 'New channel' }).click()
+  await page.getByRole('button', { name: 'Browse the library' }).click()
+  const wall = page.getByRole('region', { name: 'Browse the library' })
+  await expect(wall.getByRole('status')).toContainText('Showing 12 of 12')
+  await wall.getByLabel('Genre').selectOption('Action')
+  await expect(wall.getByRole('status')).toContainText('Showing 4 of 4')
+  await wall.getByRole('button', { name: 'Pick all shown' }).click()
+  await expect(wall.getByRole('status')).toContainText('4 picked for this channel')
+  await expect(wall.getByRole('button', { name: /^Test Movie 003 / })).toHaveAttribute('aria-pressed', 'true')
+  await wall.getByRole('button', { name: 'Add it as a rule' }).click()
+  await expect(wall.getByRole('button', { name: 'Rule added' })).toBeDisabled()
+  // How it is programmed: episodes in a row only make sense when series are mixed in; a longest length can be set.
+  await expect(page.getByLabel('Episodes in a row')).toBeVisible()
+  await page.getByLabel('Episodes in a row').selectOption('3')
+  await page.getByRole('combobox', { name: /^Order/ }).selectOption('oldest')
+  await expect(page.getByLabel('Episodes in a row')).toHaveCount(0)
+  await page.getByLabel('Leave out titles longer than').selectOption('120')
+  await page.getByLabel('Name', { exact: true }).fill('Picked')
+  await page.getByRole('button', { name: 'Preview' }).click()
+  await expect(page.getByRole('region', { name: 'Preview' })).toContainText('titles can be shown')
+  await axe(page, 'poster picker')
+  await page.getByLabel('Number').fill('9')
+  await page.getByRole('button', { name: 'Save channel' }).click()
+  await page.getByRole('button', { name: 'Edit channel Picked' }).click()
+  await expect(page.getByText('Action · films')).toBeVisible() // the rule that came with it
+  await page.getByRole('button', { name: 'Delete channel' }).click()
+  await page.getByRole('button', { name: 'Yes, delete this channel' }).click()
+  await expect(page.getByRole('button', { name: 'Edit channel Picked' })).toHaveCount(0)
+
   // A channel that is off is not on the "On now" tab, and is again when it is turned on.
   await page.getByRole('switch', { name: 'Channel Comedy is on' }).click()
   await expect(page.getByText('The channel is off.')).toBeVisible()

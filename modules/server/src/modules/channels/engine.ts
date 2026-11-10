@@ -19,6 +19,8 @@ export interface PoolItem {
   seriesId?: string
   season?: number
   episode?: number
+  /** Year of release, when Jellyfin says. */
+  year?: number
   runtime: number
 }
 
@@ -37,7 +39,7 @@ export interface ChannelState {
 
 export const emptyState = (): ChannelState => ({ cycle: 0, run: [], pos: 0, cursors: {}, recent: [] })
 
-export type EngineDef = Pick<ChannelDef, 'mode' | 'order' | 'blocks' | 'timezone' | 'avoidRepeat'>
+export type EngineDef = Pick<ChannelDef, 'mode' | 'order' | 'blocks' | 'timezone' | 'avoidRepeat'> & Partial<Pick<ChannelDef, 'episodesInARow' | 'maxMinutes'>>
 
 export interface GenerateInput {
   def: EngineDef
@@ -64,6 +66,18 @@ export const MAX_RUNTIME = 12 * 3600
 
 export function usable(item: PoolItem): boolean {
   return Number.isFinite(item.runtime) && item.runtime >= MIN_RUNTIME && item.runtime <= MAX_RUNTIME
+}
+
+/**
+ * What a channel may show: the titles with a usable length and, when the channel has a longest length, only those that fit it. If
+ * nothing fits, the limit is ignored (a channel with a limit nobody can meet would be empty).
+ */
+export function playable(pool: readonly PoolItem[], def: Pick<EngineDef, 'maxMinutes'>): PoolItem[] {
+  const items = distinct(pool)
+  const limit = (def.maxMinutes ?? 0) * 60
+  if (limit <= 0) return items
+  const fits = items.filter((i) => i.runtime <= limit)
+  return fits.length ? fits : items
 }
 
 const groupKey = (item: PoolItem): string => (item.type === 'Episode' && item.seriesId ? `s:${item.seriesId}` : `i:${item.id}`)
@@ -103,14 +117,18 @@ function groupsOf(items: readonly PoolItem[]): Group[] {
  * The list a marathon goes through once.
  *  - sequential: as the sources gave them.
  *  - shuffle: in a random order.
+ *  - oldest: by year of release, the oldest first (no year: last); the same year keeps the order the sources gave.
  *  - interleave: each series' episodes stay in order, but series and films are mixed (a series with more episodes comes up more often).
+ *    A series gives `inARow` episodes (1 to 5) each time it comes up.
  */
-export function buildRun(pool: readonly PoolItem[], order: EngineDef['order'], seed: string): string[] {
+export function buildRun(pool: readonly PoolItem[], order: EngineDef['order'], seed: string, inARow = 1): string[] {
   const items = distinct(pool)
   const random = seededRandom(hashSeed(seed))
   if (order === 'sequential') return items.map((i) => i.id)
   if (order === 'shuffle') return shuffled(items, random).map((i) => i.id)
+  if (order === 'oldest') return [...items].sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999) || a.source - b.source || a.ord - b.ord).map((i) => i.id)
   const groups = groupsOf(items).map((g) => ({ ...g, next: 0 }))
+  const row = Math.min(5, Math.max(1, Math.floor(inARow) || 1))
   let remaining = items.length
   const out: string[] = []
   while (remaining > 0) {
@@ -119,9 +137,11 @@ export function buildRun(pool: readonly PoolItem[], order: EngineDef['order'], s
       const left = g.items.length - g.next
       if (left === 0) continue
       if (pick < left) {
-        out.push((g.items[g.next] as PoolItem).id)
-        g.next += 1
-        remaining -= 1
+        const first = g.items[g.next] as PoolItem
+        const take = first.type === 'Episode' ? Math.min(row, left) : 1
+        for (let i = 0; i < take; i += 1) out.push((g.items[g.next + i] as PoolItem).id)
+        g.next += take
+        remaining -= take
         break
       }
       pick -= left
@@ -211,7 +231,7 @@ export function generate(input: GenerateInput): GenerateOutput {
   const { def, seed, pool, from, until } = input
   const max = input.maxPrograms ?? 2000
   const state: ChannelState = { ...input.state, run: [...input.state.run], cursors: { ...input.state.cursors }, recent: [...input.state.recent] }
-  const items = distinct(pool)
+  const items = playable(pool, def)
   const byId = new Map(items.map((i) => [i.id, i]))
   const programs: Program[] = []
   if (items.length === 0) return { programs, state }
@@ -222,7 +242,7 @@ export function generate(input: GenerateInput): GenerateOutput {
     while (t < until && programs.length < max) {
       if (state.pos >= state.run.length) {
         state.cycle += 1
-        state.run = buildRun(items, def.order, `${seed}:${state.cycle}`)
+        state.run = buildRun(items, def.order, `${seed}:${state.cycle}`, def.episodesInARow)
         state.pos = 0
         guard += 1
         if (state.run.length === 0 || guard > 3) break
