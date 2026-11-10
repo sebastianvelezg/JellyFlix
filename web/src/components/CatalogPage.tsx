@@ -1,8 +1,11 @@
 import { StateMessage } from './StateMessage'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { readAppearance } from '../platform/web/appearance'
+import { useHidden } from '../platform/web/hidden'
 import {
   FILTER_LABELS,
+  filterNextUp,
+  filterResume,
   getContinueEpisodes,
   getBooks,
   getContinueWatching,
@@ -564,14 +567,15 @@ function ContinueRow({
   )
   const { state } = useSwr(swrKey(swrScope(session), `continue-${kind}s`), load, { fresh: 0 })
   const playVideo = usePlayVideo()
+  const hidden = useHidden()
   if (state.status !== 'ready') return null
-  const movies = state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0)
+  const movies = filterResume(hidden, state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0))
   if (movies.length === 0) return null
   return (
     <Row title={t('Continue watching')}>
       {movies.map((m) => (
         // A music video goes on with the next ones of the row.
-        <ContinueCard key={m.id} session={session} movie={m} onPlay={(v) => (v.musicVideo && playVideo ? playVideo(v, { list: movies }) : onPlay(v))} onOpen={onOpen} />
+        <ContinueCard key={m.id} session={session} movie={m} rowKind="continue" onPlay={(v) => (v.musicVideo && playVideo ? playVideo(v, { list: movies }) : onPlay(v))} onOpen={onOpen} />
       ))}
     </Row>
   )
@@ -594,10 +598,11 @@ function EpisodeRows({
     [session, libraryId, playbackVersion],
   )
   const { state } = useSwr(swrKey(swrScope(session), 'continue-episodes', libraryId), load, { fresh: 0 })
+  const hidden = useHidden()
   if (state.status !== 'ready') return null
-  const resume = state.data.resume.map((e) => overrides[e.id] ?? e).filter((e) => e.resumeTicks > 0)
+  const resume = filterResume(hidden, state.data.resume.map((e) => overrides[e.id] ?? e).filter((e) => e.resumeTicks > 0))
   // An episode you finished since this list was read is no longer "up next".
-  const next = state.data.next.map((e) => overrides[e.id] ?? e).filter((e) => !e.played && e.resumeTicks === 0)
+  const next = filterNextUp(hidden, state.data.next).map((e) => overrides[e.id] ?? e).filter((e) => !e.played && e.resumeTicks === 0)
   const open = (episode: Movie) => {
     if (isEpisode(episode)) onOpenSeries(episode.seriesId)
   }
@@ -606,14 +611,14 @@ function EpisodeRows({
       {resume.length > 0 && (
         <Row title={t('Continue watching')}>
           {resume.map((e) => (
-            <ContinueCard key={e.id} session={session} movie={e} onPlay={onPlay} onOpen={open} />
+            <ContinueCard key={e.id} session={session} movie={e} rowKind="continue" onPlay={onPlay} onOpen={open} />
           ))}
         </Row>
       )}
       {next.length > 0 && (
         <Row title={t('Next up')}>
           {next.map((e) => (
-            <ContinueCard key={e.id} session={session} movie={e} onPlay={onPlay} onOpen={open} />
+            <ContinueCard key={e.id} session={session} movie={e} rowKind="nextUp" onPlay={onPlay} onOpen={open} />
           ))}
         </Row>
       )}

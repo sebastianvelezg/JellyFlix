@@ -53,6 +53,30 @@ enum class Tab(@StringRes val label: Int, @DrawableRes val icon: Int) {
     Settings(R.string.nav_settings, R.drawable.ic_nav_settings),
 }
 
+/** Whether the sync of preferences with the account is on, whether it is running, and how the last run went. */
+data class SyncStatus(val enabled: Boolean = false, val busy: Boolean = false, val report: app.jellyflix.tv.data.SyncReport? = null)
+
+/** A change to the PIN of the account in use, started from Settings. */
+enum class PinTask { Create, Change, Remove }
+
+/** What stands in front of the app: the app itself, or the part where an account is chosen, unlocked or signed in. */
+sealed interface Gate {
+    /** An account is open and the app is showing. */
+    data object Open : Gate
+
+    /** Leaving an account: a blank moment while its player says where it stopped. */
+    data object Switching : Gate
+
+    /** "Who is watching?" */
+    data object Chooser : Gate
+
+    /** The PIN of the account [id] is being asked. */
+    class Pin(val id: String) : Gate
+
+    /** Signing in: a new account (profileId null) or a saved one that has to sign in again; [server] is fixed when it is known. */
+    class SignIn(val profileId: String?, val server: String?) : Gate
+}
+
 /** Pages that sit on top of the tabs; Back pops them. */
 sealed interface Page {
     data class Detail(val state: DetailState) : Page

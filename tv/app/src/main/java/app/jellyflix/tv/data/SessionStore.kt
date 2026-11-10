@@ -14,77 +14,124 @@ data class Session(
 class SessionStore(context: Context, private val vault: TokenVault = KeystoreVault()) {
     private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
 
+    // ---- Accounts -------------------------------------------------------------------------------------------------
+
+    private var cachedBook: ProfileBook? = null
+
     /**
-     * The token is kept sealed ("tokenSealed", see [TokenVault]). "token" is where older versions wrote it in clear: it is sealed and
-     * erased the first time it is read.
+     * Every account saved on this TV and the one in use. Tokens are kept sealed (see [TokenVault], "tokenSealed" inside each entry).
+     * The single session older versions kept is turned into the first account the first time this is read.
      */
-    fun load(): Session? {
-        val server = prefs.getString("server", null) ?: return null
-        val read = readToken(prefs.getString("tokenSealed", null), prefs.getString("token", null), vault)
-        if (read.reseal != null || read.dropPlain) {
-            prefs.edit {
-                read.reseal?.let { putString("tokenSealed", it) }
-                if (read.dropPlain) remove("token")
+    val book: ProfileBook
+        get() = cachedBook ?: readBook().also { cachedBook = it }
+
+    /** Stores the new state of the accounts. */
+    fun commit(next: ProfileBook) {
+        cachedBook = next
+        prefs.edit { putString("profiles", ProfileCodec.encode(next, vault)) }
+    }
+
+    /** The session of the account in use, or null when nobody is (or that account has to sign in again). */
+    fun load(): Session? = book.active?.session()
+
+    /** An account signed in: it is saved (or gets its new token) and becomes the one in use. */
+    fun save(session: Session, now: Long = System.currentTimeMillis()) {
+        commit(book.signedIn(session, now))
+        lastServer = session.serverUrl
+    }
+
+    /** The account is forgotten, with everything this TV kept for it (its PIN, its remembered tracks and last channel, its visits). */
+    fun remove(id: String) {
+        prefs.edit {
+            for (base in ACCOUNT_OWNED_KEYS) remove("$base.$id")
+            for (key in Appearance().encode().keys) remove("look.$key.$id")
+        }
+        commit(book.removed(id))
+    }
+
+    private fun readBook(): ProfileBook {
+        prefs.getString("profiles", null)?.let { return ProfileCodec.decode(it, vault) }
+        return migrateSingleSession()
+    }
+
+    /** Before accounts, the app kept one session and its own data under bare keys: it becomes the first account and owns that data. */
+    private fun migrateSingleSession(): ProfileBook {
+        val migration = migrateLegacySession(prefs.all, vault, System.currentTimeMillis()) ?: return ProfileBook()
+        // One write for the new accounts and the removal of the old keys: a stop in the middle can never leave the TV with neither.
+        cachedBook = migration.book
+        prefs.edit {
+            for (key in migration.erase) remove(key)
+            for ((key, value) in migration.moved) {
+                when (value) {
+                    is String -> putString(key, value)
+                    is Long -> putLong(key, value)
+                }
             }
+            putString("profiles", ProfileCodec.encode(migration.book, vault))
         }
-        val token = read.token ?: return null
-        val userId = prefs.getString("userId", null) ?: return null
-        return Session(server, token, userId, prefs.getString("userName", "") ?: "")
+        return migration.book
     }
 
-    fun save(session: Session) = prefs.edit {
-        putString("server", session.serverUrl)
-        val sealed = vault.seal(session.accessToken)
-        if (sealed != null) {
-            putString("tokenSealed", sealed)
-            remove("token")
-        } else {
-            // This device cannot seal: keep the token as older versions did rather than lose the session.
-            putString("token", session.accessToken)
-            remove("tokenSealed")
-        }
-        putString("userId", session.userId)
-        putString("userName", session.userName)
-    }
-
-    /** Signing out forgets the session but keeps the last server address, so signing in again is quicker. */
-    fun clear() = prefs.edit {
-        remove("server")
-        remove("token")
-        remove("tokenSealed")
-        remove("userId")
-        remove("userName")
-        remove("lastChannelId")
-        remove("lastChannelName")
-        remove("seriesTracks")
-    }
+    /** The key `base` has for the account in use, or null while nobody is. */
+    private fun own(base: String): String? = book.activeId?.let { "$base.$it" }
 
     /** The audio and subtitle language chosen for each series (keyed by the series id), so the next episode starts the same way. */
     var seriesTracks: Map<String, SeriesTracks>
-        get() = decodeSeriesTracks(prefs.getString("seriesTracks", null))
-        set(value) = prefs.edit { putString("seriesTracks", encodeSeriesTracks(value)) }
+        get() = own("seriesTracks")?.let { decodeSeriesTracks(prefs.getString(it, null)) } ?: emptyMap()
+        set(value) {
+            val key = own("seriesTracks") ?: return
+            prefs.edit { putString(key, encodeSeriesTracks(value)) }
+        }
+
+    /** What the account in use has hidden from "Continue watching" and "Next up" (see [HiddenItems]). */
+    var hidden: HiddenItems
+        get() = own("hidden")?.let { HiddenItems.decode(prefs.getString(it, null)) } ?: HiddenItems()
+        set(value) {
+            val key = own("hidden") ?: return
+            prefs.edit { putString(key, HiddenItems.encode(value)) }
+        }
 
     /**
      * Starts a visit (or carries on with the current one) and says when the previous visit was last seen, or null the first time.
-     * Kept on this device only; "New since your last visit" is built on it.
+     * Kept on this device only, per account; "New since your last visit" is built on it.
      */
     fun startVisit(now: Long): Long? {
+        val seenKey = own("visitSeen") ?: return null
+        val sinceKey = own("visitSince") ?: return null
         val visit = nextVisit(
-            storedSeen = prefs.getLong("visitSeen", 0L).takeIf { it > 0 },
-            storedSince = prefs.getLong("visitSince", 0L).takeIf { it > 0 },
+            storedSeen = prefs.getLong(seenKey, 0L).takeIf { it > 0 },
+            storedSince = prefs.getLong(sinceKey, 0L).takeIf { it > 0 },
             now = now,
         )
         prefs.edit {
-            putLong("visitSeen", visit.seen)
-            putLong("visitSince", visit.since ?: 0L)
+            putLong(seenKey, visit.seen)
+            putLong(sinceKey, visit.since ?: 0L)
         }
         return visit.since
     }
 
-    /** How the TV looks: background, accent, poster size and the Home rows (Settings, Appearance). It survives signing out. */
+    /**
+     * How the TV looks: background, accent, poster size and the Home rows (Settings, Appearance). Each account has its own look; what the
+     * TV had before accounts (or with nobody signed in) is the one an account starts from.
+     */
     var appearance: Appearance
-        get() = Appearance.decode { prefs.getString("look.$it", null) }
-        set(value) = prefs.edit { value.encode().forEach { (key, text) -> putString("look.$key", text) } }
+        get() = Appearance.decode { key -> own("look.$key")?.let { prefs.getString(it, null) } ?: prefs.getString("look.$key", null) }
+        set(value) = prefs.edit {
+            value.encode().forEach { (key, text) -> putString(own("look.$key") ?: "look.$key", text) }
+        }
+
+    /** The optional sync of preferences with the account (see [SyncPrefsState]) for the account in use; off until turned on. */
+    var syncState: SyncPrefsState
+        get() = own("sync")?.let { SyncPrefsState.decode(prefs.getString(it, null)) } ?: SyncPrefsState()
+        set(value) {
+            val key = own("sync") ?: return
+            prefs.edit { putString(key, value.encode()) }
+        }
+
+    /** With two or more accounts, "Who is watching?" opens at every start (on by default); off opens the last account straight away. */
+    var askWhoAtStart: Boolean
+        get() = prefs.getBoolean("askWhoAtStart", true)
+        set(value) = prefs.edit { putBoolean("askWhoAtStart", value) }
 
     /** The next episode starts by itself when one ends (on by default, like the web client). */
     var autoplayNext: Boolean
@@ -102,16 +149,24 @@ class SessionStore(context: Context, private val vault: TokenVault = KeystoreVau
         get() = prefs.getString("liveCategory", "all") ?: "all"
         set(value) = prefs.edit { putString("liveCategory", value) }
 
-    /** Live TV: the channel watched last, as its id and name. */
+    /** Live TV: the channel watched last by the account in use, as its id and name. */
     var lastChannel: Pair<String, String>?
-        get() = prefs.getString("lastChannelId", null)?.let { id -> id to (prefs.getString("lastChannelName", "") ?: "") }
-        set(value) = prefs.edit {
-            if (value == null) {
-                remove("lastChannelId")
-                remove("lastChannelName")
-            } else {
-                putString("lastChannelId", value.first)
-                putString("lastChannelName", value.second)
+        get() {
+            val idKey = own("lastChannelId") ?: return null
+            val nameKey = own("lastChannelName") ?: return null
+            return prefs.getString(idKey, null)?.let { id -> id to (prefs.getString(nameKey, "") ?: "") }
+        }
+        set(value) {
+            val idKey = own("lastChannelId") ?: return
+            val nameKey = own("lastChannelName") ?: return
+            prefs.edit {
+                if (value == null) {
+                    remove(idKey)
+                    remove(nameKey)
+                } else {
+                    putString(idKey, value.first)
+                    putString(nameKey, value.second)
+                }
             }
         }
 

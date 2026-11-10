@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { authorizeQuickConnect, CLIENT_VERSION, languageName, type Session } from '../core'
+import { CLIENT_VERSION, languageName, STILL_WATCHING_CHOICES, type Session } from '../core'
 import {
   clearBrowsePrefs,
   clearSeriesPrefs,
@@ -21,6 +21,7 @@ import {
   type SubtitleSize,
   type TimeLabel,
 } from '../platform/web/prefs'
+import { ApproveCode } from './ApproveCode'
 import { BackIcon } from './icons'
 import { LANGUAGES, t, tr, type LanguageChoice } from '../i18n'
 import { chooseLanguage } from './useLanguage'
@@ -29,6 +30,7 @@ import { PluginsSettings } from './PluginsSettings'
 import { useIsAdmin } from './admin/editorEvents'
 import { AppearanceSettings } from './AppearanceSettings'
 import { SettingsBackup } from './SettingsBackup'
+import { SyncSettings } from './SyncSettings'
 import { openShortcuts } from './ShortcutsDialog'
 import { Card, Toggle } from './SettingsParts'
 import { KidsCard } from './KidsMode'
@@ -69,55 +71,6 @@ function InstallApp() {
         {t('Chrome and Edge only offer the install button on a secure address (https:// or localhost); on plain http the menu entry just adds a shortcut.')}
       </p>
     </div>
-  )
-}
-
-/** The other half of Quick Connect: types the code a TV is showing, so that TV signs in as this user. */
-function ApproveCode({ session }: { session: Session }) {
-  const [code, setCode] = useState('')
-  const [state, setState] = useState<{ kind: 'idle' } | { kind: 'busy' } | { kind: 'done' } | { kind: 'error'; message: string }>({ kind: 'idle' })
-  async function approve(event: React.FormEvent) {
-    event.preventDefault()
-    setState({ kind: 'busy' })
-    try {
-      await authorizeQuickConnect(session, code)
-      setCode('')
-      setState({ kind: 'done' })
-    } catch (e) {
-      setState({ kind: 'error', message: t(e instanceof Error ? e.message : 'Something went wrong.') })
-    }
-  }
-  return (
-    <form onSubmit={approve} className="space-y-2">
-      <label htmlFor="approve-code" className="block text-sm font-medium text-neutral-100">
-        {t('Code shown on the other screen')}
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <input
-          id="approve-code"
-          className="field w-40 text-center font-mono tracking-[0.3em]"
-          inputMode="numeric"
-          autoComplete="off"
-          maxLength={7}
-          placeholder="000000"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/[^\d ]/g, ''))}
-        />
-        <button type="submit" className="btn" disabled={state.kind === 'busy' || code.replace(/\s/g, '').length !== 6}>
-          {t('Approve')}
-        </button>
-      </div>
-      {state.kind === 'done' && (
-        <p role="status" className="alert-info">
-          {t('Done. The other device is signing in.')}
-        </p>
-      )}
-      {state.kind === 'error' && (
-        <p role="alert" className="alert-error">
-          {state.message}
-        </p>
-      )}
-    </form>
   )
 }
 
@@ -453,6 +406,8 @@ export function SettingsPage({
 
         <KidsCard session={session} />
 
+        <SyncSettings session={session} />
+
         <Card title={t('Install')} description={t('Add Jellyflix to the home screen or desktop of this device.')}>
           <InstallApp />
         </Card>
@@ -484,6 +439,26 @@ export function SettingsPage({
               ))}
             </select>
           </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label htmlFor="still-watching" className="text-sm font-medium text-neutral-100">
+              {t('Ask “Are you still watching?”')}
+            </label>
+            <select
+              id="still-watching"
+              className="select"
+              value={player.stillWatchingAfter}
+              onChange={(e) => updatePlayer({ stillWatchingAfter: Number(e.target.value) })}
+            >
+              {STILL_WATCHING_CHOICES.map((count) => (
+                <option key={count} value={count}>
+                  {count === 0 ? t('Never') : t('After {count} titles in a row', { count })}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="-mt-2 text-xs text-neutral-500">
+            {t('When titles keep starting by themselves, the next one waits for you to answer, and playback stops if nobody does. Pressing Play yourself starts the count again. The sleep timer is in the player’s settings menu.')}
+          </p>
           <Toggle
             label={t('Cinema mode')}
             hint={t('The picture fades in from black and the controls get out of the way sooner, even while paused. You can also switch it in the player.')}

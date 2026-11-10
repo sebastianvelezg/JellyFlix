@@ -46,12 +46,21 @@ fun SignInScreen(
     busy: Boolean,
     error: String?,
     quickCode: String?,
+    /** What the QR holds (null: no QR) and when the code stops being waited for (SystemClock.elapsedRealtime). */
+    quickLink: String? = null,
+    quickExpiresAt: Long = 0L,
     onQuickConnect: (server: String) -> Unit,
     onCancelQuickConnect: () -> Unit,
     onSignIn: (server: String, user: String, password: String) -> Unit,
+    /** The server is known (adding an account to this TV's server, or an account that has to sign in again): it cannot be typed over. */
+    fixedServer: String? = null,
+    /** An account that has to sign in again: its name is filled in. */
+    accountName: String? = null,
+    /** Back to the picker of accounts, when there is one. */
+    onBack: (() -> Unit)? = null,
 ) {
-    var server by remember { mutableStateOf(initialServer) }
-    var user by remember { mutableStateOf("") }
+    var server by remember { mutableStateOf(fixedServer ?: initialServer) }
+    var user by remember { mutableStateOf(accountName.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var withPassword by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
@@ -59,40 +68,88 @@ fun SignInScreen(
     val codeButton = remember { FocusRequester() }
     val firstField = remember { FocusRequester() }
     LaunchedEffect(withPassword) { if (withPassword) firstField.requestFocusSoon() }
-    LaunchedEffect(quickCode) { if (quickCode == null && !withPassword && initialServer.isNotBlank()) codeButton.requestFocusSoon() }
+    LaunchedEffect(quickCode) { if (quickCode == null && !withPassword && (initialServer.isNotBlank() || fixedServer != null)) codeButton.requestFocusSoon() }
 
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(painterResource(R.drawable.logo), contentDescription = null, modifier = Modifier.size(96.dp))
-        Image(painterResource(R.drawable.wordmark), contentDescription = stringResource(R.string.app_name), modifier = Modifier.height(40.dp))
+        // With a code on screen the logo gives its room to the code and the QR.
+        if (quickCode == null) {
+            Image(painterResource(R.drawable.logo), contentDescription = null, modifier = Modifier.size(96.dp))
+            Image(painterResource(R.drawable.wordmark), contentDescription = stringResource(R.string.app_name), modifier = Modifier.height(40.dp))
+        }
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.signin_tagline), color = Palette.TextDim)
+        Text(
+            when {
+                accountName != null -> stringResource(R.string.signin_again, accountName)
+                fixedServer != null -> stringResource(R.string.signin_adding, fixedServer)
+                else -> stringResource(R.string.signin_tagline)
+            },
+            color = Palette.TextDim,
+        )
         Spacer(Modifier.height(28.dp))
 
         val fieldModifier = Modifier.width(480.dp)
         if (quickCode != null) {
+            // The code and the QR sit side by side: scan it with a phone, or type the code on any device that is signed in.
+            var secondsLeft by remember(quickCode) { mutableStateOf(secondsUntil(quickExpiresAt)) }
+            LaunchedEffect(quickCode, quickExpiresAt) {
+                while (true) {
+                    secondsLeft = secondsUntil(quickExpiresAt)
+                    kotlinx.coroutines.delay(1_000)
+                }
+            }
             Text(stringResource(R.string.signin_code_title), fontSize = 18.sp, color = Palette.TextDim)
             Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(48.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        quickCode.chunked(3).joinToString(" "),
+                        fontSize = 64.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 6.sp,
+                        color = Palette.Accent,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.signin_code_steps),
+                        fontSize = 15.sp,
+                        color = Palette.TextDim,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(460.dp),
+                    )
+                }
+                if (quickLink != null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        QrImage(quickLink, stringResource(R.string.signin_qr_description), size = 190.dp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(stringResource(R.string.signin_qr_caption), fontSize = 14.sp, color = Color.White)
+                        Text(
+                            quickLink.substringBefore("/#"),
+                            fontSize = 12.sp,
+                            color = Palette.TextDim,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.width(260.dp),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Text(
-                quickCode.chunked(3).joinToString(" "),
-                fontSize = 64.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 6.sp,
-                color = Palette.Accent,
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.signin_code_steps),
-                fontSize = 15.sp,
+                if (secondsLeft > 0) stringResource(R.string.signin_expires, "%d:%02d".format(secondsLeft / 60, secondsLeft % 60)) else "",
+                fontSize = 14.sp,
                 color = Palette.TextDim,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.width(560.dp),
+                modifier = Modifier.height(20.dp),
             )
-            Spacer(Modifier.height(24.dp))
-            Pill(stringResource(R.string.signin_cancel), onClick = onCancelQuickConnect, modifier = Modifier.focusRequester(codeButton))
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Pill(stringResource(R.string.signin_new_code), onClick = { onQuickConnect(server) }, modifier = Modifier.focusRequester(codeButton))
+                Pill(stringResource(R.string.signin_cancel), onClick = onCancelQuickConnect)
+            }
             LaunchedEffect(Unit) { codeButton.requestFocusSoon() }
         } else {
             OutlinedTextField(
@@ -100,7 +157,8 @@ fun SignInScreen(
                 onValueChange = { server = it },
                 label = { androidx.compose.material3.Text(stringResource(R.string.signin_server)) },
                 singleLine = true,
-                modifier = fieldModifier.then(if (withPassword) Modifier.focusRequester(firstField) else Modifier),
+                enabled = fixedServer == null,
+                modifier = fieldModifier.then(if (withPassword && fixedServer == null) Modifier.focusRequester(firstField) else Modifier),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }),
             )
@@ -121,7 +179,7 @@ fun SignInScreen(
                     onValueChange = { user = it },
                     label = { androidx.compose.material3.Text(stringResource(R.string.signin_user)) },
                     singleLine = true,
-                    modifier = fieldModifier,
+                    modifier = fieldModifier.then(if (fixedServer != null) Modifier.focusRequester(firstField) else Modifier),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }),
                 )
@@ -147,9 +205,17 @@ fun SignInScreen(
                 }
             }
         }
+        if (onBack != null && quickCode == null) {
+            Spacer(Modifier.height(20.dp))
+            Pill(stringResource(R.string.signin_back), onClick = onBack)
+        }
         if (error != null) {
             Spacer(Modifier.height(16.dp))
             Text(error, color = Color(0xFFFF6B6B), textAlign = TextAlign.Center, modifier = Modifier.width(560.dp))
         }
     }
 }
+
+/** Whole seconds from now until [expiresAt] (SystemClock.elapsedRealtime), never below zero. */
+private fun secondsUntil(expiresAt: Long): Int =
+    if (expiresAt <= 0L) 0 else ((expiresAt - android.os.SystemClock.elapsedRealtime() + 999) / 1000).toInt().coerceAtLeast(0)

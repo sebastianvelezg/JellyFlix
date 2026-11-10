@@ -16,6 +16,65 @@
  */
 export { connect, logout, ConnectionError, type ConnectOptions } from './auth'
 export {
+  EMPTY_SYNC_FILE,
+  hasNewerSection,
+  MAX_SYNC_CHARS,
+  parseSyncFile,
+  parseSyncState,
+  planFirstActivation,
+  planSection,
+  pushStamp,
+  readableSection,
+  serializeSyncFile,
+  serverTimeFromHeader,
+  SYNC_FORMAT,
+  SYNC_OFF,
+  SYNC_SECTIONS,
+  withSection,
+  type FirstActivation,
+  type RemoteSection,
+  type SectionAction,
+  type SectionState,
+  type SyncFile,
+  type SyncSectionName,
+  type PrefsSyncState,
+} from './syncPrefs'
+export {
+  decideAtEnd,
+  NO_STREAK,
+  SLEEP_MINUTES,
+  SLEEP_WARNING_SECONDS,
+  sleepAfterMinutes,
+  sleepSecondsLeft,
+  sleepState,
+  startOfPlayback,
+  STILL_WATCHING_ANSWER_SECONDS,
+  STILL_WATCHING_CHOICES,
+  type EndDecision,
+  type SleepState,
+  type SleepTimer,
+  type Streak,
+} from './watchLimit'
+export {
+  filterNextUp,
+  filterResume,
+  hiddenCount,
+  hiddenMargin,
+  hideFromNextUp,
+  hideFromResume,
+  isNextUpHidden,
+  isResumeHidden,
+  listHidden,
+  NO_HIDDEN,
+  parseHidden,
+  restoreAllHidden,
+  restoreHidden,
+  type HiddenEntry,
+  type HiddenItems,
+  type HiddenKind,
+  type HiddenListed,
+} from './hidden'
+export {
   controlDevice,
   deviceKindOf,
   getRemoteDevices,
@@ -344,7 +403,7 @@ export {
   restoreFields,
   validateFields,
 } from './adminFields'
-export { MAX_SETTINGS_CHARS, loadSettingsFromServer, saveSettingsToServer } from './displayPrefs'
+export { MAX_SETTINGS_CHARS, loadSettingsFromServer, loadSyncText, saveSettingsToServer, saveSyncText } from './displayPrefs'
 export {
   MIN_RATINGS,
   NO_FILTERS,

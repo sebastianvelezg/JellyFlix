@@ -449,9 +449,9 @@ No, only Jellyfin.
 
 ## 🛣️ What could come next
 
-Jellyflix 1.5 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
+Jellyflix 1.6 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
 
-- **Modules:** a "YouTube without YouTube" module (subscribe to channels, downloaded without ads), a yearly **Wrapped** of what you watched, and more; see the [module plan](docs/MODULES-PLAN.md).
+- **Modules:** a **Seerr** module (search and request titles from Jellyflix, only there when you install it), a "YouTube without YouTube" module (subscribe to channels, downloaded without ads), a yearly **Wrapped** of what you watched, and more; see the [module plan](docs/MODULES-PLAN.md).
 - **Playback:** recording and timers for live TV, watch together on the TV app.
 - **Books:** a reader for the TV app, Mobi and RAR comics.
 - **Sign in:** find servers on the network, several servers and users.

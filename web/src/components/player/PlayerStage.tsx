@@ -24,13 +24,14 @@ import {
 import { reportStopOnPageHide } from '../../platform/web/browser'
 import { attachMedia, type Attached } from '../../platform/web/mediaAttach'
 import { readPlayerPrefs, readSeriesPrefs, writePlayerPrefs } from '../../platform/web/prefs'
+import { getStreak, setSleepTimer, useSleepTimer } from '../../platform/web/watchGuard'
 import type { PlaybackController } from '../remote/controller'
 import { useRegisterPlayback } from '../remote/RemoteProvider'
 import { useSyncPlay, useSyncPlayVideo } from '../syncplay/SyncPlayProvider'
 import { Controls, type ChannelChrome } from './Controls'
 import { DOCK_BAR_CLASS, DOCK_THUMB_CLASS } from './dock'
 import { enterFullscreen, inFullscreen, leaveFullscreen } from './fullscreen'
-import { BufferingSpinner, Curtain, ErrorPanel, MiniBar, SkipSegmentButton, SubtitleNotice, SyncNote, UpNextCard } from './PlayerOverlays'
+import { BufferingSpinner, Curtain, ErrorPanel, MiniBar, SkipSegmentButton, SleepWarning, StillWatchingDialog, SubtitleNotice, SyncNote, UpNextCard } from './PlayerOverlays'
 import { handlePlayerKey } from './playerKeys'
 import { SubtitleOverlay, type SubtitleStyle } from './SubtitleOverlay'
 import { SubtitleSearchDialog } from './SubtitleSearchDialog'
@@ -41,6 +42,7 @@ import { useSubtitleSync } from './useSubtitleSync'
 import { useSubtitleTrack } from './useSubtitleTrack'
 import { useTrickplay } from './useTrickplay'
 import { useUpNext } from './useUpNext'
+import { useWatchGuard } from './useWatchGuard'
 import { getLanguage, t } from '../../i18n'
 
 const PROGRESS_INTERVAL_MS = 10_000
@@ -250,7 +252,14 @@ export function PlayerStage({
   )
 
   // Near the end the card shows what follows; once the title ends it counts down (when autoplay is on) and moves on.
-  const upNext = useUpNext({ flow, next, error: !!error, autoplay, duration, currentTime, countdownSeconds, goNext, onNext })
+  // "Are you still watching?" and the sleep timer decide whether the next title starts by itself.
+  const guard = useWatchGuard({ itemId: movie.id, next, limit: initialPrefs.stillWatchingAfter, goNext, stop: back, flow })
+  const upNext = useUpNext({ flow, next, error: !!error, autoplay, duration, currentTime, countdownSeconds, goNext: guard.autoNext, onNext })
+  const sleepTimer = useSleepTimer()
+  const { onTitleEnded } = guard
+  useEffect(() => {
+    if (upNext.ended) onTitleEnded()
+  }, [upNext.ended, onTitleEnded])
 
   // Apply remembered volume and the chosen speed before the stream starts.
   useEffect(() => {
@@ -652,7 +661,13 @@ export function PlayerStage({
             <SkipSegmentButton segment={segment} next={next} onSkip={skipSegment} />
           )}
 
-          {upNext.visible && next && (
+          {guard.asking && (
+            <StillWatchingDialog count={getStreak().count} secondsLeft={guard.answerLeft} onKeep={guard.keepWatching} onStop={guard.stopWatching} />
+          )}
+
+          {guard.sleepWarning !== null && !guard.asking && <SleepWarning secondsLeft={guard.sleepWarning} onKeep={guard.cancelSleep} />}
+
+          {upNext.visible && next && !guard.asking && (
             <UpNextCard
               next={next}
               phase={upNext.phase}
@@ -737,6 +752,7 @@ export function PlayerStage({
               setAutoplay(on)
               writePlayerPrefs({ autoplayNext: on })
             } } : undefined}
+            sleepTimer={flow || mini ? undefined : { value: sleepTimer, onChange: setSleepTimer }}
           />
 
           {searchOpen && (

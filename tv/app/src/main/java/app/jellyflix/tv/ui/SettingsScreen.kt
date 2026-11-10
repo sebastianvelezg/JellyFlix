@@ -51,6 +51,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import app.jellyflix.tv.AppViewModel
+import app.jellyflix.tv.PinTask
 import app.jellyflix.tv.R
 import app.jellyflix.tv.data.ACCENTS
 import app.jellyflix.tv.data.CANVASES
@@ -66,6 +67,7 @@ import app.jellyflix.tv.data.accentColor
 import app.jellyflix.tv.data.PluginCard
 import app.jellyflix.tv.data.QualityLimit
 import app.jellyflix.tv.data.NextUpWindow
+import app.jellyflix.tv.data.StillWatching
 import app.jellyflix.tv.data.ScreenMargin
 import app.jellyflix.tv.data.ScreensaverDelay
 import app.jellyflix.tv.data.ScreensaverRating
@@ -143,6 +145,13 @@ private fun PlaybackTab(vm: AppViewModel, first: FocusRequester) {
     val s = vm.settings
     TabBody {
         Toggle(stringResource(R.string.settings_autoplay_next), vm.autoplayNext, Modifier.focusRequester(first)) { vm.updateAutoplayNext(!vm.autoplayNext) }
+        Choice(
+            title = stringResource(R.string.settings_still),
+            options = StillWatching.entries.map { if (it.count == 0) stringResource(R.string.still_off) else stringResource(R.string.still_after, it.count) },
+            selected = s.stillWatching.ordinal,
+            onSelect = { i -> vm.updateSettings { it.copy(stillWatching = StillWatching.entries[i]) } },
+            note = stringResource(R.string.settings_still_note),
+        )
         SkipChoice(R.string.settings_skip_intro, s.skipIntro) { v -> vm.updateSettings { it.copy(skipIntro = v) } }
         SkipChoice(R.string.settings_skip_recap, s.skipRecap) { v -> vm.updateSettings { it.copy(skipRecap = v) } }
         SkipChoice(R.string.settings_skip_credits, s.skipOutro) { v -> vm.updateSettings { it.copy(skipOutro = v) } }
@@ -390,6 +399,23 @@ private fun AppearanceTab(vm: AppViewModel, first: FocusRequester) {
         }
         Pill(stringResource(R.string.appearance_restore_order), onClick = { vm.updateHome { it.copy(order = HomeRow.entries) } })
 
+        SectionTitle(stringResource(R.string.sync_title), Modifier.padding(top = 12.dp), inset = false)
+        Note(stringResource(R.string.sync_note))
+        val sync = vm.syncStatus
+        Toggle(stringResource(R.string.sync_toggle), sync.enabled) { if (sync.enabled) vm.stopSync() else vm.startSync() }
+        if (sync.enabled) {
+            val report = sync.report
+            Note(
+                when {
+                    sync.busy -> stringResource(R.string.sync_busy)
+                    report?.error != null -> stringResource(R.string.sync_error)
+                    report != null -> stringResource(R.string.sync_last, java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(report.at)))
+                    else -> stringResource(R.string.sync_never)
+                },
+            )
+            Pill(stringResource(R.string.sync_now), onClick = vm::syncNow)
+        }
+
         SectionTitle(stringResource(R.string.backup_title), Modifier.padding(top = 12.dp), inset = false)
         Note(stringResource(R.string.backup_note))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -537,7 +563,36 @@ private fun AccountTab(vm: AppViewModel, first: FocusRequester) {
         Text(stringResource(R.string.settings_account, vm.userName), fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
         Text(stringResource(R.string.settings_server, vm.serverUrl), fontSize = 15.sp, color = Palette.TextDim)
 
-        Pill(stringResource(R.string.stats_open), onClick = vm::openStats, modifier = Modifier.padding(top = 14.dp).focusRequester(first))
+        // Accounts of this TV: switch, add, a PIN for this one, and forgetting it (twice: the remote's OK is easy to press by accident).
+        SectionTitle(stringResource(R.string.settings_profiles), Modifier.padding(top = 14.dp), inset = false)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Pill(stringResource(R.string.settings_switch_profile), onClick = vm::switchProfile, modifier = Modifier.focusRequester(first))
+            if (vm.profiles.canAdd) Pill(stringResource(R.string.settings_add_account), onClick = vm::addAccount)
+        }
+        val mine = vm.profiles.active
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+            if (mine?.hasPin == true) {
+                Pill(stringResource(R.string.settings_change_pin), onClick = { vm.startPinTask(PinTask.Change) })
+                Pill(stringResource(R.string.settings_remove_pin), onClick = { vm.startPinTask(PinTask.Remove) })
+            } else {
+                Pill(stringResource(R.string.settings_set_pin), onClick = { vm.startPinTask(PinTask.Create) })
+            }
+        }
+        Note(stringResource(R.string.pin_note))
+        if (vm.profiles.profiles.size >= 2) {
+            Toggle(stringResource(R.string.settings_ask_who), vm.askWhoAtStart, Modifier) { vm.updateAskWhoAtStart(!vm.askWhoAtStart) }
+        }
+        Pill(
+            stringResource(if (confirmSignOut) R.string.settings_sign_out_confirm else R.string.settings_sign_out),
+            onClick = { if (confirmSignOut) vm.signOut() else confirmSignOut = true },
+            modifier = Modifier.padding(top = 12.dp).onFocusChanged { if (!it.hasFocus) confirmSignOut = false },
+            accent = confirmSignOut,
+        )
+
+        Pill(stringResource(R.string.settings_hidden_open), onClick = vm::openHiddenList, modifier = Modifier.padding(top = 18.dp))
+        Text(stringResource(R.string.settings_hidden_note), fontSize = 13.sp, color = Palette.TextDim)
+
+        Pill(stringResource(R.string.stats_open), onClick = vm::openStats, modifier = Modifier.padding(top = 18.dp))
         Text(stringResource(R.string.stats_open_note), fontSize = 13.sp, color = Palette.TextDim)
 
         SectionTitle(stringResource(R.string.settings_storage), Modifier.padding(top = 18.dp), inset = false)
@@ -550,14 +605,6 @@ private fun AccountTab(vm: AppViewModel, first: FocusRequester) {
                 loader.diskCache?.clear()
                 Toast.makeText(context, cleared, Toast.LENGTH_SHORT).show()
             },
-        )
-
-        // Signing out asks twice: the remote's OK is easy to press by accident.
-        Pill(
-            stringResource(if (confirmSignOut) R.string.settings_sign_out_confirm else R.string.settings_sign_out),
-            onClick = { if (confirmSignOut) vm.signOut() else confirmSignOut = true },
-            modifier = Modifier.padding(top = 18.dp).onFocusChanged { if (!it.hasFocus) confirmSignOut = false },
-            accent = confirmSignOut,
         )
 
         Text(

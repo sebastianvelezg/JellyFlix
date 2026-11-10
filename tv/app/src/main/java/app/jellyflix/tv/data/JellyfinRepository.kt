@@ -128,6 +128,11 @@ class JellyfinRepository(context: Context) {
 
     private fun userId(session: Session): UUID = UUID.fromString(session.userId)
 
+    /** Tells the server this TV is done with the account, so its token stops working (the device leaves the server's list). */
+    suspend fun endSession(session: Session) {
+        api(session).sessionApi.reportSessionEnded()
+    }
+
     /** "jellyfin.local:8096" becomes "http://jellyfin.local:8096", "media.example.com" becomes "https://media.example.com". */
     fun normalizeServer(raw: String): String = ServerAddress.normalize(raw)
 
@@ -840,6 +845,27 @@ class JellyfinRepository(context: Context) {
             user,
             AppearanceBackup.PREFS_CLIENT,
             current.copy(id = AppearanceBackup.PREFS_ID, client = AppearanceBackup.PREFS_CLIENT, customPrefs = current.customPrefs + (AppearanceBackup.PREFS_FIELD to text)),
+        )
+    }
+
+    /** The synced preferences' text and the server's clock (from the answer's Date header), see [SyncEngine]. */
+    suspend fun loadSyncText(session: Session): RemoteText {
+        val response = api(session).displayPreferenceApi.getDisplayPreferences(AppearanceBackup.PREFS_ID, userId(session), AppearanceBackup.PREFS_CLIENT)
+        val date = response.headers.entries.firstOrNull { it.key.equals("date", ignoreCase = true) }?.value?.firstOrNull()
+        val serverTime = date?.let { runCatching { java.time.ZonedDateTime.parse(it, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() }.getOrNull() }
+        return RemoteText(response.content.customPrefs["sync"], serverTime)
+    }
+
+    /** Writes the synced preferences, keeping everything else in the user's display preferences as it was. */
+    suspend fun saveSyncText(session: Session, text: String) {
+        val api = api(session)
+        val user = userId(session)
+        val current = api.displayPreferenceApi.getDisplayPreferences(AppearanceBackup.PREFS_ID, user, AppearanceBackup.PREFS_CLIENT).content
+        api.displayPreferenceApi.updateDisplayPreferences(
+            AppearanceBackup.PREFS_ID,
+            user,
+            AppearanceBackup.PREFS_CLIENT,
+            current.copy(id = AppearanceBackup.PREFS_ID, client = AppearanceBackup.PREFS_CLIENT, customPrefs = current.customPrefs + ("sync" to text)),
         )
     }
 

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { addToWatchLater, type Movie, type Session } from '../core'
+import { addToWatchLater, isEpisode, type Movie, type Session } from '../core'
 import { t } from '../i18n'
 import { openAddToPlaylist } from './AddToPlaylistDialog'
 import { openItemEditor, useIsAdmin } from './admin/editorEvents'
-import { CheckIcon, HeartIcon, InfoIcon, PencilIcon, PlusIcon } from './icons'
+import { CheckIcon, EyeOffIcon, HeartIcon, InfoIcon, PencilIcon, PlusIcon } from './icons'
+import { hideFromContinue, hideSeriesFromNextUp } from './hiddenActions'
 import { notifyPlaylistsChanged } from './playlistEvents'
 import { showToast } from './toast'
 import { useToggles } from './useToggles'
@@ -39,11 +40,17 @@ export function CardMenu({
   movie,
   onOpen,
   onChange,
+  rowKind,
+  corner = 'right',
 }: {
   session: Session
   movie: Movie
   onOpen: (movie: Movie) => void
   onChange: (next: Movie) => void
+  /** The card is in "Continue watching" or in "Next up": the menu then offers to hide it from that row. */
+  rowKind?: 'continue' | 'nextUp'
+  /** Which top corner the button sits in (the right one may be taken by the card's own button). */
+  corner?: 'left' | 'right'
 }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -93,7 +100,7 @@ export function CardMenu({
   }
 
   return (
-    <div ref={root} className="absolute right-2 top-2 z-20">
+    <div ref={root} className={`absolute top-2 z-20 ${corner === 'left' ? 'left-2' : 'right-2'}`}>
       <button
         ref={trigger}
         type="button"
@@ -112,7 +119,7 @@ export function CardMenu({
           role="menu"
           aria-label={t('Options for {name}', { name: movie.name })}
           onKeyDown={onKeyDown}
-          className="absolute right-0 top-full mt-1.5 w-max min-w-[10rem] max-w-[min(15rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-white/10 bg-[var(--color-surface-2)]/95 p-1 shadow-[0_18px_50px_-10px_rgba(0,0,0,0.85)] backdrop-blur-xl"
+          className={`absolute ${corner === 'left' ? 'left-0' : 'right-0'} top-full mt-1.5 w-max min-w-[10rem] max-w-[min(15rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-white/10 bg-[var(--color-surface-2)]/95 p-1 shadow-[0_18px_50px_-10px_rgba(0,0,0,0.85)] backdrop-blur-xl`}
         >
           <button
             type="button"
@@ -125,6 +132,32 @@ export function CardMenu({
           >
             <InfoIcon /> {t('Details')}
           </button>
+          {rowKind === 'continue' && (
+            <button
+              type="button"
+              role="menuitem"
+              className={item}
+              onClick={() => {
+                close(false)
+                hideFromContinue(movie)
+              }}
+            >
+              <EyeOffIcon /> {t('Hide from Continue watching')}
+            </button>
+          )}
+          {rowKind === 'nextUp' && isEpisode(movie) && (
+            <button
+              type="button"
+              role="menuitem"
+              className={item}
+              onClick={() => {
+                close(false)
+                hideSeriesFromNextUp(movie)
+              }}
+            >
+              <EyeOffIcon /> {t('Hide series from Next up')}
+            </button>
+          )}
           {!movie.isSeries && (
             <>
               <button
@@ -196,7 +229,7 @@ export function CardMenu({
       {actionError && (
         <p
           role="alert"
-          className="absolute right-0 top-full mt-1.5 w-max max-w-[min(15rem,calc(100vw-2rem))] rounded-lg border border-red-500/30 bg-[var(--color-surface-2)] px-2.5 py-1.5 text-xs text-red-200 shadow-lg"
+          className={`absolute ${corner === 'left' ? 'left-0' : 'right-0'} top-full mt-1.5 w-max max-w-[min(15rem,calc(100vw-2rem))] rounded-lg border border-red-500/30 bg-[var(--color-surface-2)] px-2.5 py-1.5 text-xs text-red-200 shadow-lg`}
         >
           {actionError}
         </p>

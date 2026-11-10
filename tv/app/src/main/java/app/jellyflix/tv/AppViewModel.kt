@@ -9,6 +9,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.jellyflix.tv.data.Album
+import app.jellyflix.tv.data.FirstActivation
+import app.jellyflix.tv.data.SyncEngine
+import app.jellyflix.tv.data.SyncPrefsState
+import app.jellyflix.tv.data.SyncReport
+import app.jellyflix.tv.data.SyncSection
+import app.jellyflix.tv.data.SyncValues
+import app.jellyflix.tv.data.EndDecision
+import app.jellyflix.tv.data.SLEEP_WARNING_MS
+import app.jellyflix.tv.data.STILL_WATCHING_ANSWER_MS
+import app.jellyflix.tv.data.SleepTimer
+import app.jellyflix.tv.data.decideAtEnd
+import app.jellyflix.tv.data.HiddenItems
+import app.jellyflix.tv.data.HiddenKind
+import app.jellyflix.tv.data.hiddenLabel
+import app.jellyflix.tv.data.QUICK_CONNECT_WINDOW_MS
+import app.jellyflix.tv.data.quickConnectLink
+import app.jellyflix.tv.data.PinResult
+import app.jellyflix.tv.data.Pins
+import app.jellyflix.tv.data.Profile
+import app.jellyflix.tv.data.ProfileBook
 import app.jellyflix.tv.data.AlbumSort
 import app.jellyflix.tv.data.Artist
 import app.jellyflix.tv.data.CastMember
@@ -71,16 +91,21 @@ import app.jellyflix.tv.data.SortOption
 import app.jellyflix.tv.music.MusicPlayer
 import app.jellyflix.tv.music.MusicReporter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import android.os.SystemClock
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.exception.InvalidStatusException
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -94,17 +119,67 @@ private const val PAGE_SIZE = 60
 /** The SDK reads each response on the thread that called it, which must not be the main one. */
 private suspend fun <T> io(block: suspend () -> T): T = withContext(Dispatchers.IO) { block() }
 
+/** A synced choice is sent this long after the last change. */
+private const val SYNC_SETTLE_MS = 4_000L
+
+/** The most hidden things the Settings list shows at once (it is a list of choices over the screen). */
+private const val HIDDEN_LIST_SHOWN = 40
+
+/** The longest "Remove this account" waits for the server to end its session. */
+private const val END_SESSION_TIMEOUT_MS = 6_000L
+
+/** How long the player gets to say where it stopped before an account is left. */
+private const val LEAVE_SETTLE_MS = 400L
+
 /** All state lives here so it survives recomposition and a screen coming back from the player. */
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val failureHandler = CoroutineExceptionHandler { _, e -> if (e is Exception) fail(e) }
 
-    /** Like `viewModelScope.launch`, but a failure shows the error banner instead of crashing, and does not cancel its siblings. */
-    private fun launchSafe(block: suspend CoroutineScope.() -> Unit): Job = viewModelScope.launch(failureHandler, block = block)
+    /**
+     * What the account in use is doing. Everything started with [launchSafe] hangs from it, and it is cancelled when the account is left
+     * or its token expires, so a slow answer for one account can never land on the screens (or expire the token) of the next one.
+     */
+    private var accountJob: CompletableJob = SupervisorJob(viewModelScope.coroutineContext[Job])
+
+    private fun endAccountWork() {
+        accountJob.cancel()
+        accountJob = SupervisorJob(viewModelScope.coroutineContext[Job])
+    }
+
+    /** Work of the account in use: like `viewModelScope.launch`, but a failure shows the error banner instead of crashing and does not cancel its siblings, and it stops when the account is left. */
+    private fun launchSafe(block: suspend CoroutineScope.() -> Unit): Job = viewModelScope.launch(failureHandler + accountJob, block = block)
+
+    /** Work that belongs to no account (signing in, the picker, forgetting an account): it is not stopped when an account is left. */
+    private fun launchApp(block: suspend CoroutineScope.() -> Unit): Job = viewModelScope.launch(failureHandler, block = block)
+
+    /**
+     * A report to the server for [s] (where a video or song stopped). It finishes even if that account is left meanwhile, and a failure
+     * is only shown (or expires a token) when [s] is still the account in use.
+     */
+    private fun launchFor(s: Session, block: suspend CoroutineScope.() -> Unit): Job =
+        viewModelScope.launch(CoroutineExceptionHandler { _, e -> if (e is Exception && session?.accessToken == s.accessToken) fail(e) }, block = block)
 
     private val store = SessionStore(app)
     private val repo = JellyfinRepository(app)
 
-    private var session: Session? = store.load()
+    private var session: Session? = null
+
+    /** The accounts saved on this TV (the picker and Settings show them); it changes when one is added, removed or locked. */
+    var profiles by mutableStateOf(store.book)
+        private set
+
+    /** What stands in front of the app: the app itself, or the part where an account is chosen, unlocked or signed in. */
+    var gate by mutableStateOf<Gate>(Gate.Open)
+        private set
+
+    /** What the account in use has hidden from Continue watching and Next up. Loaded when the account opens. */
+    var hidden by mutableStateOf(HiddenItems())
+        private set
+
+    private fun commit(next: ProfileBook) {
+        store.commit(next)
+        profiles = next
+    }
 
     /** Playback preferences (Settings). */
     var autoplayNext by mutableStateOf(store.autoplayNext)
@@ -113,6 +188,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun updateAutoplayNext(on: Boolean) {
         autoplayNext = on
         store.autoplayNext = on
+        scheduleSync()
     }
 
     /** Subtitle look, quality limit, text size... (Settings). */
@@ -122,6 +198,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun updateSettings(change: (TvSettings) -> TvSettings) {
         settings = change(settings)
         store.settings = settings
+        scheduleSync()
     }
 
     /** Background, accent, poster size and Home rows (Settings, Appearance). Painted from the very first frame. */
@@ -174,6 +251,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         appearance = change(appearance)
         store.appearance = appearance
         showLook(appearance)
+        scheduleSync()
     }
 
     fun chooseCanvas(id: String) = updateAppearance { it.copy(theme = it.theme.copy(canvas = id)) }
@@ -397,26 +475,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         launchSafe { capabilities = runCatching { io { repo.capabilitySummary() } }.getOrDefault(emptyList()) }
         startScreensaverWatch()
-        session?.let { s ->
-            // What the main page showed last time goes up at once; the server's answer replaces it a moment later.
-            HomeCache.load(getApplication(), s)?.let { cached ->
-                libs = cached.libs
-                home.lineup = cached.lineup
-                home.continueRow = cached.continueRow
-                home.nextUp = cached.nextUp
-                home.newMovies = cached.newMovies
-                home.newSeries = cached.newSeries
-                home.newAnime = cached.newAnime
-                home.newMusicVideos = cached.newMusicVideos
-                home.newBooks = cached.newBooks
-                home.collections = cached.collections
-            }
-        }
-        if (session != null) {
-            loadHome()
-            startRemote()
-            modules.start()
-        }
     }
 
     // ---- Screensaver --------------------------------------------------------------------------------------------
@@ -481,16 +539,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = true
         errorText = null
         errorRes = null
-        launchSafe {
+        launchApp {
             try {
                 val s = io { repo.signIn(server, user, password) }
-                store.save(s)
-                store.lastServer = s.serverUrl
-                session = s
-                tab = Tab.Home
-                loadHome()
-                startRemote()
-                modules.start()
+                afterSignIn(s)
             } catch (e: Exception) {
                 fail(e, R.string.error_sign_in)
             } finally {
@@ -504,6 +556,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The code to type on another device while waiting for it to be approved; null when not waiting. */
     var quickCode: String? by mutableStateOf(null)
         private set
+
+    /** What the QR beside that code holds (the web page that confirms it from a phone), or null when there is nothing to build it from. */
+    var quickLink: String? by mutableStateOf(null)
+        private set
+
+    /** When the code stops being waited for (SystemClock.elapsedRealtime); the screen counts down to it. */
+    var quickExpiresAt: Long by mutableStateOf(0L)
+        private set
     private var quickJob: Job? = null
 
     /** Asks the server for a code and waits (every two seconds, up to ten minutes) for somebody to approve it. */
@@ -512,24 +572,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         quickJob?.cancel()
         errorText = null
         errorRes = null
-        quickJob = launchSafe {
+        quickJob = launchApp {
             try {
                 val start = io { repo.quickConnectStart(server) }
                 quickCode = start.code
-                var waited = 0
-                while (waited < 600_000) {
+                quickLink = quickConnectLink(store.webAddress, start.serverUrl, start.code)
+                quickExpiresAt = SystemClock.elapsedRealtime() + QUICK_CONNECT_WINDOW_MS
+                var waited = 0L
+                while (waited < QUICK_CONNECT_WINDOW_MS) {
                     delay(2_000)
                     waited += 2_000
                     if (io { repo.quickConnectApproved(start) }) {
                         val s = io { repo.quickConnectFinish(start) }
-                        store.save(s)
-                        store.lastServer = s.serverUrl
-                        session = s
-                        tab = Tab.Home
-                        loadHome()
-                        startRemote()
-                        modules.start()
-                        return@launchSafe
+                        afterSignIn(s)
+                        return@launchApp
                     }
                 }
                 errorRes = R.string.error_quick_connect_expired
@@ -540,6 +596,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 fail(e, R.string.error_sign_in)
             } finally {
                 quickCode = null
+                quickLink = null
             }
         }
     }
@@ -547,21 +604,334 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun cancelQuickConnect() {
         quickJob?.cancel()
         quickCode = null
+        quickLink = null
     }
 
+    // ---- Sync of preferences with the account (rules: data/SyncPrefs.kt) --------------------------------------------------------
+
+    /** Whether the sync is on, whether it is running, and how the last run went. */
+    var syncStatus by mutableStateOf(SyncStatus())
+        private set
+    private var syncJob: Job? = null
+    private var syncRunning = false
+
+    /** Stops a run whose account was left: what it holds and writes is the account in use's, which must stay untouched. */
+    private fun stillIn(s: Session) {
+        if (session?.accessToken != s.accessToken) throw CancellationException("The account was left")
+    }
+
+    private fun syncEngine(s: Session) = SyncEngine(
+        load = { io { repo.loadSyncText(s) } },
+        save = { text -> io { repo.saveSyncText(s, text) } },
+        values = { stillIn(s); SyncValues(appearance, settings, autoplayNext) },
+        setValues = { v ->
+            stillIn(s)
+            // What comes from the account is put in place without announcing it as a change of this TV's (that would send it back).
+            appearance = v.look
+            store.appearance = v.look
+            showLook(v.look)
+            settings = v.settings
+            store.settings = v.settings
+            autoplayNext = v.autoplayNext
+            store.autoplayNext = v.autoplayNext
+        },
+        state = { stillIn(s); store.syncState },
+        setState = { stillIn(s); store.syncState = it },
+    )
+
+    /** Runs the sync now (when it is on), and says what changed if something came from another device. */
+    fun syncNow() {
+        val s = session ?: return
+        if (!store.syncState.enabled || syncRunning) return
+        syncRunning = true
+        syncStatus = syncStatus.copy(enabled = true, busy = true)
+        launchSafe {
+            try {
+                val report = syncEngine(s).run()
+                syncStatus = SyncStatus(store.syncState.enabled, false, report)
+                when {
+                    report.conflicts.isNotEmpty() -> notice = str(R.string.sync_conflict)
+                    report.applied.isNotEmpty() -> notice = str(R.string.sync_applied)
+                }
+            } finally {
+                syncRunning = false
+                syncStatus = syncStatus.copy(busy = false)
+            }
+        }
+    }
+
+    /** A synced choice changed on this TV: it is sent a few seconds after the last change, so going through choices makes one request. */
+    private fun scheduleSync() {
+        if (session == null || !store.syncState.enabled) return
+        syncJob?.cancel()
+        syncJob = launchSafe {
+            delay(SYNC_SETTLE_MS)
+            syncNow()
+        }
+    }
+
+    /** "Sync with my account": looks at the account first, and asks which side to use when it already has different choices. */
+    fun startSync() {
+        val s = session ?: return
+        launchSafe {
+            val engine = syncEngine(s)
+            val preview = runCatching { engine.preview() }.getOrElse {
+                if (it is CancellationException) throw it
+                notice = str(R.string.sync_failed)
+                return@launchSafe
+            }
+            if (preview is FirstActivation.Ask) {
+                val what = preview.sections.joinToString(", ") { str(if (it.section == SyncSection.Appearance) R.string.sync_section_look else R.string.sync_section_playback) }
+                dialog = DialogSpec(
+                    str(R.string.sync_ask, what),
+                    listOf(
+                        DialogChoice(str(R.string.sync_use_account)) { enableSync(useAccount = true) },
+                        DialogChoice(str(R.string.sync_upload)) { enableSync(useAccount = false) },
+                        DialogChoice(str(R.string.pin_cancel)) {},
+                    ),
+                )
+            } else {
+                enableSync(useAccount = false)
+            }
+        }
+    }
+
+    private fun enableSync(useAccount: Boolean) {
+        val s = session ?: return
+        syncStatus = SyncStatus(true, true, null)
+        launchSafe {
+            val report = runCatching { syncEngine(s).enable(useAccount) }.getOrElse {
+                if (it is CancellationException) throw it
+                notice = str(R.string.sync_failed)
+                SyncReport(error = it.message ?: "", at = System.currentTimeMillis())
+            }
+            syncStatus = SyncStatus(store.syncState.enabled, false, report)
+        }
+    }
+
+    fun stopSync() {
+        store.syncState = SyncPrefsState()
+        syncJob?.cancel()
+        syncStatus = SyncStatus()
+    }
+
+    // ---- Accounts ---------------------------------------------------------------------------------------------
+
+    /** The PIN screen of Settings (set, change, remove) while it is open. */
+    var pinTask by mutableStateOf<PinTask?>(null)
+        private set
+
+    fun startPinTask(task: PinTask) {
+        pinTask = task
+    }
+
+    fun endPinTask() {
+        pinTask = null
+    }
+
+    /** Whether the picker opens at every start when there are two or more accounts (otherwise the last one is opened). */
+    var askWhoAtStart by mutableStateOf(store.askWhoAtStart)
+        private set
+
+    fun updateAskWhoAtStart(on: Boolean) {
+        askWhoAtStart = on
+        store.askWhoAtStart = on
+    }
+
+    private fun startGate() {
+        val book = profiles
+        when {
+            book.isEmpty -> gate = Gate.SignIn(null, null)
+            book.profiles.size >= 2 && askWhoAtStart -> gate = Gate.Chooser
+            else -> choose(book.active ?: book.profiles.maxByOrNull { it.lastUsed } ?: return)
+        }
+    }
+
+    /** An account was picked (or it is the only one): sign in again, ask its PIN, or go straight in. */
+    fun choose(profile: Profile) {
+        gate = when {
+            profile.needsSignIn -> Gate.SignIn(profile.id, profile.serverUrl)
+            profile.hasPin -> Gate.Pin(profile.id)
+            else -> {
+                enter(profile)
+                return
+            }
+        }
+        errorText = null
+        errorRes = null
+    }
+
+    fun choose(id: String) {
+        profiles.find(id)?.let(::choose)
+    }
+
+    /** Checks a PIN typed for an account. A wrong one is remembered (and, after a few, makes the next try wait). */
+    suspend fun checkPin(id: String, pin: String): PinResult = pinChecks.withLock {
+        // The hash is slow on purpose, so it is not computed on the thread that draws the screen. One check at a time: two quick
+        // presses cannot both be counted against the same number of wrong tries.
+        val before = profiles
+        val result = withContext(Dispatchers.Default) { Pins.attempt(before, id, pin, System.currentTimeMillis()) }
+        when (result) {
+            is PinResult.Wrong -> result.book.find(id)?.let { commit(profiles.withAttempts(id, it.failures, it.lockedUntil)) }
+            PinResult.Right -> profiles.find(id)?.takeIf { it.failures > 0 || it.lockedUntil > 0 }?.let { commit(profiles.withAttempts(id, 0, 0)) }
+            is PinResult.Waiting -> Unit
+        }
+        result
+    }
+
+    private val pinChecks = Mutex()
+
+    /** The PIN was right: the account opens. */
+    fun unlock(id: String) {
+        profiles.find(id)?.takeIf { !it.needsSignIn }?.let(::enter)
+    }
+
+    /** Sets, changes (a new [pin]) or removes (null) the PIN of an account. The caller has already asked the old one. */
+    fun setPin(id: String, pin: String?) {
+        launchApp {
+            val lock = pin?.let { withContext(Dispatchers.Default) { Pins.create(it) } }
+            commit(profiles.withPin(id, lock))
+            notice = str(if (pin == null) R.string.pin_removed else R.string.pin_saved)
+        }
+    }
+
+    /** A password or Quick Connect sign-in worked: the account is saved (or refreshed) and opened. */
+    private fun afterSignIn(s: Session) {
+        store.save(s)
+        profiles = store.book
+        profiles.active?.let(::enter)
+    }
+
+    /** Opens an account: everything on screen is from it from now on. */
+    private fun enter(profile: Profile) {
+        val s = profile.session() ?: return
+        commit(profiles.activate(profile.id, System.currentTimeMillis()))
+        store.lastServer = s.serverUrl
+        session = s
+        gate = Gate.Open
+        errorText = null
+        errorRes = null
+        tab = Tab.Home
+        lastChannel = store.lastChannel?.let { (id, name) -> runCatching { LastChannel(UUID.fromString(id), name) }.getOrNull() }
+        hidden = store.hidden
+        // The look is each account's own.
+        appearance = store.appearance
+        showLook(appearance)
+        // What the main page showed last time (for this very account) goes up at once; the server's answer replaces it a moment later.
+        HomeCache.load(getApplication(), s)?.let { cached ->
+            libs = cached.libs
+            home.lineup = cached.lineup
+            home.continueRow = hidden.filterResume(cached.continueRow)
+            home.nextUp = hidden.filterNextUp(cached.nextUp)
+            home.newMovies = cached.newMovies
+            home.newSeries = cached.newSeries
+            home.newAnime = cached.newAnime
+            home.newMusicVideos = cached.newMusicVideos
+            home.newBooks = cached.newBooks
+            home.collections = cached.collections
+        }
+        loadHome()
+        startRemote()
+        modules.start()
+        syncNow()
+    }
+
+    /**
+     * Stops what the account in use is doing and shows nothing of it: the video or music stops (and tells the server where), the web
+     * socket closes, and every list, row and cache of the account is emptied. Nobody is in use afterwards.
+     */
+    private suspend fun leave() {
+        if (session == null) return
+        gate = Gate.Switching
+        // The player is taken off the screen while the account is still known, so it can say where it stopped.
+        if (pages.lastOrNull() is Page.Player) modules.playerClosed()
+        pages.clear()
+        music?.stop()
+        delay(LEAVE_SETTLE_MS)
+        resetAccountState()
+        session = null
+        commit(profiles.idle())
+    }
+
+    /** "Who is watching?": leaves the account in use and shows the picker. */
+    fun switchProfile() {
+        launchApp {
+            leave()
+            gate = if (profiles.isEmpty) Gate.SignIn(null, null) else Gate.Chooser
+        }
+    }
+
+    /** Adds another account of the same server: leaves the one in use and asks for the new one. */
+    fun addAccount() {
+        if (!profiles.canAdd) return
+        val server = session?.serverUrl ?: profiles.profiles.firstOrNull()?.serverUrl
+        launchApp {
+            leave()
+            gate = Gate.SignIn(null, server)
+        }
+    }
+
+    /** From a sign-in screen back to the picker (when there is one). */
+    fun backToChooser() {
+        cancelQuickConnect()
+        if (!profiles.isEmpty) gate = Gate.Chooser
+    }
+
+    /**
+     * Forgets an account on this TV: the server is told to end its session (when it can be reached), and the token, PIN and everything
+     * kept for the account are erased here either way.
+     */
+    fun removeProfile(id: String) {
+        val target = profiles.find(id) ?: return
+        val wasInUse = profiles.activeId == id
+        val s = target.session()
+        launchApp {
+            if (wasInUse) leave()
+            // The server is asked to end the session, but a slow or absent server must not keep the account on this TV for long.
+            if (s != null) withTimeoutOrNull(END_SESSION_TIMEOUT_MS) { runCatching { io { repo.endSession(s) } } }
+            store.remove(id)
+            profiles = store.book
+            HomeCache.clear(getApplication())
+            gate = when {
+                profiles.isEmpty -> Gate.SignIn(null, null)
+                gate is Gate.SignIn -> gate
+                else -> Gate.Chooser
+            }
+        }
+    }
+
+    /** Settings, "Remove this account": the account in use. */
     fun signOut() {
+        profiles.activeId?.let(::removeProfile)
+    }
+
+    /** The server refused the token of the account in use: only that account has to sign in again; the others stay as they are. */
+    private fun expireActive() {
+        val id = profiles.activeId
+        resetAccountState()
+        session = null
+        if (id == null) {
+            gate = Gate.SignIn(null, null)
+            return
+        }
+        commit(profiles.expired(id).idle())
+        gate = Gate.SignIn(id, profiles.find(id)?.serverUrl)
+    }
+
+    /** Everything the app holds for the account in use goes back to its starting value. */
+    private fun resetAccountState() {
+        // Whatever the account was still asking the server stops here: its answers must not reach the next account.
+        endAccountWork()
         remoteJob?.cancel()
         homeSaveJob?.cancel()
         homeLoaded = false
-        HomeCache.clear(getApplication())
-        launchSafe { io { WatchNext.clear(getApplication()) } }
+        // The Google TV home row belongs to the launcher, which every account shares: it is emptied here, and the next account fills it.
+        launchApp { io { WatchNext.clear(getApplication()) } }
         music?.release()
         music = null
         musicTicker?.cancel()
         resetMusic()
-        store.clear()
         modules.reset()
-        session = null
         // The pictures of the screensaver belong to the account that was signed in: the next one asks for its own.
         screensaverShown = false
         screensaverPictures = emptyList()
@@ -577,6 +947,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         musicResults = emptyList<Album>() to emptyList()
         query = ""
         tab = Tab.Home
+        dialog = null
+        pinTask = null
+        hidden = HiddenItems()
+        sleepTimer = null
+        sleepJob?.cancel()
+        syncJob?.cancel()
+        syncStatus = SyncStatus()
+        streakPending = null
+        streakCount = 0
+        notice = null
+        plugins = null
+        pluginsFailed = false
         errorText = null
         errorRes = null
     }
@@ -862,13 +1244,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val withVideos = libs?.musicVideos?.isNotEmpty() == true
                 val resuming = async { runCatching { io { repo.continueAll(s, withVideos) } }.getOrNull() }
                 val upNext = async { runCatching { io { repo.nextUp(s, settings.nextUp) } }.getOrNull() }
-                resuming.await()?.let { home.continueRow = it }
-                upNext.await()?.let { home.nextUp = it }
+                resuming.await()?.let { home.continueRow = hidden.filterResume(it) }
+                upNext.await()?.let { home.nextUp = hidden.filterNextUp(it) }
             }
             // The same two lists feed the "Continue watching" row of the Google TV home screen.
             val resuming = home.continueRow
             val upNext = home.nextUp
-            io { WatchNext.sync(getApplication(), resuming, upNext) }
+            // The launcher is shared by everybody who uses this TV: an account locked with a PIN keeps its titles off it.
+            if (profiles.active?.hasPin == true) io { WatchNext.clear(getApplication()) }
+            else io { WatchNext.sync(getApplication(), resuming, upNext) }
             saveHomeLater()
         }
     }
@@ -1254,15 +1638,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         music?.let { return it }
         val reporter = object : MusicReporter {
             override fun started(song: Song) {
-                launchSafe { io { repo.reportSongStarted(s, song) } }
+                launchFor(s) { io { repo.reportSongStarted(s, song) } }
             }
 
             override fun stopped(song: Song, positionMs: Long) {
-                launchSafe { io { repo.reportSongStopped(s, song, positionMs) } }
+                launchFor(s) { io { repo.reportSongStopped(s, song, positionMs) } }
             }
 
             override fun progress(song: Song, positionMs: Long, paused: Boolean) {
-                launchSafe { io { repo.reportSongProgress(s, song, positionMs, paused) } }
+                launchFor(s) { io { repo.reportSongProgress(s, song, positionMs, paused) } }
             }
         }
         val player = MusicPlayer(getApplication(), s.accessToken, { repo.audioUrl(s, it) }, reporter)
@@ -1365,6 +1749,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val watchable = item.kind == BaseItemKind.MOVIE || item.kind == BaseItemKind.SERIES || item.kind == BaseItemKind.EPISODE || item.kind == BaseItemKind.MUSIC_VIDEO
         val markable = watchable || item.isBook || item.isAudiobook
         if (item.isPlayable && item.resumeMs >= MIN_RESUME_MS) choices += DialogChoice(str(R.string.menu_start_over)) { play(item, 0) }
+        // Leaving a title out of Continue watching, or a series out of Next up, without touching what has been watched.
+        if (home.continueRow.any { it.id == item.id }) choices += DialogChoice(str(R.string.menu_hide_continue)) { hideFromContinue(item) }
+        if (item.seriesId != null && home.nextUp.any { it.id == item.id }) choices += DialogChoice(str(R.string.menu_hide_next_up)) { hideSeriesFromNextUp(item) }
         if (inList != null) {
             val entries = inList.state.entries.orEmpty()
             val at = entries.indexOfFirst { it.entryId == inList.entry.entryId }
@@ -1383,6 +1770,62 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             choices += DialogChoice(str(R.string.menu_add_playlist)) { chooseWhichPlaylist(item) }
         }
         dialog = DialogSpec(item.title, choices)
+    }
+
+    private fun changeHidden(next: HiddenItems) {
+        hidden = next
+        store.hidden = next
+    }
+
+    /** "Hide from Continue watching": the title leaves that row (and the Google TV one); its progress and watched state stay as they were. */
+    private fun hideFromContinue(item: MediaItem) {
+        changeHidden(hidden.hideFromResume(item.id, item.lastPlayedAt, hiddenLabel(item), System.currentTimeMillis()))
+        home.continueRow = hidden.filterResume(home.continueRow)
+        offerUndo(str(R.string.hidden_continue_done, hiddenLabel(item))) { restoreHidden(HiddenKind.Resume, item.id.toString()) }
+        refreshContinue()
+    }
+
+    /** "Hide series from Next up": the whole series leaves that row until it is restored. */
+    private fun hideSeriesFromNextUp(item: MediaItem) {
+        val series = item.seriesId ?: return
+        changeHidden(hidden.hideFromNextUp(series, item.title, System.currentTimeMillis()))
+        home.nextUp = hidden.filterNextUp(home.nextUp)
+        offerUndo(str(R.string.hidden_next_up_done, item.title)) { restoreHidden(HiddenKind.NextUp, series.toString()) }
+        refreshContinue()
+    }
+
+    /** Brings one hidden thing back (the rows are read again, so it shows up where it belongs). */
+    private fun restoreHidden(kind: HiddenKind, id: String) {
+        changeHidden(hidden.restored(kind, id))
+        refreshContinue()
+    }
+
+    /** Settings: lists what is hidden, each with a way to restore it, and "Restore all". */
+    fun openHiddenList() {
+        val listed = hidden.listed()
+        if (listed.isEmpty()) {
+            notice = str(R.string.hidden_none)
+            return
+        }
+        val choices = ArrayList<DialogChoice>()
+        choices += DialogChoice(str(R.string.hidden_restore_all, listed.size)) {
+            changeHidden(hidden.restoredAll())
+            refreshContinue()
+            notice = str(R.string.hidden_restored)
+        }
+        for (entry in listed.take(HIDDEN_LIST_SHOWN)) {
+            val where = str(if (entry.kind == HiddenKind.Resume) R.string.row_continue else R.string.row_next_up)
+            choices += DialogChoice(str(R.string.hidden_restore_one, entry.entry.name.ifBlank { entry.id }, where)) {
+                restoreHidden(entry.kind, entry.id)
+                notice = str(R.string.hidden_restored)
+            }
+        }
+        dialog = DialogSpec(str(R.string.settings_hidden), choices)
+    }
+
+    /** A message with "Undo" for what was just hidden; OK keeps it. */
+    private fun offerUndo(message: String, undo: () -> Unit) {
+        dialog = DialogSpec(message, listOf(DialogChoice(str(R.string.hidden_undo)) { undo() }, DialogChoice(str(R.string.hidden_keep)) {}))
     }
 
     private fun markPlayed(item: MediaItem, played: Boolean) {
@@ -1772,8 +2215,93 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Plays the next episode of the one that just ended, replacing the player; leaves the player when there is none. */
-    fun playNext(plan: PlaybackPlan) {
+    // ---- "Are you still watching?" and the sleep timer (rules: data/WatchLimit.kt) ------------------------------------------
+
+    /** The sleep timer of the video player: null (off), a time, or the end of the title now playing. Forgotten when the account changes. */
+    var sleepTimer: SleepTimer? by mutableStateOf(null)
+        private set
+    private var sleepJob: Job? = null
+
+    /** Titles of the run so far, and the title that began by itself and whose count it is: any other title starts a new count. */
+    private var streakCount = 0
+    private var streakPending: UUID? = null
+
+    fun changeSleepTimer(timer: SleepTimer?) {
+        sleepJob?.cancel()
+        sleepTimer = timer
+        if (timer !is SleepTimer.At) return
+        sleepJob = launchSafe {
+            // A warning for the last half minute, with a way to keep watching; then the stop itself.
+            val warnAt = timer.endsAt - SLEEP_WARNING_MS
+            if (System.currentTimeMillis() < warnAt) delay(warnAt - System.currentTimeMillis())
+            if (pages.lastOrNull() is Page.Player) {
+                dialog = DialogSpec(
+                    str(R.string.sleep_warning),
+                    listOf(DialogChoice(str(R.string.sleep_keep)) { changeSleepTimer(null) }, DialogChoice(str(R.string.sleep_ok)) {}),
+                )
+            }
+            val left = timer.endsAt - System.currentTimeMillis()
+            if (left > 0) delay(left)
+            sleepTimer = null
+            if (pages.lastOrNull() is Page.Player) {
+                dialog = null
+                notice = str(R.string.sleep_done)
+                back()
+            }
+        }
+    }
+
+    /**
+     * A video played to its end. [continues] says there is a next title and autoplay is on: then the limit and the timer decide whether it
+     * starts by itself, is asked about first, or does not start.
+     */
+    fun titleEnded(plan: PlaybackPlan, continues: Boolean) {
+        if (sleepTimer is SleepTimer.EpisodeEnd) {
+            changeSleepTimer(null)
+            notice = str(R.string.sleep_stopped_end)
+            back()
+            return
+        }
+        if (!continues) {
+            back()
+            return
+        }
+        val count = if (streakPending == plan.item.id) streakCount else 1
+        when (val decision = decideAtEnd(count, settings.stillWatching.count, sleepTimer, System.currentTimeMillis())) {
+            EndDecision.Stop -> {
+                changeSleepTimer(null)
+                notice = str(R.string.sleep_done)
+                back()
+            }
+            EndDecision.Ask -> askStillWatching(plan, count)
+            is EndDecision.Continue -> playNext(plan, carry = decision.count)
+        }
+    }
+
+    private fun askStillWatching(plan: PlaybackPlan, count: Int) {
+        val spec = DialogSpec(
+            str(R.string.still_title, count),
+            listOf(
+                DialogChoice(str(R.string.still_keep)) { playNext(plan, carry = 1) },
+                DialogChoice(str(R.string.still_stop)) { back() },
+            ),
+        )
+        dialog = spec
+        launchSafe {
+            delay(STILL_WATCHING_ANSWER_MS)
+            // No answer: the playback stops. (The title's position was already reported when it ended.)
+            if (dialog === spec) {
+                dialog = null
+                notice = str(R.string.still_stopped)
+                back()
+            }
+        }
+    }
+
+    /**
+     * Plays the next title of the one that just ended, replacing the player; leaves the player when there is none.
+     * [carry] (when above 0) is the count to hand to it: it was started by itself, so its end carries the run on. */
+    fun playNext(plan: PlaybackPlan, carry: Int = 0) {
         val s = session ?: return
         launchSafe {
             val next = nextInPlaylist(plan.item) ?: if (playContext != null) null else runCatching { io { repo.episodeAfter(s, plan.item) } }.getOrNull()
@@ -1784,6 +2312,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val top = pages.lastIndex
                 val nextPlan = io { repo.plan(s, next, null, null, 0, limits = settings.limits, remembered = rememberedFor(next)) }
+                if (carry > 0) {
+                    streakCount = carry
+                    streakPending = next.id
+                }
                 if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(nextPlan)
             } catch (e: DirectOnlyException) {
                 errorRes = R.string.error_direct_only
@@ -1938,19 +2470,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reportStart(plan: PlaybackPlan, positionMs: Long) {
         val s = session ?: return
-        launchSafe { io { repo.reportStart(s, plan, positionMs) } }
+        launchFor(s) { io { repo.reportStart(s, plan, positionMs) } }
     }
 
     fun reportProgress(plan: PlaybackPlan, positionMs: Long, paused: Boolean) {
         val s = session ?: return
-        launchSafe { io { repo.reportProgress(s, plan, positionMs, paused) } }
+        launchFor(s) { io { repo.reportProgress(s, plan, positionMs, paused) } }
     }
 
     fun reportStopped(plan: PlaybackPlan, positionMs: Long) {
         val s = session ?: return
-        launchSafe {
+        launchFor(s) {
             io { repo.reportStopped(s, plan, positionMs) }
-            refreshContinue()
+            // Only the account that was watching refreshes its own row; if it was left meanwhile, the next one loads its own.
+            if (session?.accessToken == s.accessToken) refreshContinue()
         }
     }
 
@@ -1983,7 +2516,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         errorRes = when {
             // A token the server no longer knows: go back to the sign-in screen instead of failing on every request.
             unauthorized && session != null -> {
-                signOut()
+                expireActive()
                 R.string.error_session_expired
             }
             unauthorized -> fallback
@@ -1996,5 +2529,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissError() {
         errorRes = null
         errorText = null
+    }
+
+    init {
+        startGate()
     }
 }

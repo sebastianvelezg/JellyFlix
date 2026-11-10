@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { announcePrefsChanged } from './prefsEvents'
 import { DEFAULT_HOME_LAYOUT, DEFAULT_MENU_LAYOUT, sanitizeHomeLayout, sanitizeMenuLayout, type HomeLayout, type MenuLayout } from '../../core'
 import { DEFAULT_THEME, canvasOf, sanitizeTheme, themeVariables, type ThemeChoice } from '../../theme/themes'
 
@@ -114,6 +115,7 @@ export function readAppearance(): AppearancePrefs {
 
 export function writeAppearance(patch: Partial<AppearancePrefs>): AppearancePrefs {
   const next = { ...readAppearance(), ...patch }
+  announcePrefsChanged()
   try {
     localStorage.setItem(KEY, JSON.stringify(next))
   } catch {

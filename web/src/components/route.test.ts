@@ -60,6 +60,18 @@ describe('routes', () => {
     expect(formatRoute({ page: 'channel', id: 'a b' })).toBe('#/channel/a%20b')
   })
 
+  it('knows the page a TV QR code opens, and only trusts a code made of six digits', () => {
+    expect(parseRoute('#/link?code=123456')).toEqual({ page: 'link', code: '123456' })
+    expect(parseRoute('#/link?code=123%20456')).toEqual({ page: 'link', code: '123456' })
+    expect(parseRoute('#/link')).toEqual({ page: 'link' })
+    for (const bad of ['#/link?code=12345', '#/link?code=1234567', '#/link?code=abcdef', '#/link?code=%3Cscript%3E', '#/link?code=']) {
+      expect(parseRoute(bad)).toEqual({ page: 'link' })
+    }
+    expect(parseRoute('#/link/extra?code=123456')).toEqual({ page: 'home' })
+    expect(formatRoute({ page: 'link', code: '123456' })).toBe('#/link?code=123456')
+    expect(formatRoute({ page: 'link' })).toBe('#/link')
+  })
+
   it('keeps movies at #/movies and the main page at #/', () => {
     expect(formatRoute({ page: 'home' })).toBe('#/')
     expect(formatRoute({ page: 'browse' })).toBe('#/movies')

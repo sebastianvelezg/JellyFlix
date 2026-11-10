@@ -13,7 +13,7 @@ import { restoreKids, useKids } from './platform/web/kids'
 import { KidsExitDialog } from './components/KidsMode'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
 import { SetupWizard } from './components/SetupWizard'
-import { Toaster } from './components/toast'
+import { showToast, Toaster } from './components/toast'
 import { HomePage } from './components/HomePage'
 import { BottomNav, Header, type NavTab } from './components/Header'
 import { MiniPlayer } from './components/music/MiniPlayer'
@@ -28,6 +28,7 @@ import { formatRoute, useRoute, type Navigate, type PlayRoute, type Route } from
 import { writeUiPrefs } from './platform/web/prefs'
 import { clearRecentSearches } from './platform/web/recentSearches'
 import { setStorageOwner } from './platform/web/owner'
+import { startSyncWatcher } from './platform/web/sync'
 import { SearchPage } from './components/SearchPage'
 import { useLanguage } from './components/useLanguage'
 import { clearSwr, swrKey, swrScope, useSwr } from './components/useSwr'
@@ -64,6 +65,7 @@ const SettingsPage = lazy(() => import('./components/SettingsPage').then((m) => 
 const CollectionsPage = lazy(() => import('./components/CollectionsPage').then((m) => ({ default: m.CollectionsPage })))
 const CollectionPage = lazy(() => import('./components/CollectionsPage').then((m) => ({ default: m.CollectionPage })))
 const AdminPage = lazy(() => import('./components/admin/AdminPage').then((m) => ({ default: m.AdminPage })))
+const LinkPage = lazy(() => import('./components/LinkPage').then((m) => ({ default: m.LinkPage })))
 const StatsPage = lazy(() => import('./components/StatsPage').then((m) => ({ default: m.StatsPage })))
 const ListsPage = lazy(() => import('./components/ListsPage').then((m) => ({ default: m.ListsPage })))
 const ListPage = lazy(() => import('./components/ListsPage').then((m) => ({ default: m.ListPage })))
@@ -294,6 +296,15 @@ function Shell({
   const together = useSyncPlay()
   const interceptPlay = together?.interceptPlay
   const go = useCallback<Navigate>((to, options) => (interceptPlay?.(to) ? undefined : goNow(to, options)), [goNow, interceptPlay])
+  // The optional sync of preferences with the account's other devices (nothing runs unless it was turned on in Settings).
+  useEffect(
+    () =>
+      startSyncWatcher(session, (report) => {
+        if (report.conflicts.length > 0) showToast({ message: t('A newer copy of your settings from another device replaced your latest change.') })
+        else if (report.applied.length > 0) showToast({ message: t('Your settings were updated from another device.') })
+      }),
+    [session],
+  )
   const loadSections = useCallback(() => getLibrarySections(session), [session])
   // The list of libraries is remembered, so the page can start loading its rows without waiting for it.
   const { state: sections, retry: retrySections } = useSwr(swrKey(swrScope(session), 'sections'), loadSections, { fresh: 60_000 })
@@ -585,6 +596,11 @@ function Shell({
         {route.page === 'admin' && (
           <Suspense fallback={<PageLoading />}>
             <AdminPage session={session} onBack={() => back({ page: 'settings' })} />
+          </Suspense>
+        )}
+        {route.page === 'link' && (
+          <Suspense fallback={<PageLoading />}>
+            <LinkPage session={session} code={route.code} onDone={() => go(homeRoute, { replace: true })} />
           </Suspense>
         )}
         {route.page === 'stats' && (
