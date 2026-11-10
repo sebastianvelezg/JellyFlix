@@ -17,8 +17,9 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/movie/<id>        movie page
  *   #/live/<id>         a live channel being watched
  *   #/link?code=<six digits>  the page a TV's QR code opens: confirm that TV's Quick Connect code (the code is optional)
- *   #/modules[/<module>]  the extra modules (only there when a modules container is running): channels, match
+ *   #/modules[/<module>]  the extra modules (only there when a modules container is running): channels, match, seerr
  *   #/modules/match?join=<code>  the link in a Match invitation: it joins the room with that code
+ *   #/modules/seerr?q=<text>  the Seerr module with that text already searched (from "Search in Seerr" in the search results)
  *   #/channel/<id>      a retro TV channel being watched (a module channel, not Live TV)
  *   #/book/<id>         book page (read it, listen to it, download it); #/read/<id> the reader
  *   #/person/<id>?name= a person's filmography
@@ -28,7 +29,7 @@ import { useCallback, useEffect, useState } from 'react'
  *                       memory, so only until a reload); &shuffle=<seed> plays that queue in a random order)
  *   #/folder/<id>       a folder of music videos
  */
-export const MODULE_KEYS = ['channels', 'match'] as const
+export const MODULE_KEYS = ['channels', 'match', 'seerr'] as const
 export type ModuleKey = (typeof MODULE_KEYS)[number]
 export const MUSIC_TABS = ['home', 'albums', 'artists', 'songs'] as const
 export type MusicTab = (typeof MUSIC_TABS)[number]
@@ -70,7 +71,7 @@ export type Route =
   | { page: 'book'; id: string }
   | { page: 'read'; id: string }
   | { page: 'live'; id: string }
-  | { page: 'modules'; module?: ModuleKey; join?: string }
+  | { page: 'modules'; module?: ModuleKey; join?: string; q?: string }
   | { page: 'link'; code?: string }
   | { page: 'channel'; id: string }
   | { page: 'person'; id: string; name: string }
@@ -120,7 +121,7 @@ export function formatRoute(route: Route): string {
     case 'live':
       return `#/${route.page}/${encodeURIComponent(route.id)}`
     case 'modules':
-      return route.module ? `#/modules/${route.module}${route.join ? `?join=${encodeURIComponent(route.join)}` : ''}` : '#/modules'
+      return route.module ? `#/modules/${route.module}${route.join ? `?join=${encodeURIComponent(route.join)}` : route.q ? `?q=${encodeURIComponent(route.q)}` : ''}` : '#/modules'
     case 'link':
       return route.code ? `#/link?code=${encodeURIComponent(route.code)}` : '#/link'
     case 'channel':
@@ -155,8 +156,13 @@ export function parseRoute(hash: string): Route {
     if ((kind === 'book' || kind === 'read' || kind === 'live') && decoded) return { page: kind, id: decoded }
     if (kind === 'modules') {
       const module = MODULE_KEYS.find((m) => m === decoded)
-      const join = new URLSearchParams(query).get('join')
-      return module ? { page: 'modules', module, ...(module === 'match' && join && /^[A-Za-z0-9]{3,12}$/.test(join) ? { join } : {}) } : { page: 'modules' }
+      const params = new URLSearchParams(query)
+      const join = params.get('join')
+      // The text of a search handed to the Seerr module (cut to what that module accepts).
+      const q = (params.get('q') ?? '').trim().slice(0, 200)
+      return module
+        ? { page: 'modules', module, ...(module === 'match' && join && /^[A-Za-z0-9]{3,12}$/.test(join) ? { join } : {}), ...(module === 'seerr' && q ? { q } : {}) }
+        : { page: 'modules' }
     }
     if (kind === 'link' && !decoded) {
       const code = (new URLSearchParams(query).get('code') ?? '').replace(/\s+/g, '')

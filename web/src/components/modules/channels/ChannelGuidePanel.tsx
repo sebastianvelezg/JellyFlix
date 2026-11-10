@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { channelWindow, liveTime, type ChannelWindow, type Program } from '../../../core/modules'
 import { t } from '../../../i18n'
 import { useModulesClient } from '../ModulesProvider'
+import { programTitle } from './programText'
 
 const clock = (seconds: number): string => new Date(seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
@@ -101,7 +102,7 @@ export function ChannelGuidePanel({
               >
                 <span className="w-[4.5rem] shrink-0 whitespace-nowrap pt-0.5 text-xs tabular-nums text-white/60">{clock(p.start)}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-white">{p.title}</span>
+                  <span className="block truncate text-sm font-medium text-white">{programTitle(p)}</span>
                   {p.subtitle && <span className="block truncate text-xs text-white/60">{p.subtitle}</span>}
                 </span>
                 {isLive && <span className="mt-0.5 shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{t('Live')}</span>}

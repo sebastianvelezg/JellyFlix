@@ -22,6 +22,7 @@ import { prepareStream } from '../../player/prepareStream'
 import { useModulesClient } from '../ModulesProvider'
 import { ChannelGuidePanel } from './ChannelGuidePanel'
 import { ChannelOsd } from './ChannelOsd'
+import { programTitle } from './programText'
 
 const Player = lazy(() => import('../../player/Player').then((m) => ({ default: m.Player })))
 
@@ -144,6 +145,11 @@ export function ChannelPlayer({
   }
   useEffect(() => {
     if (!current) return
+    // A program whose title this account may not see (the container sends no id for it): the viewer goes on to the next one.
+    if (current.unavailable) {
+      skipTo(programsRef.current[programsRef.current.indexOf(current) + 1])
+      return
+    }
     let cancelled = false
     played.current = 0
     // A program that was got ready ahead of time starts without asking the server again.
@@ -217,7 +223,7 @@ export function ChannelPlayer({
     const at = list.findIndex((p) => p.start === placeRef.current?.start)
     const here = list[at]
     const next = list[at + 1]
-    if (!here || !next) return
+    if (!here || !next || next.unavailable) return
     const left = (Number.isFinite(video.duration) ? video.duration : here.runtime) - video.currentTime
     if (left > PREPARE_AHEAD_SECONDS) return
     const key = `${next.itemId}@${next.start}`
@@ -363,11 +369,11 @@ export function ChannelPlayer({
             <LiveBadge behind={behind} onLive={setLiveNow} />
             {upNext && (
               <span className="ml-auto hidden min-w-0 truncate text-xs text-white/60 sm:block">
-                {t('Next at {time}: {title}', { time: clock(upNext.start), title: upNext.title })}
+                {t('Next at {time}: {title}', { time: clock(upNext.start), title: programTitle(upNext) })}
               </span>
             )}
           </div>
-          <p className="mt-1.5 truncate text-lg font-semibold leading-tight tracking-tight text-white">{current.title}</p>
+          <p className="mt-1.5 truncate text-lg font-semibold leading-tight tracking-tight text-white">{programTitle(current)}</p>
           <p className="truncate text-xs text-white/60">{[current.subtitle, `${clock(current.start)} – ${clock(current.end)}`].filter(Boolean).join(' · ')}</p>
         </div>
       ),

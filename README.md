@@ -204,6 +204,7 @@ The buttons at the top can show icons and names, only icons or only names, in th
 | Plugins page | ✅ run their tasks | ✅ read only |
 | Modules: Retro TV channels (watch, guide) | ✅ (+ set channels up) | ✅ |
 | Modules: Match with friends | ✅ on your phone or one screen | ✅ the screen only (QR code, plays the winner) |
+| Modules: Seerr (look up and request what the library does not have) | ✅ | — |
 | **Administration and the title editor** | ✅ | — |
 | Settings export and import, subtitle files from your device, installable (PWA) | ✅ | — |
 | Plays at the picture's own size, frame-rate matching, Info panel, version picker | — | ✅ |
@@ -215,6 +216,8 @@ Extras that live in a small second container, [`jellyflix-modules`](modules/READ
 
 - **Retro TV.** Channels made from your own library: a marathon of one anime, Saturdays of Marvel, horror at midnight. Nothing is broadcast and nothing runs while nobody watches: a channel is a schedule, and tuning in plays the title that is on, at the right minute, with the normal player. It has a guide, start over, previous and next program, go live and channel up and down. Administrators set channels up on the web (by hand, with rules or one per genre in one click); everybody watches, on the web and on the TV.
 - **Match.** Two or more people, each on their own phone and Jellyfin account, swipe the same films; what everybody liked goes on to the next round until one is left, and it plays on the screen. The TV shows a **QR code** and plays the winner. Filter by genre, decade, length and series, and see at the end how much you agreed.
+
+- **Seerr** (off unless you turn it on). Look up movies and series your library does not have and ask for them, as yourself: your own Seerr account's permissions and quota apply. It is also offered from the search of the library ("Search “…” in Seerr"), apart from the results. Needs Seerr 3.3 or later.
 
 Set it up in the [modules README](modules/README.md) (one `docker compose up`), then point the web image at it with `JELLYFLIX_MODULES_URL` or the TV at it in **Settings → Modules**. More modules are planned.
 
@@ -449,9 +452,9 @@ No, only Jellyfin.
 
 ## 🛣️ What could come next
 
-Jellyflix 1.6 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
+Jellyflix 1.7 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
 
-- **Modules:** a **Seerr** module (search and request titles from Jellyflix, only there when you install it), a "YouTube without YouTube" module (subscribe to channels, downloaded without ads), a yearly **Wrapped** of what you watched, and more; see the [module plan](docs/MODULES-PLAN.md).
+- **Modules:** a "YouTube without YouTube" module (subscribe to channels, downloaded without ads), a yearly **Wrapped** of what you watched, and more; see the [module plan](docs/MODULES-PLAN.md).
 - **Playback:** recording and timers for live TV, watch together on the TV app.
 - **Books:** a reader for the TV app, Mobi and RAR comics.
 - **Sign in:** find servers on the network, several servers and users.
@@ -474,7 +477,7 @@ Reports from different servers, libraries, browsers and TVs are very welcome. If
 | [web/README.md](web/README.md) | Jellyflix Web: every feature, hosting step by step, the security model, administration, plugins, architecture and testing |
 | [tv/README.md](tv/README.md) | Jellyflix TV: every feature, the remote control, installing it on a TV, how it is built, testing and compatibility |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, tests, the rules of the project, adding a language |
-| [modules/README.md](modules/README.md) | The optional modules container (Retro TV channels, Match): how to run it and how Jellyflix finds it |
+| [modules/README.md](modules/README.md) | The optional modules container (Retro TV channels, Match, Seerr): how to run it and how Jellyflix finds it |
 | [CHANGELOG.md](CHANGELOG.md) | What changed in each version |
 
 Project files: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURITY.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) · [LICENSE](LICENSE)
@@ -485,7 +488,7 @@ Project files: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [SECURITY.md](SECURIT
 JellyFlix/
 ├── web/        Jellyflix Web: React + TypeScript + Vite, Dockerfile, tests (Vitest, Playwright) and a mock Jellyfin server
 ├── tv/         Jellyflix TV: Kotlin + Jetpack Compose for TV + Media3, JVM unit tests
-├── modules/    The optional modules container (Retro TV, Match): Node 24, no dependencies, SQLite, tests
+├── modules/    The optional modules container (Retro TV, Match, Seerr): Node 24, no dependencies, SQLite, tests
 ├── docs/       The screenshots used by the READMEs and the plan of the modules
 ├── branding/   Logo, wordmark and the scripts that make every icon and the README images
 └── .github/    CI, the release workflow, issue and pull request templates

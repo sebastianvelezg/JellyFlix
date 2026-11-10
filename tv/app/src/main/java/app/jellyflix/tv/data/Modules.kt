@@ -27,6 +27,8 @@ data class ModuleProgram(
     val title: String,
     val subtitle: String?,
     val runtime: Long,
+    /** This account may not see the title: the container sends no id and no name for it. Nothing can be played for it. */
+    val unavailable: Boolean = false,
 ) {
     /** The Jellyfin item that is played for it. */
     val itemUuid: UUID get() = uuidOfHex(itemId)
@@ -143,6 +145,7 @@ fun parseProgram(o: JSONObject): ModuleProgram = ModuleProgram(
     title = o.optString("title"),
     subtitle = o.optStringOrNull("subtitle"),
     runtime = o.optLong("runtime"),
+    unavailable = o.optBoolean("unavailable", false),
 )
 
 fun parseChannels(array: JSONArray): List<ModuleChannel> = (0 until array.length()).map { i ->

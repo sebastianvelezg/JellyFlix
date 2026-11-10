@@ -252,6 +252,16 @@ class ModulesController(
     /** Plays [program] of the channel from [seekSeconds] into it. A program that was got ready ahead of time starts without asking again. */
     private suspend fun play(view: ChannelViewing, program: ModuleProgram, seekSeconds: Long) {
         val s = session() ?: return
+        if (program.unavailable) {
+            // A title this account may not watch is skipped: the channel goes on to the next program that it may.
+            val next = view.programs.firstOrNull { it.start >= program.end && !it.unavailable }
+            if (next == null) {
+                leaveChannel()
+                notify(str(R.string.modules_channel_unavailable, emptyArray()))
+                return
+            }
+            return play(view, next, 0)
+        }
         tidy(view)
         val early = view.prepared?.takeIf { it.start == program.start && seekSeconds == 0L }
         view.prepared = null
@@ -384,7 +394,7 @@ class ModulesController(
     private fun prepareAhead(view: ChannelViewing, positionMs: Long, durationMs: Long) {
         val s = session() ?: return
         val here = view.current ?: return
-        val next = view.programs.firstOrNull { it.start > here.start } ?: return
+        val next = view.programs.firstOrNull { it.start > here.start && !it.unavailable } ?: return
         val left = (if (durationMs > 0) durationMs else here.runtime * 1000) - positionMs
         if (left > PREPARE_AHEAD_SECONDS * 1000 || view.preparing == next.start || view.prepared?.start == next.start) return
         view.preparing = next.start

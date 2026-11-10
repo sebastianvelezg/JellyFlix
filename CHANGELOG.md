@@ -5,6 +5,21 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-10
+
+The Seerr module, and the guides of Retro TV and the cards of Match made to respect who is looking.
+
+### Security
+- **Retro TV guides respect who is looking.** The guide, the list of channels and the program on show used to name every title of a channel to everybody signed in, including titles from a library hidden from a child account or over its age limit. Now the container asks Jellyfin, with each person's own token, which titles their account may see, and a title they may not see is a *Program not available* slot (the times stay; no name, picture, id or synopsis). The apps skip those programs when tuning in. The definition of a channel (its sources and their names) is only given to administrators. Needs the modules container and the apps of this version together: an older app shows the slot with an empty id.
+- **Match never deals a title hidden from somebody in the room** when the container has its Jellyfin API key: it checks what each person (and the host, whose screen shows the cards) may see, and asks to try again if Jellyfin cannot say. Without the key it only knows the library of the person asking.
+
+### Fixed
+- **Leaving a Retro TV channel no longer overwrites progress made elsewhere.** The place a title had before the channel touched it is put back only if the title is still where the channel left it; if the same title moved on in another device meanwhile, it is left alone.
+
+### Added
+- **"Search in Seerr" from the search of the library.** When there is a modules container with Seerr working, the results of a search end with a block of its own (and, when nothing matched, the block comes right under that message): "Not in your library? Search “…” in Seerr". It opens the Seerr module with that text already searched. What can be played and what can only be asked for are never mixed in one list, and without the container or without Seerr turned on there is nothing to see.
+- **Seerr module** (modules container and Jellyflix Web). Look up movies and series the library does not have and ask for them, from Modules, Seerr: search with where each title stands (in your library, partly, being added, waiting for approval, cannot be requested), ask for a movie or for chosen seasons of a series, see your own requests and how many requests you have left. A title Seerr knows is in the library opens in Jellyflix. It is **off unless turned on**: add `seerr` to `JELLYFLIX_MODULES` and set `SEERR_URL` and `SEERR_API_KEY` in the container; without them the app does not offer anything about Seerr. It needs **Seerr 3.3.0 or later**, and says so when it is older or does not answer. Each person acts as their own Seerr user (the container finds them by their Jellyfin account and calls Seerr as them), so their permissions and quota apply and a request is theirs; an account Seerr does not know is asked to be imported by an administrator, never served as the administrator. The Seerr key never leaves the container, only fixed Seerr routes are called, every number and text is checked and cut to size, Seerr's own error words are not passed on, and each person is limited to 10 requests, 60 searches and 180 other questions (titles, own requests, quota) a minute. Pictures come from TMDb.
+
 ## [1.6.0] - 2026-11-10
 
 Several accounts on the TV with PINs, signing in by QR, hiding titles from Continue watching and Next up, "Are you still watching?", a sleep timer and an optional sync of preferences between the web app and the TV.

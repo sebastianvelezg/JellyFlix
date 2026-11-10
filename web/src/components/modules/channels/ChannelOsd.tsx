@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Program } from '../../../core/modules'
 import { t } from '../../../i18n'
+import { programTitle } from './programText'
 
 const SHOW_MS = 6000
 /** Longer when there is a button to press. */
@@ -26,14 +27,14 @@ export function ChannelOsd({ now, next, joinedMinute, onStartOver }: { now: Prog
       <div className="pointer-events-auto min-w-0 max-w-xl rounded-2xl border border-white/12 bg-black/55 px-4 py-3 shadow-2xl backdrop-blur-md">
         <p className="flex min-w-0 items-baseline gap-2">
           <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{t('Now')}</span>
-          <span className="truncate text-base font-semibold text-white">{now.title}</span>
+          <span className="truncate text-base font-semibold text-white">{programTitle(now)}</span>
           {now.subtitle && <span className="hidden shrink-0 text-xs text-white/60 sm:inline">{now.subtitle}</span>}
         </p>
         {next && (
           <p className="mt-1 flex min-w-0 items-baseline gap-2 text-sm text-white/70">
             <span className="shrink-0 rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/80">{t('Next')}</span>
             <span className="shrink-0 tabular-nums">{clock(next.start)}</span>
-            <span className="truncate">{next.title}</span>
+            <span className="truncate">{programTitle(next)}</span>
           </p>
         )}
         {joinedMinute !== null && (

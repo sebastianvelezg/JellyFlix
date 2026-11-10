@@ -9,6 +9,8 @@ export interface FakeUser {
 
 export const ADMIN: FakeUser = { id: 'u-admin', name: 'Ana', admin: true }
 export const BEN: FakeUser = { id: 'u-ben', name: 'Ben', admin: false }
+/** The container's own Jellyfin key in tests. */
+export const SERVICE_KEY = 'svc-key'
 export const TOKENS: Record<string, FakeUser> = { 'tok-admin': ADMIN, 'tok-ben': BEN }
 
 const MIN = 60 * 10_000_000
@@ -59,11 +61,19 @@ export interface FakeJellyfin {
   calls: Array<{ path: string; token: string }>
   /** Ids already watched, per user id. */
   watched: Record<string, Set<string>>
+  /** Ids a user may not see (a library hidden from them, an age limit), per user id. */
+  hidden: Record<string, Set<string>>
+  /** While set, every list of items fails (Jellyfin is struggling). */
+  failItems: boolean
+  /** While set, what the container asks with its own key fails. */
+  failService: boolean
 }
 
 export function fakeJellyfin(): FakeJellyfin {
   const calls: FakeJellyfin['calls'] = []
   const watched: FakeJellyfin['watched'] = { [ADMIN.id]: new Set(), [BEN.id]: new Set() }
+  const hidden: FakeJellyfin['hidden'] = { [ADMIN.id]: new Set(), [BEN.id]: new Set() }
+  const state = { failItems: false, failService: false }
   const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
   const fetch: FetchLike = async (rawUrl, init) => {
@@ -71,7 +81,9 @@ export function fakeJellyfin(): FakeJellyfin {
     const header = String((init?.headers as Record<string, string> | undefined)?.authorization ?? '')
     const token = /Token="([^"]+)"/.exec(header)?.[1] ?? ''
     calls.push({ path: url.pathname, token })
-    const user = TOKENS[token]
+    // The container's own key (when it has one) is the administrator for the questions it asks about other people.
+    const user = TOKENS[token] ?? (token === SERVICE_KEY ? ADMIN : undefined)
+    if (token === SERVICE_KEY && state.failService) return json({}, 500)
     if (!user) return json({}, 401)
     const q = url.searchParams
     if (url.pathname === '/Users/Me') return json({ Id: user.id, Name: user.name, Policy: { IsAdministrator: user.admin } })
@@ -79,8 +91,9 @@ export function fakeJellyfin(): FakeJellyfin {
     const episodes = /^\/Shows\/([^/]+)\/Episodes$/.exec(url.pathname)
     if (episodes) return json({ Items: EPISODES.filter((e) => e.SeriesId === episodes[1]) })
     if (url.pathname === '/Items') {
+      if (state.failItems) return json({}, 500)
       const forUser = q.get('userId') ?? user.id
-      let list = ALL
+      let list = ALL.filter((i) => !hidden[forUser]?.has(i.Id))
       const ids = q.getAll('ids').flatMap((x) => x.split(','))
       if (ids.length) list = list.filter((i) => ids.includes(i.Id))
       const types = q.getAll('includeItemTypes').flatMap((x) => x.split(','))
@@ -95,5 +108,22 @@ export function fakeJellyfin(): FakeJellyfin {
     }
     return json({}, 404)
   }
-  return { fetch, calls, watched }
+  return {
+    fetch,
+    calls,
+    watched,
+    hidden,
+    get failItems() {
+      return state.failItems
+    },
+    set failItems(value: boolean) {
+      state.failItems = value
+    },
+    get failService() {
+      return state.failService
+    },
+    set failService(value: boolean) {
+      state.failService = value
+    },
+  }
 }

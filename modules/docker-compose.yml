@@ -14,8 +14,11 @@ services:
       # Optional. An API key from Jellyfin (Dashboard > API keys): lets the container refresh the lists of titles of the channels by night
       # and leave out films the other people of a Match already watched. Without it everything still works.
       JELLYFIN_API_KEY: "${JELLYFIN_API_KEY:-}"
-      # Which modules are on: channels, match.
+      # Which modules are on: channels, match, seerr (Seerr is off unless you add it, and then needs the two settings below).
       JELLYFLIX_MODULES: "${JELLYFLIX_MODULES:-channels,match}"
+      # Only for the seerr module (Seerr 3.3 or later): its address as this container reaches it, and its API key (Settings, General).
+      SEERR_URL: "${SEERR_URL:-}"
+      SEERR_API_KEY: "${SEERR_API_KEY:-}"
       # Optional: the sites allowed to call it from a browser, separated by commas. Empty means any (it uses tokens, not cookies).
       JELLYFLIX_ORIGINS: "${JELLYFLIX_ORIGINS:-*}"
       # Optional: 1 only when this container is reached through the web image's /modules/ proxy and the port above is removed. It

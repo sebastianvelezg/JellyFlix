@@ -509,6 +509,8 @@
     <string name="modules_on_now">On now</string>
     <string name="modules_channels_empty">There are no channels on yet. An administrator makes them in the web app (Modules, Retro TV, Set up).</string>
     <string name="modules_channel_empty">This channel has nothing on right now.</string>
+    <string name="modules_program_unavailable">Program not available</string>
+    <string name="modules_channel_unavailable">This channel is showing something your account cannot watch right now.</string>
     <string name="modules_nothing_on">Nothing on right now.</string>
     <string name="modules_next_at">Next at %1$s: %2$s</string>
     <string name="modules_working">Working…</string>

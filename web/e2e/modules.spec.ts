@@ -2,10 +2,11 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { createServer } from 'node:net'
+import { createServer as createSocketServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { MockServer } from '../test/mock/mockJellyfin'
+import { REQUEST, SEERR_KEY, startMockSeerr } from '../test/mock/mockSeerr'
 import { signIn, startMock, waitPlaying } from './helpers'
 
 /**
@@ -26,7 +27,7 @@ test.afterEach(async () => {
 
 const freePort = () =>
   new Promise<number>((resolvePort, reject) => {
-    const server = createServer()
+    const server = createSocketServer()
     server.once('error', reject)
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as { port: number }
@@ -35,11 +36,11 @@ const freePort = () =>
   })
 
 /** Starts the modules container (the real code) against the mock server; returns its address. */
-async function startContainer(jellyfinUrl: string): Promise<string> {
+async function startContainer(jellyfinUrl: string, extraEnv: Record<string, string> = {}): Promise<string> {
   const port = await freePort()
   dataDir = mkdtempSync(join(tmpdir(), 'jellyflix-modules-'))
   container = spawn(process.execPath, [resolve(import.meta.dirname, '..', '..', 'modules', 'server', 'src', 'main.ts')], {
-    env: { ...process.env, JELLYFIN_URL: jellyfinUrl, DATA_DIR: dataDir, PORT: String(port), HOST: '127.0.0.1', NODE_OPTIONS: '--disable-warning=ExperimentalWarning' },
+    env: { ...process.env, JELLYFIN_URL: jellyfinUrl, DATA_DIR: dataDir, PORT: String(port), HOST: '127.0.0.1', NODE_OPTIONS: '--disable-warning=ExperimentalWarning', ...extraEnv },
     stdio: 'ignore',
   })
   const url = `http://127.0.0.1:${port}`
@@ -273,4 +274,94 @@ test('Match on one device: choose the films, swipe here, and play the winner', a
   await page.getByRole('button', { name: 'Play here' }).click()
   await expect(page).toHaveURL(/#\/play\//)
   await waitPlaying(page)
+})
+
+test('Seerr: search, see where each title stands, ask for a movie and for some seasons, and see my requests', async ({ page }) => {
+  mock = await startMock({ movieCount: 3 })
+  // The mock Jellyfin's account is the Seerr user 7, who may request.
+  const seerr = await startMockSeerr({ user1: { id: 7, permissions: REQUEST } })
+  try {
+    await page.route('https://image.tmdb.org/**', (route) => route.abort())
+    const modulesUrl = await startContainer(mock.url, { JELLYFLIX_MODULES: 'seerr', SEERR_URL: seerr.url, SEERR_API_KEY: SEERR_KEY })
+    await withModulesAt(page, modulesUrl)
+    await signIn(page, mock, { start: '/#/modules' })
+    await expect(page.getByRole('heading', { name: 'Modules', level: 1 })).toBeVisible()
+    await page.getByRole('button', { name: 'Search and request' }).click()
+    await expect(page.getByRole('searchbox', { name: 'Search for a movie or series' })).toBeVisible()
+    await axe(page, 'seerr page')
+
+    await page.getByRole('searchbox', { name: 'Search for a movie or series' }).fill('matrix')
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
+    const results = page.getByRole('list', { name: 'Results' })
+    await expect(results.getByRole('button', { name: /^The Matrix Movie 1999 In your library$/ })).toBeVisible()
+    await expect(results.getByRole('button', { name: /^The Matrix Reloaded Movie 2003 Being added$/ })).toBeVisible()
+    await axe(page, 'seerr results')
+
+    // A movie: the quota is said, and asking sends Seerr only the kind and the number.
+    await results.getByRole('button', { name: /^The Matrix Reloaded Movie 2003 Being added$/ }).click()
+    await expect(page.getByText('Requests left: 1 of 2 every 7 days.')).toBeVisible()
+    await page.getByRole('button', { name: 'Request this movie' }).click()
+    await expect.poll(() => seerr.requests.map((r) => r.body)).toEqual([{ mediaType: 'movie', mediaId: 604 }])
+    await page.getByRole('button', { name: '← Results' }).click()
+
+    // A series: the seasons that are not there are ticked, the one that is cannot be.
+    await results.getByRole('button', { name: /^Breaking Bad Series 2008 Partly in your library$/ }).click()
+    await expect(page.getByRole('checkbox', { name: /Season 1/ })).toBeDisabled()
+    await page.getByRole('checkbox', { name: /Season 2/ }).uncheck()
+    await axe(page, 'seerr series')
+    await page.getByRole('button', { name: 'Request the chosen seasons' }).click()
+    await expect.poll(() => seerr.requests.map((r) => r.body)).toEqual([{ mediaType: 'movie', mediaId: 604 }, { mediaType: 'tv', mediaId: 1396, seasons: [3] }])
+    // Seerr was asked as the person (user 7), never as the administrator.
+    expect(seerr.requests.every((r) => r.userId === 7)).toBe(true)
+
+    await page.getByRole('tab', { name: 'My requests' }).click()
+    await expect(page.getByText('Seasons 3')).toBeVisible()
+    await axe(page, 'seerr requests')
+  } finally {
+    seerr.close()
+  }
+})
+
+test('Seerr: what the library does not have can be looked up from its search, in a block of its own, and only when Seerr is there', async ({ page }) => {
+  mock = await startMock({ movieCount: 3 })
+  const seerr = await startMockSeerr({ user1: { id: 7, permissions: REQUEST } })
+  try {
+    await page.route('https://image.tmdb.org/**', (route) => route.abort())
+    const modulesUrl = await startContainer(mock.url, { JELLYFLIX_MODULES: 'seerr', SEERR_URL: seerr.url, SEERR_API_KEY: SEERR_KEY })
+    await withModulesAt(page, modulesUrl)
+    await signIn(page, mock, { start: '/#/search/matrix%20reloaded' })
+    // Nothing in the library: the offer comes with the text already written, apart from the results.
+    await expect(page.getByText('nothing else in your library does either', { exact: false })).toBeVisible()
+    const offer = page.getByRole('region', { name: 'Not in your library?' })
+    await expect(offer).toBeVisible()
+    await axe(page, 'search with the Seerr offer')
+    await offer.getByRole('button', { name: 'Search “matrix reloaded” in Seerr' }).click()
+    // The Seerr page opens with that search already made.
+    await expect(page.getByRole('searchbox', { name: 'Search for a movie or series' })).toHaveValue('matrix reloaded')
+    await expect(page.getByRole('list', { name: 'Results' }).getByRole('button', { name: /^The Matrix Reloaded Movie 2003/ })).toBeVisible()
+    expect(page.url()).toContain('#/modules/seerr?q=matrix%20reloaded')
+    // (The development build runs an effect twice: the same search may be made twice, never another one.)
+    expect(seerr.searches.length).toBeGreaterThan(0)
+    expect(seerr.searches.every((q) => q === 'matrix reloaded')).toBe(true)
+  } finally {
+    seerr.close()
+  }
+})
+
+test('Seerr: the search of the library has no offer without a container', async ({ page }) => {
+  mock = await startMock({ movieCount: 3 })
+  await signIn(page, mock, { start: '/#/search/zzz' })
+  await expect(page.getByText('nothing else in your library does either', { exact: false })).toBeVisible()
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByRole('region', { name: 'Not in your library?' })).toHaveCount(0)
+})
+
+test('Seerr: the search of the library has no offer when the container does not have Seerr turned on', async ({ page }) => {
+  mock = await startMock({ movieCount: 3 })
+  await withModulesAt(page, await startContainer(mock.url))
+  await signIn(page, mock, { start: '/#/search/zzz' })
+  await expect(page.getByText('nothing else in your library does either', { exact: false })).toBeVisible()
+  await expect(tabs(page).getByRole('button', { name: 'Modules' })).toBeVisible()
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByRole('region', { name: 'Not in your library?' })).toHaveCount(0)
 })

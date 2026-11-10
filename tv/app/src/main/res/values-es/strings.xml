@@ -509,6 +509,8 @@
     <string name="modules_on_now">En emisión</string>
     <string name="modules_channels_empty">Todavía no hay canales activados. Un administrador los crea en la web (Módulos, TV retro, Configurar).</string>
     <string name="modules_channel_empty">Este canal no tiene nada en emisión ahora.</string>
+    <string name="modules_program_unavailable">Programa no disponible</string>
+    <string name="modules_channel_unavailable">Este canal emite algo que tu cuenta no puede ver ahora.</string>
     <string name="modules_nothing_on">No hay nada en emisión ahora.</string>
     <string name="modules_next_at">A las %1$s: %2$s</string>
     <string name="modules_working">Trabajando…</string>

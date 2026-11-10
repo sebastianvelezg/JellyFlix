@@ -9,6 +9,7 @@ import { useModulesClient } from '../ModulesProvider'
 import { ChannelEditor } from './ChannelEditor'
 import { ManageChannels } from './ManageChannels'
 import { QuickChannels } from './QuickChannels'
+import { programTitle } from './programText'
 
 const PX_PER_HOUR = 240
 const GUIDE_BEFORE = 1800
@@ -137,7 +138,7 @@ function NowList({ channels, now, onWatch }: { channels: ChannelSummary[]; now: 
               <div>
                 <p className="text-sm text-neutral-100">
                   <span className="mr-2 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">{t('On now')}</span>
-                  {c.now.title}
+                  {programTitle(c.now)}
                 </p>
                 {c.now.subtitle && <p className="text-xs text-neutral-400">{c.now.subtitle}</p>}
                 <div aria-hidden="true" className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
@@ -152,7 +153,7 @@ function NowList({ channels, now, onWatch }: { channels: ChannelSummary[]; now: 
             )}
             {c.next && (
               <p className="text-xs text-neutral-400">
-                {t('Next at {time}: {title}', { time: timeOf(c.next.start), title: c.next.title })}
+                {t('Next at {time}: {title}', { time: timeOf(c.next.start), title: programTitle(c.next) })}
               </p>
             )}
           </li>
@@ -214,11 +215,11 @@ function GuideRow({ channel, from, width, x, serverNow, onWatch }: { channel: Gu
               type="button"
               disabled={!onNow}
               onClick={() => onNow && onWatch(channel.id)}
-              title={`${p.title}${p.subtitle ? ` · ${p.subtitle}` : ''} (${timeOf(p.start)} – ${timeOf(p.end)})`}
+              title={`${programTitle(p)}${p.subtitle ? ` · ${p.subtitle}` : ''} (${timeOf(p.start)} – ${timeOf(p.end)})`}
               className={`absolute top-1 h-12 overflow-hidden rounded-lg border px-2 py-1 text-left text-xs ${onNow ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-white hover:bg-[var(--color-accent)]/30' : 'border-white/10 bg-white/[.04] text-neutral-300'}`}
               style={{ left: left + 2, width: Math.max(0, right - left - 4) }}
             >
-              <span className="block truncate font-medium">{p.title}</span>
+              <span className="block truncate font-medium">{programTitle(p)}</span>
               <span className="block truncate text-neutral-400">{p.subtitle ?? `${timeOf(p.start)} – ${timeOf(p.end)}`}</span>
             </button>
           )

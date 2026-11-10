@@ -40,6 +40,7 @@ export function SearchPage({
   onOpenAlbum,
   onOpenArtist,
   onPlay,
+  onSearchSeerr,
 }: {
   term: string
   session: Session
@@ -57,6 +58,8 @@ export function SearchPage({
   onOpenAlbum: (id: string) => void
   onOpenArtist: (id: string) => void
   onPlay: (episode: Episode) => void
+  /** Given when the Seerr module is there: opens it with this text searched, for what the library does not have. */
+  onSearchSeerr?: (term: string) => void
 }) {
   const [totals, setTotals] = useState<{ movies?: number; series?: number; musicVideos?: number; books?: number }>({})
   const [kind, setKind] = useState<SearchKind>('all')
@@ -85,6 +88,16 @@ export function SearchPage({
   const nothing =
     totals.movies === 0 && totals.series === 0 && (!hasMusicVideos || totals.musicVideos === 0) && (!hasBooks || totals.books === 0) && (episodes.status === 'error' || episodeCount === 0) && noMusic && noCollections
 
+  // What can be played is above; what can only be asked for is apart, in a block of its own, never mixed into the results.
+  const offer = onSearchSeerr ? (
+    <section aria-label={t('Not in your library?')} className="glass mb-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4">
+      <p className="text-sm text-neutral-300">{t('Not in your library? You can look for it in Seerr and ask for it.')}</p>
+      <button type="button" className="btn" onClick={() => onSearchSeerr(term)}>
+        {t('Search “{term}” in Seerr', { term })}
+      </button>
+    </section>
+  ) : null
+
   return (
     <div className="pt-6">
       <h1 className="mb-4 text-lg font-semibold">
@@ -100,6 +113,7 @@ export function SearchPage({
           message={t('No movies match “{term}”, and nothing else in your library does either. Check the spelling or try a shorter title.', { term })}
         />
       )}
+      {nothing && offer}
 
       {totals.movies !== 0 && (
         <section aria-label={t('Movies')} hidden={!shows('movies')} className="mb-10">
@@ -216,6 +230,8 @@ export function SearchPage({
           <TrackList session={session} tracks={music.data.tracks} onOpenAlbum={onOpenAlbum} />
         </section>
       )}
+
+      {!nothing && offer}
     </div>
   )
 }

@@ -796,7 +796,7 @@ private fun ChannelInfo(channel: ChannelUi, positionMs: Long) {
             )
             Spacer(Modifier.weight(1f))
             view.upNext?.let {
-                Text(stringResource(R.string.modules_next_at, clockOf(it.start), it.title), fontSize = 14.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(0.45f), textAlign = TextAlign.End)
+                Text(stringResource(R.string.modules_next_at, clockOf(it.start), it.shownTitle()), fontSize = 14.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(0.45f), textAlign = TextAlign.End)
             }
         }
         if (current != null) {
@@ -823,12 +823,12 @@ private fun ChannelOsdCard(osd: app.jellyflix.tv.ChannelOsdState, onStartOver: (
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.modules_osd_now), fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color.White, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFDC2626)).padding(horizontal = 8.dp, vertical = 3.dp))
-            Text(osd.now.title, fontSize = 22.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(osd.now.shownTitle(), fontSize = 22.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         osd.next?.let {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.modules_osd_next), fontSize = 12.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color(0xCCFFFFFF), modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0x33FFFFFF)).padding(horizontal = 8.dp, vertical = 3.dp))
-                Text("${clockOf(it.start)}  ${it.title}", fontSize = 17.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${clockOf(it.start)}  ${it.shownTitle()}", fontSize = 17.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         osd.joinedMinute?.let { minute ->
@@ -871,7 +871,7 @@ private fun ChannelGuidePanel(channel: ChannelUi, onPick: (ModuleProgram) -> Uni
                     else -> ""
                 }
                 TrackPill(
-                    "${clockOf(program.start)}  ${program.title}$mark",
+                    "${clockOf(program.start)}  ${program.shownTitle()}$mark",
                     selected = viewing,
                     onClick = { onPick(program) },
                     modifier = if (viewing || (isLiveNow && view.programs.none { it.start == view.currentStart })) Modifier.focusRequester(first) else Modifier,
