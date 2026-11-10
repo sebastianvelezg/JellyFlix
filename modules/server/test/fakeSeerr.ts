@@ -90,7 +90,7 @@ export function fakeSeerr(): FakeSeerr {
       return json({ movie: { days: 7, limit: 2, used: 1, remaining: 1, restricted: false }, tv: { restricted: false, used: 0 } })
     }
     // The real Seerr refuses a "+" for a space (and any unencoded reserved character) in the query: HTTP 400.
-    if (path === '/search' && /[?&]query=[^&]*\+/.test(rawUrl)) {
+    if (path === '/search' && (rawUrl.split('?')[1] ?? '').split('&').some((pair) => pair.startsWith('query=') && pair.includes('+'))) {
       return json({ message: "Parameter 'query' must be url encoded. Its value may not contain reserved characters." }, 400)
     }
     if (path === '/search') return json({ page: Number(url.searchParams.get('page')), totalPages: 3, totalResults: 55, results: RESULTS })

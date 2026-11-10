@@ -72,7 +72,8 @@ export async function startMockSeerr(users: Record<string, MockSeerrUser>): Prom
       if (/^\/user\/\d+\/quota$/.test(path)) return send(200, { movie: { days: 7, limit: 2, used: 1, remaining: 1, restricted: false }, tv: { restricted: false, used: 0 } })
       if (path === '/search') {
         // Seerr refuses a "+" for a space (and any reserved character that is not percent-encoded).
-        if (/[?&]query=[^&]*\+/.test(req.url ?? '')) return send(400, { message: "Parameter 'query' must be url encoded. Its value may not contain reserved characters." })
+        const rawQuery = (req.url ?? '').split('?')[1] ?? ''
+        if (rawQuery.split('&').some((pair) => pair.startsWith('query=') && pair.includes('+'))) return send(400, { message: "Parameter 'query' must be url encoded. Its value may not contain reserved characters." })
         state.searches.push(url.searchParams.get('query') ?? '')
         return send(200, { page: Number(url.searchParams.get('page')), totalPages: 1, totalResults: RESULTS.length, results: RESULTS })
       }
