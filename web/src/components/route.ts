@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from 'react'
  *   #/search/<text>     search results
  *   #/movie/<id>        movie page
  *   #/live/<id>         a live channel being watched
+ *   #/link?code=<six digits>  the page a TV's QR code opens: confirm that TV's Quick Connect code (the code is optional)
  *   #/modules[/<module>]  the extra modules (only there when a modules container is running): channels, match
  *   #/modules/match?join=<code>  the link in a Match invitation: it joins the room with that code
  *   #/channel/<id>      a retro TV channel being watched (a module channel, not Live TV)
@@ -70,6 +71,7 @@ export type Route =
   | { page: 'read'; id: string }
   | { page: 'live'; id: string }
   | { page: 'modules'; module?: ModuleKey; join?: string }
+  | { page: 'link'; code?: string }
   | { page: 'channel'; id: string }
   | { page: 'person'; id: string; name: string }
   | ({ page: 'play'; id: string; startOver: boolean; startAt?: number } & PlayQueueRef)
@@ -119,6 +121,8 @@ export function formatRoute(route: Route): string {
       return `#/${route.page}/${encodeURIComponent(route.id)}`
     case 'modules':
       return route.module ? `#/modules/${route.module}${route.join ? `?join=${encodeURIComponent(route.join)}` : ''}` : '#/modules'
+    case 'link':
+      return route.code ? `#/link?code=${encodeURIComponent(route.code)}` : '#/link'
     case 'channel':
       return `#/channel/${encodeURIComponent(route.id)}`
     case 'person':
@@ -153,6 +157,10 @@ export function parseRoute(hash: string): Route {
       const module = MODULE_KEYS.find((m) => m === decoded)
       const join = new URLSearchParams(query).get('join')
       return module ? { page: 'modules', module, ...(module === 'match' && join && /^[A-Za-z0-9]{3,12}$/.test(join) ? { join } : {}) } : { page: 'modules' }
+    }
+    if (kind === 'link' && !decoded) {
+      const code = (new URLSearchParams(query).get('code') ?? '').replace(/\s+/g, '')
+      return /^\d{6}$/.test(code) ? { page: 'link', code } : { page: 'link' }
     }
     if (kind === 'channel' && decoded) return { page: 'channel', id: decoded }
     if (kind === 'movies' && !decoded) return { page: 'browse' }

@@ -228,3 +228,48 @@ fun ChaptersPanel(chapters: List<Chapter>, current: Chapter?, onChoose: (Chapter
 /** A chapter's name, or "Chapter N" when the file gives none. */
 @Composable
 fun chapterName(index: Int, chapter: Chapter): String = chapter.name.ifBlank { stringResource(R.string.player_chapter, index + 1) }
+
+/** The sleep timer: off, a time, or the end of this title. Picking one sets it and closes the panel. */
+@Composable
+fun SleepPanel(current: app.jellyflix.tv.data.SleepTimer?, onChoose: (app.jellyflix.tv.data.SleepTimer?) -> Unit, onClose: () -> Unit) {
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) { first.requestFocusSoon() }
+    Box(Modifier.fillMaxSize().background(Color(0x99000000))) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .width(520.dp)
+                .fillMaxHeight()
+                .background(Palette.Surface.copy(alpha = 0.95f))
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(stringResource(R.string.player_sleep), fontSize = 20.sp, color = Color.White)
+            Pill(
+                text = (if (current == null) "✓ " else "") + stringResource(R.string.sleep_off),
+                onClick = { onChoose(null) },
+                selected = current == null,
+                modifier = Modifier.focusRequester(first),
+            )
+            val left = (current as? app.jellyflix.tv.data.SleepTimer.At)?.let { ((it.endsAt - System.currentTimeMillis()) / 60_000L).toInt() }
+            for (minutes in app.jellyflix.tv.data.SLEEP_MINUTES) {
+                // The choice that is on is the one nearest to what is left of the timer.
+                val on = left != null && left <= minutes && left > (app.jellyflix.tv.data.SLEEP_MINUTES.getOrNull(app.jellyflix.tv.data.SLEEP_MINUTES.indexOf(minutes) - 1) ?: 0)
+                Pill(
+                    text = (if (on) "✓ " else "") + stringResource(R.string.sleep_minutes, minutes),
+                    onClick = { onChoose(app.jellyflix.tv.data.sleepAfterMinutes(minutes, System.currentTimeMillis())) },
+                    selected = on,
+                )
+            }
+            val atEnd = current is app.jellyflix.tv.data.SleepTimer.EpisodeEnd
+            Pill(
+                text = (if (atEnd) "✓ " else "") + stringResource(R.string.sleep_episode_end),
+                onClick = { onChoose(app.jellyflix.tv.data.SleepTimer.EpisodeEnd) },
+                selected = atEnd,
+            )
+            Text(stringResource(R.string.sleep_note), fontSize = 13.sp, color = Palette.TextDim)
+            Pill(stringResource(R.string.player_close), onClick = onClose, modifier = Modifier.padding(top = 16.dp))
+        }
+    }
+}

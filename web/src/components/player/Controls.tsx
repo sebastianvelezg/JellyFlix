@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { chapterAt, formatTime, timeLabelText, type Chapter, type TrackOption } from '../../core'
+import { chapterAt, formatTime, timeLabelText, type Chapter, type SleepTimer, type TrackOption } from '../../core'
 import type { TimeLabel } from '../../platform/web/prefs'
 import type { SubtitleStyle } from './SubtitleOverlay'
 import type { TrickplayPreview } from './useTrickplay'
@@ -123,6 +123,8 @@ export interface ControlsProps {
   cinemaMode?: { enabled: boolean; onChange: (enabled: boolean) => void }
   /** Present when there is a next episode: adds the autoplay switch to the settings menu. */
   autoplayNext?: { enabled: boolean; onChange: (enabled: boolean) => void }
+  /** The sleep timer: what is set now, and how to change it (null: off). Not shown for a title that flows into the next one. */
+  sleepTimer?: { value: SleepTimer | null; onChange: (timer: SleepTimer | null) => void }
 }
 
 export function Controls(p: ControlsProps) {

@@ -135,6 +135,9 @@ class PlayerActions(
     val loadEpisodes: suspend (seasonId: java.util.UUID) -> List<MediaItem> = { emptyList() },
     /** An episode was picked from that list. */
     val onPlayEpisode: (MediaItem) -> Unit = {},
+    /** The sleep timer now set (null: off), and how to change it. */
+    val sleepTimer: app.jellyflix.tv.data.SleepTimer? = null,
+    val onSleep: (app.jellyflix.tv.data.SleepTimer?) -> Unit = {},
     /** Present when the video is a program of a retro TV channel: the channel's own controls, guide and on-screen graphics are added. */
     val channel: ChannelUi? = null,
 )
@@ -543,6 +546,7 @@ fun PlayerScreen(
                 chapters = chapters,
                 currentChapter = currentChapter,
                 onChapters = { panel = Panel.Chapters },
+                onSleep = { panel = Panel.Sleep },
                 onEpisodes = if (plan.item.isEpisodeLike() && plan.item.seriesId != null) ({ panel = Panel.Episodes }) else null,
                 showInfo = showInfo,
                 onInfo = { showInfo = !showInfo },
@@ -612,13 +616,22 @@ fun PlayerScreen(
                 onAll = channel.onAllChannels,
                 onClose = { panel = Panel.None },
             )
+            Panel.Sleep -> SleepPanel(
+                current = actions.sleepTimer,
+                onChoose = { timer ->
+                    panel = Panel.None
+                    controlsVisible = false
+                    actions.onSleep(timer)
+                },
+                onClose = { panel = Panel.None },
+            )
             Panel.None -> Unit
         }
         }
     }
 }
 
-private enum class Panel { None, Tracks, Chapters, Episodes, Guide }
+private enum class Panel { None, Tracks, Chapters, Episodes, Guide, Sleep }
 
 /** The time labels on both sides of the seek bar have one width, so a picture above the bar lines up with it. */
 private val TIME_LABEL_WIDTH = 64.dp
@@ -640,6 +653,7 @@ private fun Controls(
     chapters: List<Chapter>,
     currentChapter: Chapter?,
     onChapters: () -> Unit,
+    onSleep: () -> Unit,
     /** Present for an episode: opens the list of the series' seasons and episodes. */
     onEpisodes: (() -> Unit)?,
     showInfo: Boolean,
@@ -743,6 +757,7 @@ private fun Controls(
                     }
                     Pill(stringResource(R.string.player_audio_subtitles), onClick = onTracks)
                     if (chapters.size > 1) Pill(stringResource(R.string.player_chapters), onClick = onChapters)
+                    if (channel == null && plan.liveStreamId == null) Pill(stringResource(R.string.player_sleep), onClick = onSleep)
                     if (onEpisodes != null) Pill(stringResource(R.string.player_episodes), onClick = onEpisodes)
                     Pill(stringResource(R.string.player_info), onClick = onInfo, selected = showInfo)
                 }

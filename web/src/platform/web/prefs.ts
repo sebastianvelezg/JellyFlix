@@ -1,4 +1,5 @@
-import { isChannelCategory, sanitizeFilters, type AdvancedFilters, type ChannelCategory, type Section, type SortKey, type WatchFilter } from '../../core'
+import { isChannelCategory, sanitizeFilters, STILL_WATCHING_CHOICES, type AdvancedFilters, type ChannelCategory, type Section, type SortKey, type WatchFilter } from '../../core'
+import { announcePrefsChanged } from './prefsEvents'
 import { LANGUAGES, type LanguageChoice } from '../../i18n'
 import { ownedKey } from './owner'
 
@@ -39,6 +40,8 @@ export interface PlayerPrefs {
   autoplayNext: boolean
   /** How many seconds the "Up next" countdown runs before the next title starts by itself. */
   autoplayCountdown: number
+  /** "Are you still watching?" after this many titles in a row that began by themselves (0: never). */
+  stillWatchingAfter: number
   /** Play a queue again from its first title after the last one (a folder of music videos, a playlist, a collection). */
   repeatQueue: boolean
   /** Cinema mode: the picture fades in from black, the controls get out of the way sooner and also while paused. */
@@ -102,6 +105,7 @@ const PLAYER_DEFAULTS: PlayerPrefs = {
   subtitleLanguage: null,
   autoplayNext: true,
   autoplayCountdown: 8,
+  stillWatchingAfter: 0,
   cinemaMode: false,
   repeatQueue: false,
   crossfadeSeconds: 0,
@@ -166,6 +170,7 @@ export function sanitizePlayerPrefs(value: unknown): PlayerPrefs {
     subtitleLanguage: typeof p.subtitleLanguage === 'string' ? p.subtitleLanguage : null,
     autoplayNext: p.autoplayNext !== false,
     autoplayCountdown: (COUNTDOWN_CHOICES as readonly number[]).includes(p.autoplayCountdown) ? p.autoplayCountdown : 8,
+    stillWatchingAfter: (STILL_WATCHING_CHOICES as readonly number[]).includes(p.stillWatchingAfter) ? p.stillWatchingAfter : 0,
     cinemaMode: p.cinemaMode === true,
     repeatQueue: p.repeatQueue === true,
     crossfadeSeconds: (CROSSFADE_CHOICES as readonly number[]).includes(p.crossfadeSeconds) ? p.crossfadeSeconds : 0,
@@ -189,6 +194,7 @@ export function sanitizePlayerPrefs(value: unknown): PlayerPrefs {
 
 export function writePlayerPrefs(patch: Partial<PlayerPrefs>): void {
   write(PLAYER_KEY, { ...readPlayerPrefs(), ...patch })
+  announcePrefsChanged()
 }
 
 /** Movies keep the original key; series and anime have their own sort, filter and library. */

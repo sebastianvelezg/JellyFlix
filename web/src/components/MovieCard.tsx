@@ -211,12 +211,16 @@ export function ContinueCard({
   movie,
   onPlay,
   onOpen,
+  rowKind,
 }: {
   session: Session
   movie: Movie
   onPlay: (movie: Movie) => void
   onOpen: (movie: Movie) => void
+  /** Which row the card is in, so its menu can offer to hide it from that row. */
+  rowKind?: 'continue' | 'nextUp'
 }) {
+  const remember = useCardActions()
   const progress = progressPercent(movie)
   const left = movie.runtimeTicks ? ticksToSeconds(movie.runtimeTicks - movie.resumeTicks) : 0
   const resuming = movie.resumeTicks > 0
@@ -230,7 +234,7 @@ export function ContinueCard({
   const label = isEpisode(movie) ? `${movie.seriesName} ${episodeCode(movie)}` : movie.name
 
   return (
-    <div className="group relative w-64 shrink-0 snap-start sm:w-72 lg:w-80">
+    <div className="group group/card relative w-64 shrink-0 snap-start sm:w-72 lg:w-80">
       <button
         type="button"
         onClick={() => (opens ? onOpen(movie) : onPlay(movie))}
@@ -262,6 +266,7 @@ export function ContinueCard({
       >
         {opens ? <PlayIcon /> : <InfoIcon />}
       </button>
+      {remember && rowKind && <CardMenu session={session} movie={movie} onOpen={onOpen} onChange={remember} rowKind={rowKind} corner="left" />}
     </div>
   )
 }

@@ -300,3 +300,51 @@ export function MiniBar({
     </>
   )
 }
+
+/**
+ * "Are you still watching?": the next title waits until somebody answers; with no answer the playback stops (the seconds left are said
+ * out loud once, not every second, so a screen reader is not flooded).
+ */
+export function StillWatchingDialog({ count, secondsLeft, onKeep, onStop }: { count: number; secondsLeft: number; onKeep: () => void; onStop: () => void }) {
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="still-watching-title"
+        aria-describedby="still-watching-note"
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[var(--color-surface)]/95 p-5 text-center shadow-[0_24px_70px_-10px_rgba(0,0,0,0.9)]"
+      >
+        <h2 id="still-watching-title" className="text-xl font-semibold text-white">
+          {t('Are you still watching?')}
+        </h2>
+        <p id="still-watching-note" className="mt-2 text-sm text-neutral-300">
+          {t('{count} titles have played in a row. The next one waits for your answer.', { count })}
+        </p>
+        <p aria-hidden="true" className="mt-1 text-xs tabular-nums text-neutral-500">
+          {t('Stopping in {seconds}s', { seconds: Math.max(0, secondsLeft) })}
+        </p>
+        <div className="mt-4 flex justify-center gap-2">
+          <button type="button" className="btn-primary" autoFocus onClick={onKeep}>
+            {t('Keep watching')}
+          </button>
+          <button type="button" className="btn" onClick={onStop}>
+            {t('Stop')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The last half minute of the sleep timer, with a way to keep watching. */
+export function SleepWarning({ secondsLeft, onKeep }: { secondsLeft: number; onKeep: () => void }) {
+  return (
+    <div role="status" className="absolute bottom-28 left-4 z-20 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/80 px-4 py-3 text-sm text-neutral-100 backdrop-blur-2xl sm:left-6">
+      <span className="tabular-nums">{t('Sleep timer: stopping in {seconds}s', { seconds: secondsLeft })}</span>
+      <button type="button" className="btn py-1.5" onClick={onKeep}>
+        {t('Keep watching')}
+      </button>
+    </div>
+  )
+}

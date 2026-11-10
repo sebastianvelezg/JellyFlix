@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   chapterAt,
   formatTime,
+  sleepAfterMinutes,
+  SLEEP_MINUTES,
+  sleepSecondsLeft,
   stepOffset,
   SUBTITLE_FILE_EXTENSIONS,
   SYNC_STEP,
@@ -34,7 +37,7 @@ const BACKGROUND_LABELS: Record<SubtitleBackground, string> = { shadow: tr('Shad
 const POSITION_LABELS: Record<SubtitlePosition, string> = { low: tr('Low'), high: tr('Higher') }
 
 /** The menu opens on its list; each row opens one page of choices, with a way back at the top. */
-type View = 'main' | 'audio' | 'subtitles' | 'second' | 'look' | 'quality' | 'speed' | 'chapters'
+type View = 'main' | 'audio' | 'subtitles' | 'second' | 'look' | 'quality' | 'speed' | 'chapters' | 'sleep'
 
 const ROW =
   'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-neutral-100 transition-colors duration-150 hover:bg-white/[.08] focus-visible:bg-white/[.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-accent)] pointer-coarse:py-3.5'
@@ -189,6 +192,13 @@ export function SettingsMenu(p: ControlsProps & { iconButton: string }) {
   const speedNow = p.speed === 1 ? t('Normal') : `${p.speed}×`
   const lookNow = `${t(SUBTITLE_SIZES.find(([size]) => size === p.subtitleStyle.size)?.[1] ?? '')} · ${t(COLOR_LABELS[p.subtitleStyle.color])}`
   const chapter = chapterAt(p.chapters, p.currentTime)
+  const sleep = p.sleepTimer?.value ?? null
+  const sleepNow =
+    sleep === null
+      ? t('Off')
+      : sleep.kind === 'episodeEnd'
+        ? t('End of this episode')
+        : t('{minutes} min left', { minutes: Math.max(1, Math.ceil(sleepSecondsLeft(sleep, p.now) / 60)) })
 
   const page = (title: string, body: ReactNode) => (
     <>
@@ -248,6 +258,7 @@ export function SettingsMenu(p: ControlsProps & { iconButton: string }) {
               <NavRow rowId="quality" label={t('Quality')} value={qualityNow} onClick={() => go('quality')} />
               <NavRow rowId="speed" label={t('Speed')} value={speedNow} onClick={() => go('speed')} />
               <NavRow rowId="look" label={t('Subtitle look')} value={lookNow} onClick={() => go('look')} />
+              {p.sleepTimer && <NavRow rowId="sleep" label={t('Sleep timer')} value={sleepNow} onClick={() => go('sleep')} />}
               {p.chapters.length > 0 && <NavRow rowId="chapters" label={t('Chapters')} value={chapter?.name} onClick={() => go('chapters')} />}
               {(p.repeatQueue || p.cinemaMode || p.autoplayNext) && (
                 <div className="mt-1.5 border-t border-white/10 pt-1.5">
@@ -258,6 +269,29 @@ export function SettingsMenu(p: ControlsProps & { iconButton: string }) {
               )}
             </>
           )}
+
+          {view === 'sleep' &&
+            p.sleepTimer &&
+            page(
+              t('Sleep timer'),
+              <fieldset>
+                <legend className={LEGEND}>{t('Sleep timer')}</legend>
+                <Option name="sleep" label={t('Off')} checked={sleep === null} onChange={() => p.sleepTimer?.onChange(null)} />
+                {SLEEP_MINUTES.map((minutes) => (
+                  <Option
+                    key={minutes}
+                    name="sleep"
+                    label={t('Stop in {minutes} minutes', { minutes })}
+                    checked={sleep?.kind === 'at' && Math.round(sleepSecondsLeft(sleep, p.now) / 60) <= minutes && Math.round(sleepSecondsLeft(sleep, p.now) / 60) > (SLEEP_MINUTES[SLEEP_MINUTES.indexOf(minutes) - 1] ?? 0)}
+                    onChange={() => p.sleepTimer?.onChange(sleepAfterMinutes(minutes, Date.now()))}
+                  />
+                ))}
+                <Option name="sleep" label={t('At the end of this episode')} checked={sleep?.kind === 'episodeEnd'} onChange={() => p.sleepTimer?.onChange({ kind: 'episodeEnd' })} />
+                <p className="mt-1 border-t border-white/10 px-3 pb-1.5 pt-2.5 text-xs leading-relaxed text-neutral-400">
+                  {t('Playback stops at that moment and where you were is saved. It is forgotten when you reload the page.')}
+                </p>
+              </fieldset>,
+            )}
 
           {view === 'audio' &&
             page(

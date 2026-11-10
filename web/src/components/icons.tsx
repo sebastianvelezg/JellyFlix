@@ -148,6 +148,13 @@ export const CheckIcon = () => (
     <path d="m5 12.5 4.5 4.5L19 7.5" />
   </Icon>
 )
+export const EyeOffIcon = () => (
+  <Icon width={18} height={18}>
+    <path d="M3 3l18 18" />
+    <path d="M10.6 6.2A9.7 9.7 0 0 1 12 6c5 0 8.5 4.2 9.5 6-.4.8-1.3 2-2.5 3.1M6.5 7.6C4.6 8.9 3.3 10.7 2.5 12c1 1.8 4.5 6 9.5 6 1.4 0 2.7-.3 3.8-.8" />
+    <path d="M9.9 10a3 3 0 0 0 4.1 4.1" />
+  </Icon>
+)
 export const InfoIcon = () => (
   <Icon width={18} height={18}>
     <circle cx="12" cy="12" r="9" />

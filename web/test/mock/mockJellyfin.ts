@@ -1783,7 +1783,8 @@ export async function startMockJellyfin(options: MockOptions = {}): Promise<Mock
     const displayPref = /^\/DisplayPreferences\/([^/]+)$/.exec(path)
     if (displayPref) {
       if (!needAuth()) return
-      const key = `${displayPref[1]}|${query.client}`
+      // Jellyfin keeps display preferences for each user.
+      const key = `${displayPref[1]}|${query.client}|${query.userId ?? ''}`
       if (req.method === 'POST') {
         displayPrefs.set(key, ((body as { CustomPrefs?: Record<string, string> } | undefined)?.CustomPrefs ?? {}))
         return void res.writeHead(204).end()

@@ -2,7 +2,10 @@ import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react'
 import {
   buildHomeLineup,
   getRecommendations,
+  filterNextUp,
+  filterResume,
   getContinueAll,
+  hiddenMargin,
   getHomePool,
   getLatestTitles,
   getNextUp,
@@ -21,6 +24,7 @@ import {
   type Session,
 } from '../core'
 import { useAppearance } from '../platform/web/appearance'
+import { readHidden, useHidden } from '../platform/web/hidden'
 import { readUiPrefs } from '../platform/web/prefs'
 import { CollectionsRow } from './CollectionCard'
 import { Discover } from './Discover'
@@ -321,18 +325,21 @@ function ContinueAll({
 }) {
   // `playbackVersion` is part of the callback identity so the row is read again after playback ends (`fresh: 0`:
   // what is remembered is shown at once, but never trusted).
-  const load = useCallback(() => getContinueAll(session, undefined, withMusicVideos).then((rows) => ({ rows, playbackVersion })), [session, withMusicVideos, playbackVersion])
+  const hidden = useHidden()
+  // A few more than the row needs are asked for, so it is still full once the hidden ones are taken out.
+  const [margin] = useState(() => hiddenMargin(readHidden(), 'resume'))
+  const load = useCallback(() => getContinueAll(session, 16 + margin, withMusicVideos).then((rows) => ({ rows, playbackVersion })), [session, withMusicVideos, playbackVersion, margin])
   const { state } = useSwr(swrKey(swrScope(session), 'home', 'continue', withMusicVideos ? 'mv' : ''), load, { fresh: 0 })
   const playVideo = usePlayVideo()
   if (state.status !== 'ready') return null
-  const items = state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0)
+  const items = filterResume(hidden, state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0))
   if (items.length === 0) return null
   const videos = items.filter((m) => m.musicVideo)
   return (
     <Row title={t('Continue watching')}>
       {items.map((m) => (
         // A music video goes on with the other music videos of the row.
-        <ContinueCard key={m.id} session={session} movie={m} onPlay={(v) => (v.musicVideo && playVideo ? playVideo(v, { list: videos }) : onPlay(v))} onOpen={onOpen} />
+        <ContinueCard key={m.id} session={session} movie={m} rowKind="continue" onPlay={(v) => (v.musicVideo && playVideo ? playVideo(v, { list: videos }) : onPlay(v))} onOpen={onOpen} />
       ))}
     </Row>
   )
@@ -353,16 +360,18 @@ function NextUpRow({
   onOpenSeries: (seriesId: string) => void
 }) {
   const { nextUpDays } = useAppearance()
-  const load = useCallback(() => getNextUp(session, { days: nextUpDays }).then((rows) => ({ rows, playbackVersion })), [session, playbackVersion, nextUpDays])
+  const hidden = useHidden()
+  const [margin] = useState(() => hiddenMargin(readHidden(), 'nextUp'))
+  const load = useCallback(() => getNextUp(session, { days: nextUpDays, limit: 16 + margin }).then((rows) => ({ rows, playbackVersion })), [session, playbackVersion, nextUpDays, margin])
   const { state } = useSwr(swrKey(swrScope(session), 'home', 'next-up', String(nextUpDays)), load, { fresh: 0 })
   if (state.status !== 'ready') return null
   // An episode you finished since this list was read is no longer "up next".
-  const next = state.data.rows.map((e) => overrides[e.id] ?? e).filter((e) => !e.played && e.resumeTicks === 0)
+  const next = filterNextUp(hidden, state.data.rows).map((e) => overrides[e.id] ?? e).filter((e) => !e.played && e.resumeTicks === 0)
   if (next.length === 0) return null
   return (
     <Row title={t('Next up')}>
       {next.map((e) => (
-        <ContinueCard key={e.id} session={session} movie={e} onPlay={onPlay} onOpen={(m) => isEpisode(m) && onOpenSeries(m.seriesId)} />
+        <ContinueCard key={e.id} session={session} movie={e} rowKind="nextUp" onPlay={onPlay} onOpen={(m) => isEpisode(m) && onOpenSeries(m.seriesId)} />
       ))}
     </Row>
   )

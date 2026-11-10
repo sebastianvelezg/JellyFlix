@@ -36,6 +36,7 @@ import {
 } from '../platform/web/appearance'
 import { t } from '../i18n'
 import { ACCENTS, CANVASES, accentColor, resolveAccent, sanitizeTheme, type Canvas } from '../theme/themes'
+import { HiddenSettings } from './HiddenSettings'
 import { BannerDrawing, DensityDrawing, NavDrawing, PickCards, UiSizeDrawing } from './LayoutCards'
 import { TAB_LABELS } from './Header'
 import { Card, Toggle } from './SettingsParts'
@@ -343,6 +344,8 @@ export function AppearanceSettings() {
         </div>
         <p className="-mt-2 text-xs text-neutral-500">{t('A series you have not watched for longer than that leaves Next up.')}</p>
       </Card>
+
+      <HiddenSettings />
 
       <Card title={t('Home page')} description={t('Show, hide and reorder what the home page is made of. Rows for a kind of library you do not have are left out anyway.')}>
         <Toggle

@@ -44,7 +44,8 @@ import app.jellyflix.tv.ui.PlayerActions
 import app.jellyflix.tv.ui.PlayerScreen
 import app.jellyflix.tv.ui.PlaylistScreen
 import app.jellyflix.tv.ui.Screensaver
-import app.jellyflix.tv.ui.SignInScreen
+import app.jellyflix.tv.ui.GateScreen
+import app.jellyflix.tv.ui.PinTaskScreen
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -60,6 +61,11 @@ class MainActivity : ComponentActivity() {
                 SideEffect { window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(canvas.toArgb())) }
                 // Back closes a page or goes to Home; on Home it falls through and leaves the app.
                 BackHandler(enabled = vm.signedIn && (vm.pages.isNotEmpty() || vm.tab != Tab.Home)) { vm.back() }
+                // From a sign-in or a PIN, Back returns to the picker of accounts.
+                val gate = vm.gate
+                BackHandler(enabled = (gate is Gate.SignIn && !vm.profiles.isEmpty) || (gate is Gate.Pin && vm.profiles.profiles.size >= 2)) { vm.backToChooser() }
+                // The PIN screen of Settings covers the app; Back closes it.
+                BackHandler(enabled = vm.pinTask != null) { vm.endPinTask() }
                 // The screen margin (Settings, Display) keeps everything off the edge a TV may cut off. The video fills the screen
                 // anyway, so the player gets the margin to keep its own controls and subtitles inside.
                 BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Black)) {
@@ -70,6 +76,7 @@ class MainActivity : ComponentActivity() {
                         CompositionLocalProvider(LocalCardMenu provides { item -> vm.openCardMenu(item) }) {
                             Content(insetX, insetY)
                         }
+                        vm.pinTask?.let { if (vm.gate == Gate.Open) PinTaskScreen(vm, it) }
                         BusyIndicator()
                         ErrorBanner()
                         NoticeBanner()
@@ -123,16 +130,9 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Content(insetX: Dp, insetY: Dp) {
-        if (!vm.signedIn) {
-            SignInScreen(
-                initialServer = vm.lastServer,
-                busy = vm.busy,
-                quickCode = vm.quickCode,
-                onQuickConnect = vm::startQuickConnect,
-                onCancelQuickConnect = vm::cancelQuickConnect,
-                error = vm.errorRes?.let { stringResource(it) } ?: vm.errorText,
-                onSignIn = vm::signIn,
-            )
+        // No account open: the picker, a PIN, a sign-in, or a blank moment between two accounts.
+        if (vm.gate != Gate.Open || !vm.signedIn) {
+            GateScreen(vm)
             return
         }
         when (val page = vm.pages.lastOrNull()) {
@@ -167,7 +167,7 @@ class MainActivity : ComponentActivity() {
                             // A retro TV channel goes on with its next program; any other video with its next episode, or leaves.
                             if (!vm.modules.ended(page.plan)) {
                                 val continues = page.plan.item.kind == BaseItemKind.EPISODE || vm.hasNextInPlaylist(page.plan.item)
-                                if (continues && vm.autoplayNext) vm.playNext(page.plan) else vm.back()
+                                vm.titleEnded(page.plan, continues && vm.autoplayNext)
                             }
                         },
                         channel = vm.modules.uiFor(page.plan),
@@ -179,6 +179,8 @@ class MainActivity : ComponentActivity() {
                         loadSeasons = { vm.seasonsOf(page.plan.item) },
                         loadEpisodes = { seasonId -> vm.episodesOf(page.plan.item, seasonId) },
                         onPlayEpisode = { vm.playEpisode(it) },
+                        sleepTimer = vm.sleepTimer,
+                        onSleep = vm::changeSleepTimer,
                     ),
                 )
             }
