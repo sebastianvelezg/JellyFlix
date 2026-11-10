@@ -1816,6 +1816,22 @@ export const es: Record<string, string> = {
   '{count} minutes': '{count} minutos',
   'Longer films and episodes are left out of the schedule. If nothing is short enough, the limit is ignored.': 'Las películas y episodios más largos se dejan fuera del horario. Si nada es lo bastante corto, el límite se ignora.',
   'A channel can hold {max} titles picked one by one. To bring more, add a rule.': 'Un canal admite {max} títulos elegidos uno a uno. Para traer más, añade una regla.',
+  'Remove {name} from favourites': 'Quitar {name} de favoritos',
+  'Add {name} to favourites': 'Añadir {name} a favoritos',
+  'Remove from favourites': 'Quitar de favoritos',
+  'Keep first (favourite)': 'Poner primero (favorito)',
+  'Time scale': 'Escala de tiempo',
+  'Loading more of the guide…': 'Cargando más de la guía…',
+  'Scroll right to see what comes later. Drag the edge of the Channel column to make it wider.': 'Desplázate a la derecha para ver lo que viene después. Arrastra el borde de la columna Canal para hacerla más ancha.',
+  'Resize the channel names': 'Cambiar el ancho de los nombres de canal',
+  'Drag to change the width (double click for the usual one)': 'Arrastra para cambiar el ancho (doble clic para el normal)',
+  'Picture': 'Imagen',
+  'A picture for the channel (PNG, JPEG, WebP or GIF). It is shrunk to fit, and shows in the cards, the guide and the lists.': 'Una imagen para el canal (PNG, JPEG, WebP o GIF). Se reduce para que quepa y se ve en las tarjetas, la guía y las listas.',
+  'Choose a picture': 'Elegir una imagen',
+  'Remove the picture': 'Quitar la imagen',
+  'That file is not a picture.': 'Ese archivo no es una imagen.',
+  'That file is not a picture this browser can read.': 'Ese archivo no es una imagen que este navegador pueda leer.',
+  'The picture is still too big after shrinking it. Try a simpler one.': 'La imagen sigue siendo demasiado grande tras reducirla. Prueba con una más sencilla.',
 }
 
 /** Messages with numbers or names in them, written once as a pattern. `$1` is the first captured part. */

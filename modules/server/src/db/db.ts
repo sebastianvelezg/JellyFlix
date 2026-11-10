@@ -57,6 +57,21 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX match_members_user ON match_members (user_id);
   `,
+  // 3: channels that a person keeps first, and the picture of a channel
+  `
+  CREATE TABLE channel_favorites (
+    user_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, channel_id)
+  );
+  CREATE INDEX channel_favorites_channel ON channel_favorites (channel_id);
+  CREATE TABLE channel_images (
+    channel_id TEXT PRIMARY KEY REFERENCES channels(id) ON DELETE CASCADE,
+    mime TEXT NOT NULL,
+    data BLOB NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  `,
 ]
 
 /** Opens (and creates) the database and brings its schema up to date. `path` may be ":memory:" for tests. */

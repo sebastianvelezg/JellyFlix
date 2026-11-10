@@ -395,3 +395,72 @@ test('Seerr: the search of the library has no offer when the container does not 
   await page.waitForLoadState('networkidle')
   await expect(page.getByRole('region', { name: 'Not in your library?' })).toHaveCount(0)
 })
+
+const PNG_1X1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
+test('the guide of all the channels goes on as it is scrolled, its names column and scale can be changed, favourites come first and a channel can have a picture', async ({ page }) => {
+  mock = await startMock({ movieCount: 12 })
+  await withModulesAt(page, await startContainer(mock.url))
+  const guideCalls: string[] = []
+  page.on('request', (request) => {
+    if (request.url().includes('/v1/guide')) guideCalls.push(request.url())
+  })
+  await signIn(page, mock, { start: '/#/' })
+  await tabs(page).getByRole('button', { name: 'Modules' }).click()
+  await page.getByRole('button', { name: 'Open the channels' }).click()
+  await page.getByRole('button', { name: 'Set up channels' }).click()
+  await page.getByRole('button', { name: 'Quick channels' }).click()
+  await page.getByText('Action', { exact: true }).click()
+  await page.getByText('Comedy', { exact: true }).click()
+  await page.getByRole('button', { name: 'Make 2 channels' }).click()
+  await expect(page.getByRole('button', { name: 'Edit channel Action' })).toBeVisible()
+
+  // A picture: chosen in the editor, kept with the channel, shown in the lists.
+  await page.getByRole('button', { name: 'Edit channel Action' }).click()
+  await page.getByLabel('Choose a picture').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') })
+  await expect(page.getByRole('button', { name: 'Remove the picture' })).toBeVisible()
+  await page.getByRole('button', { name: 'Save channel' }).click()
+  await expect(page.getByRole('button', { name: 'Edit channel Action' })).toBeVisible()
+  await expect(page.locator('li', { hasText: 'Action' }).locator('img').first()).toBeVisible()
+
+  // The guide asks for more as it is scrolled on.
+  await page.getByRole('tab', { name: 'Guide' }).click()
+  const guide = page.getByRole('region', { name: 'Channel guide' })
+  await expect(guide.getByRole('button', { name: 'Watch channel Action' })).toBeVisible()
+  await expect(guide.locator('img').first()).toBeVisible() // the picture of the channel
+  const asked = guideCalls.length
+  const lastTo = Number(new URL(guideCalls[asked - 1] as string).searchParams.get('to'))
+  await guide.evaluate((el) => {
+    el.scrollLeft = el.scrollWidth
+  })
+  await expect.poll(() => guideCalls.length).toBeGreaterThan(asked)
+  expect(Number(new URL(guideCalls[asked] as string).searchParams.get('from'))).toBe(lastTo) // the next piece starts where the one before ended
+
+  // The column of names is wider on a drag or the arrow keys, and the width is kept.
+  const handle = page.getByRole('separator', { name: 'Resize the channel names' })
+  const width = Number(await handle.getAttribute('aria-valuenow'))
+  await handle.focus()
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('ArrowRight')
+  await expect(handle).toHaveAttribute('aria-valuenow', String(width + 48))
+  expect(await page.evaluate(() => localStorage.getItem('jellyflix.guide.nameWidth'))).toBe(String(width + 48))
+
+  // The time scale: closer makes the guide wider.
+  const before = await guide.evaluate((el) => el.scrollWidth)
+  await page.getByRole('button', { name: 'Zoom in' }).click()
+  await expect.poll(() => guide.evaluate((el) => el.scrollWidth)).toBeGreaterThan(before)
+
+  // Favourites come first, in the guide and in the cards.
+  const order = () => guide.getByRole('button', { name: /^Watch channel / }).evaluateAll((buttons) => buttons.map((b) => b.querySelector('.sr-only')?.textContent))
+  expect(await order()).toEqual(['Watch channel Action', 'Watch channel Comedy'])
+  await guide.getByRole('button', { name: 'Add Comedy to favourites' }).click()
+  await expect.poll(order).toEqual(['Watch channel Comedy', 'Watch channel Action'])
+  await expect(guide.getByRole('button', { name: 'Remove Comedy from favourites' })).toHaveAttribute('aria-pressed', 'true')
+  await axe(page, 'channel guide')
+  await page.getByRole('tab', { name: 'On now' }).click()
+  await expect(page.getByRole('button', { name: /^Watch channel / }).first()).toHaveAttribute('aria-label', 'Watch channel Comedy')
+  if (process.env.SHOTS) await page.screenshot({ path: join(process.env.SHOTS, 'cards.png'), fullPage: true })
+  await page.getByRole('tab', { name: 'Guide' }).click()
+  if (process.env.SHOTS) await page.screenshot({ path: join(process.env.SHOTS, 'guide.png'), fullPage: true })
+})

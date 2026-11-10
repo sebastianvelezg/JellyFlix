@@ -1,5 +1,17 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
+/** An answer that is not JSON (a picture): what a handler returns to be sent as it is. */
+export class RawResponse {
+  status: number
+  headers: Record<string, string>
+  body: Buffer
+  constructor(status: number, headers: Record<string, string>, body: Buffer) {
+    this.status = status
+    this.headers = headers
+    this.body = body
+  }
+}
+
 export class HttpError extends Error {
   status: number
   constructor(status: number, message: string) {

@@ -75,6 +75,11 @@ export interface ChannelsService {
   suggestions(user: AuthUser): Promise<ChannelSuggestions>
   auto(user: AuthUser, request: AutoChannelsRequest, now: number): Promise<Channel[]>
   get(id: string): Channel
+  /** The person keeps this channel first (or no longer does). It is only theirs: nobody else sees it. */
+  setFavorite(user: AuthUser, id: string, favorite: boolean): { favorite: boolean }
+  setImage(id: string, mime: string, bytes: Buffer, now: number): { imageVersion: number }
+  removeImage(id: string): void
+  image(id: string): { mime: string; data: Buffer; version: number }
 }
 
 export function createChannelsService(db: Db, jellyfin: JellyfinClient): ChannelsService {
@@ -85,13 +90,24 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
     return row
   }
   const poolSizeOf = (id: string): number => (db.prepare('SELECT COUNT(*) AS n FROM pool_items WHERE channel_id = ?').get(id) as { n: number }).n
-  const channelOf = (row: ChannelRow): Channel => ({
-    ...(JSON.parse(row.def) as ChannelDef),
-    id: row.id,
-    poolSize: poolSizeOf(row.id),
-    poolRefreshedAt: row.pool_refreshed_at,
-    createdAt: row.created_at,
-  })
+  /** The channels this person keeps first. */
+  const favoritesOf = (userId: string): Set<string> => new Set((db.prepare('SELECT channel_id FROM channel_favorites WHERE user_id = ?').all(userId) as Array<{ channel_id: string }>).map((r) => r.channel_id))
+  /** When each channel picture was last changed (a channel without one is not in it). */
+  const imageVersions = (): Map<string, number> => new Map((db.prepare('SELECT channel_id, updated_at FROM channel_images').all() as Array<{ channel_id: string; updated_at: number }>).map((r) => [r.channel_id, r.updated_at]))
+  /** Favourites first, each group by number. */
+  const favouritesFirst = <T extends { id: string; number: number }>(rows: T[], favorites: Set<string>): T[] =>
+    [...rows].sort((a, b) => Number(favorites.has(b.id)) - Number(favorites.has(a.id)) || a.number - b.number)
+  const channelOf = (row: ChannelRow): Channel => {
+    const picture = imageVersions().get(row.id)
+    return {
+      ...(JSON.parse(row.def) as ChannelDef),
+      id: row.id,
+      poolSize: poolSizeOf(row.id),
+      poolRefreshedAt: row.pool_refreshed_at,
+      createdAt: row.created_at,
+      ...(picture !== undefined ? { imageVersion: picture } : {}),
+    }
+  }
   const readerFor = (user: AuthUser): Reader => ({ jellyfin, token: user.token, userId: user.id })
 
   function poolOf(id: string): PoolItem[] {
@@ -174,7 +190,9 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
     get: (id) => channelOf(rowOf(id)),
 
     async list(user, now) {
-      const rows = db.prepare('SELECT * FROM channels ORDER BY number').all() as unknown as ChannelRow[]
+      const favorites = favoritesOf(user.id)
+      const pictures = imageVersions()
+      const rows = favouritesFirst(db.prepare('SELECT * FROM channels ORDER BY number').all() as unknown as ChannelRow[], favorites)
       const shown = rows.map((row) => {
         const def = JSON.parse(row.def) as ChannelDef
         if (def.enabled) ensureTimeline(row, now, now + HORIZON_SECONDS)
@@ -196,6 +214,8 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
           mode: def.mode,
           poolSize: poolSizeOf(row.id),
           poolRefreshedAt: row.pool_refreshed_at,
+          favorite: favorites.has(row.id),
+          ...(pictures.has(row.id) ? { imageVersion: pictures.get(row.id) as number } : {}),
           ...(current ? { now: current } : {}),
           ...(next ? { next } : {}),
         }
@@ -274,7 +294,7 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
       const programs = await visibility.restrict(user, [...past, ...(current ? [current] : []), ...future].map(toProgram))
       return {
         serverTime: now,
-        channel: { id: row.id, number: row.number, name: row.name, color: def.color },
+        channel: { id: row.id, number: row.number, name: row.name, color: def.color, favorite: favoritesOf(user.id).has(row.id), ...(imageVersions().has(row.id) ? { imageVersion: imageVersions().get(row.id) as number } : {}) },
         programs,
         currentIndex: current ? past.length : -1,
       }
@@ -282,19 +302,48 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
 
     async guide(user, from, to, now) {
       const end = Math.min(to, from + MAX_GUIDE_SECONDS)
-      const rows = db.prepare('SELECT * FROM channels ORDER BY number').all() as unknown as ChannelRow[]
+      const favorites = favoritesOf(user.id)
+      const pictures = imageVersions()
+      const rows = favouritesFirst(db.prepare('SELECT * FROM channels ORDER BY number').all() as unknown as ChannelRow[], favorites)
       const raw = rows
         .filter((row) => (JSON.parse(row.def) as ChannelDef).enabled)
         .map((row) => {
           ensureTimeline(row, now, Math.max(end, now + HORIZON_SECONDS))
           const def = JSON.parse(row.def) as ChannelDef
-          return { id: row.id, number: row.number, name: row.name, color: def.color, programs: programsBetween(row.id, from, end) }
+          return { id: row.id, number: row.number, name: row.name, color: def.color, favorite: favorites.has(row.id), ...(pictures.has(row.id) ? { imageVersion: pictures.get(row.id) as number } : {}), programs: programsBetween(row.id, from, end) }
         })
       // One round of questions to Jellyfin for the whole guide, then each channel gets its own programs back.
       const restricted = await visibility.restrict(user, raw.flatMap((c) => c.programs))
       let index = 0
       const channels = raw.map((c) => ({ ...c, programs: restricted.slice(index, (index += c.programs.length)) }))
       return { serverTime: now, from, to: end, channels }
+    },
+
+    setFavorite(user, id, favorite) {
+      rowOf(id)
+      if (favorite) db.prepare('INSERT OR IGNORE INTO channel_favorites (user_id, channel_id) VALUES (?, ?)').run(user.id, id)
+      else db.prepare('DELETE FROM channel_favorites WHERE user_id = ? AND channel_id = ?').run(user.id, id)
+      return { favorite }
+    },
+
+    setImage(id, mime, bytes, now) {
+      rowOf(id)
+      // Never the same number twice, so an app that remembers a picture by its version asks for the new one.
+      const before = (db.prepare('SELECT updated_at FROM channel_images WHERE channel_id = ?').get(id) as { updated_at: number } | undefined)?.updated_at ?? 0
+      const version = Math.max(now, before + 1)
+      db.prepare('INSERT OR REPLACE INTO channel_images (channel_id, mime, data, updated_at) VALUES (?, ?, ?, ?)').run(id, mime, bytes, version)
+      return { imageVersion: version }
+    },
+
+    removeImage(id) {
+      rowOf(id)
+      db.prepare('DELETE FROM channel_images WHERE channel_id = ?').run(id)
+    },
+
+    image(id) {
+      const row = db.prepare('SELECT mime, data, updated_at FROM channel_images WHERE channel_id = ?').get(id) as { mime: string; data: Uint8Array; updated_at: number } | undefined
+      if (!row) throw new HttpError(404, 'That channel has no picture.')
+      return { mime: row.mime, data: Buffer.from(row.data), version: row.updated_at }
     },
 
     async preview(user, def, now) {

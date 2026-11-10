@@ -1723,6 +1723,22 @@ export const fr: Record<string, string> = {
   '{count} minutes': '{count} minutes',
   'Longer films and episodes are left out of the schedule. If nothing is short enough, the limit is ignored.': 'Les films et épisodes plus longs sont exclus du programme. Si rien n’est assez court, la limite est ignorée.',
   'A channel can hold {max} titles picked one by one. To bring more, add a rule.': 'Une chaîne accepte {max} titres choisis un par un. Pour en avoir plus, ajoutez une règle.',
+  'Remove {name} from favourites': 'Retirer {name} des favoris',
+  'Add {name} to favourites': 'Ajouter {name} aux favoris',
+  'Remove from favourites': 'Retirer des favoris',
+  'Keep first (favourite)': 'Mettre en premier (favori)',
+  'Time scale': 'Échelle de temps',
+  'Loading more of the guide…': 'Chargement de la suite du guide…',
+  'Scroll right to see what comes later. Drag the edge of the Channel column to make it wider.': 'Faites défiler vers la droite pour voir la suite. Faites glisser le bord de la colonne Chaîne pour l’élargir.',
+  'Resize the channel names': 'Modifier la largeur des noms de chaînes',
+  'Drag to change the width (double click for the usual one)': 'Faites glisser pour changer la largeur (double clic pour la valeur habituelle)',
+  'Picture': 'Image',
+  'A picture for the channel (PNG, JPEG, WebP or GIF). It is shrunk to fit, and shows in the cards, the guide and the lists.': 'Une image pour la chaîne (PNG, JPEG, WebP ou GIF). Elle est réduite pour tenir et s’affiche dans les cartes, le guide et les listes.',
+  'Choose a picture': 'Choisir une image',
+  'Remove the picture': 'Retirer l’image',
+  'That file is not a picture.': 'Ce fichier n’est pas une image.',
+  'That file is not a picture this browser can read.': 'Ce fichier n’est pas une image que ce navigateur sait lire.',
+  'The picture is still too big after shrinking it. Try a simpler one.': 'L’image est encore trop lourde après réduction. Essayez-en une plus simple.',
 }
 
 /** Messages with numbers or names in them (an error code, a song title) that have a pattern instead of a fixed entry. */

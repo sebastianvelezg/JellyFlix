@@ -55,6 +55,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trustProxy: /^(1|true|yes)$/i.test(clean(env.JELLYFLIX_TRUST_PROXY)),
     seerrUrl,
     seerrApiKey: clean(env.SEERR_API_KEY) || undefined,
-    version: '0.2.1',
+    version: '0.2.2',
   }
 }

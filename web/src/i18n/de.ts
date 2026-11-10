@@ -1723,6 +1723,22 @@ export const de: Record<string, string> = {
   '{count} minutes': '{count} Minuten',
   'Longer films and episodes are left out of the schedule. If nothing is short enough, the limit is ignored.': 'Längere Filme und Folgen werden aus dem Programm genommen. Ist nichts kurz genug, wird die Grenze ignoriert.',
   'A channel can hold {max} titles picked one by one. To bring more, add a rule.': 'Ein Kanal fasst {max} einzeln gewählte Titel. Für mehr fügen Sie eine Regel hinzu.',
+  'Remove {name} from favourites': '{name} aus den Favoriten entfernen',
+  'Add {name} to favourites': '{name} zu den Favoriten hinzufügen',
+  'Remove from favourites': 'Aus den Favoriten entfernen',
+  'Keep first (favourite)': 'Zuerst anzeigen (Favorit)',
+  'Time scale': 'Zeitskala',
+  'Loading more of the guide…': 'Weitere Programmübersicht wird geladen…',
+  'Scroll right to see what comes later. Drag the edge of the Channel column to make it wider.': 'Nach rechts scrollen, um spätere Sendungen zu sehen. Den Rand der Spalte Kanal ziehen, um sie zu verbreitern.',
+  'Resize the channel names': 'Breite der Kanalnamen ändern',
+  'Drag to change the width (double click for the usual one)': 'Ziehen, um die Breite zu ändern (Doppelklick für die normale)',
+  'Picture': 'Bild',
+  'A picture for the channel (PNG, JPEG, WebP or GIF). It is shrunk to fit, and shows in the cards, the guide and the lists.': 'Ein Bild für den Kanal (PNG, JPEG, WebP oder GIF). Es wird verkleinert und erscheint in den Karten, im Programm und in den Listen.',
+  'Choose a picture': 'Bild auswählen',
+  'Remove the picture': 'Bild entfernen',
+  'That file is not a picture.': 'Diese Datei ist kein Bild.',
+  'That file is not a picture this browser can read.': 'Diese Datei ist kein Bild, das dieser Browser lesen kann.',
+  'The picture is still too big after shrinking it. Try a simpler one.': 'Das Bild ist auch nach dem Verkleinern zu groß. Versuchen Sie ein einfacheres.',
 }
 
 /** Messages with numbers or names in them (an error code, a song title) that have a pattern instead of a fixed entry. */

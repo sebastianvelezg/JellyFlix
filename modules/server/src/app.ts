@@ -3,7 +3,7 @@ import { API_VERSION, type Manifest, type ModuleInfo } from '../../contract/inde
 import { clientOf, createAuthenticator, tokenFrom } from './auth/auth.ts'
 import type { Config } from './config.ts'
 import type { Db } from './db/db.ts'
-import { corsHeaders, HttpError, readJson, Router, send, type Ctx } from './http/router.ts'
+import { corsHeaders, HttpError, RawResponse, readJson, Router, send, type Ctx } from './http/router.ts'
 import type { JellyfinClient } from './jellyfin/client.ts'
 import { registerChannelRoutes } from './modules/channels/routes.ts'
 import { createChannelsService, type ChannelsService } from './modules/channels/service.ts'
@@ -81,6 +81,10 @@ export function createApp({ config, db, jellyfin, clock = nowSeconds, seerrFetch
       const body = method === 'GET' || method === 'DELETE' ? undefined : await readJson(req)
       const ctx: Ctx = { method, path: url.pathname, params, query: url.searchParams, body, user }
       const result = await route.handler(ctx)
+      if (result instanceof RawResponse) {
+        res.writeHead(result.status, { ...result.headers, ...cors, 'content-length': String(result.body.length) }).end(result.body)
+        return
+      }
       return result === undefined ? send(res, 204, undefined, cors) : send(res, 200, result, cors)
     } catch (e) {
       if (e instanceof HttpError) return send(res, e.status, { error: e.message }, cors)

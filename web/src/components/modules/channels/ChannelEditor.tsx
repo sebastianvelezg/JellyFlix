@@ -5,6 +5,8 @@ import {
   createChannel,
   deleteChannel,
   previewChannel,
+  removeChannelImage,
+  setChannelImage,
   updateChannel,
   type Channel,
   type ChannelDef,
@@ -16,6 +18,8 @@ import {
 import { t } from '../../../i18n'
 import { errorText, useAsync } from '../../useAsync'
 import { useModulesClient } from '../ModulesProvider'
+import { ChannelLogo } from './ChannelBits'
+import { PictureError, shrinkPicture } from './imagePrep'
 import { LibraryPicker } from './LibraryPicker'
 
 const COLORS = ['#4d8dff', '#e5484d', '#30a46c', '#f5a524', '#8e4ec6', '#12a594', '#e93d82', '#0091ff']
@@ -64,6 +68,9 @@ export function ChannelEditor({ session, channel, onDone, onCancel }: { session:
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // The picture is kept when the channel is saved: a new one, or taking the one it has away.
+  const [picture, setPicture] = useState<{ kind: 'none' } | { kind: 'remove' } | { kind: 'new'; data: string; preview: string }>({ kind: 'none' })
+  const [pictureError, setPictureError] = useState<string | null>(null)
 
   const set = <K extends keyof ChannelDef>(key: K, value: ChannelDef[K]) => {
     setDef((d) => ({ ...d, [key]: value }))
@@ -83,7 +90,24 @@ export function ChannelEditor({ session, channel, onDone, onCancel }: { session:
     }
   }
 
-  const save = () => run(() => (channel ? updateChannel(client, channel.id, def) : createChannel(client, def)), onDone)
+  const save = () =>
+    run(async () => {
+      const saved = channel ? await updateChannel(client, channel.id, def) : await createChannel(client, def)
+      if (picture.kind === 'new') await setChannelImage(client, saved.id, picture.data)
+      else if (picture.kind === 'remove') await removeChannelImage(client, saved.id)
+    }, onDone)
+
+  async function choosePicture(file: File | undefined) {
+    if (!file) return
+    setPictureError(null)
+    try {
+      const small = await shrinkPicture(file)
+      setPicture({ kind: 'new', ...small })
+    } catch (e) {
+      setPictureError(e instanceof PictureError ? t(e.message) : t('That file is not a picture this browser can read.'))
+    }
+  }
+  const hasPicture = picture.kind === 'new' || (picture.kind === 'none' && !!channel?.imageVersion)
   const check = () => run(async () => setPreview(await previewChannel(client, def)))
   const remove = () => run(() => deleteChannel(client, channel!.id), onDone)
 
@@ -117,6 +141,32 @@ export function ChannelEditor({ session, channel, onDone, onCancel }: { session:
             ))}
           </div>
         </fieldset>
+      </div>
+
+      <div className="glass flex flex-wrap items-center gap-4 rounded-2xl p-4">
+        <ChannelLogo
+          channel={{ id: channel?.id ?? 'new', number: def.number, color: def.color, ...(picture.kind === 'none' && channel?.imageVersion ? { imageVersion: channel.imageVersion } : {}) }}
+          preview={picture.kind === 'new' ? picture.preview : null}
+          className="h-16 w-16 text-2xl"
+        />
+        <div className="min-w-0 flex-1 basis-60 text-sm">
+          <p className="font-medium text-white">{t('Picture')}</p>
+          <p className="text-xs text-neutral-400">{t('A picture for the channel (PNG, JPEG, WebP or GIF). It is shrunk to fit, and shows in the cards, the guide and the lists.')}</p>
+          {pictureError && (
+            <p role="alert" className="mt-1 text-xs text-red-300">
+              {pictureError}
+            </p>
+          )}
+        </div>
+        <label className="btn cursor-pointer">
+          {t('Choose a picture')}
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" onChange={(e) => void choosePicture(e.target.files?.[0]).then(() => (e.target.value = ''))} />
+        </label>
+        {hasPicture && (
+          <button type="button" className="btn-ghost" onClick={() => setPicture(channel?.imageVersion ? { kind: 'remove' } : { kind: 'none' })}>
+            {t('Remove the picture')}
+          </button>
+        )}
       </div>
 
       <Sources session={session} sources={def.sources} onChange={(next) => set('sources', next)} />

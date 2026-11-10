@@ -1723,6 +1723,22 @@ export const pt: Record<string, string> = {
   '{count} minutes': '{count} minutos',
   'Longer films and episodes are left out of the schedule. If nothing is short enough, the limit is ignored.': 'Os filmes e episódios mais longos ficam fora da programação. Se nada for curto o bastante, o limite é ignorado.',
   'A channel can hold {max} titles picked one by one. To bring more, add a rule.': 'Um canal aceita {max} títulos escolhidos um a um. Para trazer mais, adicione uma regra.',
+  'Remove {name} from favourites': 'Remover {name} dos favoritos',
+  'Add {name} to favourites': 'Adicionar {name} aos favoritos',
+  'Remove from favourites': 'Remover dos favoritos',
+  'Keep first (favourite)': 'Colocar primeiro (favorito)',
+  'Time scale': 'Escala de tempo',
+  'Loading more of the guide…': 'A carregar mais do guia…',
+  'Scroll right to see what comes later. Drag the edge of the Channel column to make it wider.': 'Desloque para a direita para ver o que vem depois. Arraste a borda da coluna Canal para a alargar.',
+  'Resize the channel names': 'Alterar a largura dos nomes dos canais',
+  'Drag to change the width (double click for the usual one)': 'Arraste para mudar a largura (duplo clique para a normal)',
+  'Picture': 'Imagem',
+  'A picture for the channel (PNG, JPEG, WebP or GIF). It is shrunk to fit, and shows in the cards, the guide and the lists.': 'Uma imagem para o canal (PNG, JPEG, WebP ou GIF). É reduzida para caber e aparece nos cartões, no guia e nas listas.',
+  'Choose a picture': 'Escolher uma imagem',
+  'Remove the picture': 'Remover a imagem',
+  'That file is not a picture.': 'Esse ficheiro não é uma imagem.',
+  'That file is not a picture this browser can read.': 'Esse ficheiro não é uma imagem que este navegador consiga ler.',
+  'The picture is still too big after shrinking it. Try a simpler one.': 'A imagem continua demasiado grande depois de reduzida. Experimente uma mais simples.',
 }
 
 /** Messages with numbers or names in them (an error code, a song title) that have a pattern instead of a fixed entry. */
