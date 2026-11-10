@@ -6,9 +6,7 @@ import { createServer as createSocketServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { MockServer } from '../test/mock/mockJellyfin'
-import { createServer as createHttpServer } from 'node:http'
-import type { AddressInfo } from 'node:net'
-import { fakeSeerr, REQUEST, SEERR_KEY, type FakeSeerr } from '../../modules/server/test/fakeSeerr.ts'
+import { REQUEST, SEERR_KEY, startMockSeerr } from '../test/mock/mockSeerr'
 import { signIn, startMock, waitPlaying } from './helpers'
 
 /**
@@ -278,32 +276,13 @@ test('Match on one device: choose the films, swipe here, and play the winner', a
   await waitPlaying(page)
 })
 
-/** The small Seerr of the container's tests, behind a real HTTP port (what the real container talks to). */
-async function serveSeerr(seerr: FakeSeerr): Promise<{ url: string; close: () => void }> {
-  const server = createHttpServer((req, res) => {
-    const chunks: Buffer[] = []
-    req.on('data', (c: Buffer) => chunks.push(c))
-    req.on('end', () => {
-      const body = Buffer.concat(chunks).toString('utf8')
-      const headers = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, String(v)]))
-      void seerr.fetch(`http://seerr.test${req.url ?? '/'}`, { method: req.method ?? 'GET', headers, ...(body ? { body } : {}) }).then(async (answer) => {
-        res.writeHead(answer.status, { 'content-type': 'application/json' }).end(await answer.text())
-      })
-    })
-  })
-  await new Promise<void>((resolveListen) => server.listen(0, '127.0.0.1', resolveListen))
-  return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, close: () => server.close() }
-}
-
 test('Seerr: search, see where each title stands, ask for a movie and for some seasons, and see my requests', async ({ page }) => {
   mock = await startMock({ movieCount: 3 })
-  const seerr = fakeSeerr()
   // The mock Jellyfin's account is the Seerr user 7, who may request.
-  seerr.users['user1'] = { id: 7, permissions: REQUEST }
-  const served = await serveSeerr(seerr)
+  const seerr = await startMockSeerr({ user1: { id: 7, permissions: REQUEST } })
   try {
     await page.route('https://image.tmdb.org/**', (route) => route.abort())
-    const modulesUrl = await startContainer(mock.url, { JELLYFLIX_MODULES: 'seerr', SEERR_URL: served.url, SEERR_API_KEY: SEERR_KEY })
+    const modulesUrl = await startContainer(mock.url, { JELLYFLIX_MODULES: 'seerr', SEERR_URL: seerr.url, SEERR_API_KEY: SEERR_KEY })
     await withModulesAt(page, modulesUrl)
     await signIn(page, mock, { start: '/#/modules' })
     await expect(page.getByRole('heading', { name: 'Modules', level: 1 })).toBeVisible()
@@ -339,18 +318,16 @@ test('Seerr: search, see where each title stands, ask for a movie and for some s
     await expect(page.getByText('Seasons 3')).toBeVisible()
     await axe(page, 'seerr requests')
   } finally {
-    served.close()
+    seerr.close()
   }
 })
 
 test('Seerr: what the library does not have can be looked up from its search, in a block of its own, and only when Seerr is there', async ({ page }) => {
   mock = await startMock({ movieCount: 3 })
-  const seerr = fakeSeerr()
-  seerr.users['user1'] = { id: 7, permissions: REQUEST }
-  const served = await serveSeerr(seerr)
+  const seerr = await startMockSeerr({ user1: { id: 7, permissions: REQUEST } })
   try {
     await page.route('https://image.tmdb.org/**', (route) => route.abort())
-    const modulesUrl = await startContainer(mock.url, { JELLYFLIX_MODULES: 'seerr', SEERR_URL: served.url, SEERR_API_KEY: SEERR_KEY })
+    const modulesUrl = await startContainer(mock.url, { JELLYFLIX_MODULES: 'seerr', SEERR_URL: seerr.url, SEERR_API_KEY: SEERR_KEY })
     await withModulesAt(page, modulesUrl)
     await signIn(page, mock, { start: '/#/search/matrix%20reloaded' })
     // Nothing in the library: the offer comes with the text already written, apart from the results.
@@ -363,9 +340,11 @@ test('Seerr: what the library does not have can be looked up from its search, in
     await expect(page.getByRole('searchbox', { name: 'Search for a movie or series' })).toHaveValue('matrix reloaded')
     await expect(page.getByRole('list', { name: 'Results' }).getByRole('button', { name: /^The Matrix Reloaded Movie 2003/ })).toBeVisible()
     expect(page.url()).toContain('#/modules/seerr?q=matrix%20reloaded')
-    expect(seerr.calls.find((c) => c.path === '/search')?.query.query).toBe('matrix reloaded')
+    // (The development build runs an effect twice: the same search may be made twice, never another one.)
+    expect(seerr.searches.length).toBeGreaterThan(0)
+    expect(seerr.searches.every((q) => q === 'matrix reloaded')).toBe(true)
   } finally {
-    served.close()
+    seerr.close()
   }
 })
 

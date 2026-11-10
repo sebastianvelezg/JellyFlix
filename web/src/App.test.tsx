@@ -499,7 +499,8 @@ describe('series and anime', () => {
     await screen.findByRole('heading', { name: /Results for/ })
     const episodes = await screen.findByRole('region', { name: 'Episodes' })
     expect(await within(episodes).findAllByRole('button', { name: /Episode Title 2-3/ })).toHaveLength(5)
-    expect(screen.queryByRole('region', { name: 'Movies' })).not.toBeInTheDocument()
+    // (The movies are searched apart from the episodes: their section goes away when that answer says there are none, which may come later.)
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Movies' })).not.toBeInTheDocument())
   })
 })
 
