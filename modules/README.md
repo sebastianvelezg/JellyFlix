@@ -121,7 +121,10 @@ All routes need `Authorization: MediaBrowser Token="<jellyfin token>"`, except `
 |---|---|---|
 | `GET /v1/manifest` | any user | modules that are on, who you are |
 | `GET /v1/channels`, `GET /v1/channels/:id/window`, `GET /v1/guide` | any user | what is on (without the titles that person may not see) |
+| `GET /v1/channels/:id/image` | any user | the picture of a channel (PNG, JPEG or WebP; the address carries `?v=<imageVersion>` so it can be kept) |
+| `POST /v1/channels/:id/favorite` `{ favorite }` | any user | keep a channel first for the person asking; `GET /v1/channels` and `/v1/guide` list their favourites first and say `favorite` |
 | `GET /v1/channels/:id` | administrator | the definition of a channel |
+| `PUT /v1/channels/:id/image` `{ data: base64 }`, `DELETE /v1/channels/:id/image` | administrator | set or take away the picture (up to 150 kB and 1024 px, checked by what is inside it; never SVG) |
 | `POST/PUT/DELETE /v1/channels…`, `POST /v1/channels/preview`, `/auto`, `/:id/rebuild`, `/:id/refresh`, `GET /v1/channels/suggestions` | administrator | manage channels |
 | `GET /v1/seerr/me`, `GET /v1/seerr/search`, `GET /v1/seerr/title/:type/:id`, `GET/POST /v1/seerr/requests` | any user (acting as their Seerr user) | Seerr (only when turned on) |
 | `GET/POST /v1/match/rooms`, `POST /v1/match/join`, `POST /v1/match/rooms/:id/{swipe,pick,again}`, `GET/DELETE /v1/match/rooms/:id` | any user | Match |

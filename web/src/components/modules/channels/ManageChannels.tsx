@@ -4,6 +4,7 @@ import { t } from '../../../i18n'
 import { errorText, useAsync } from '../../useAsync'
 import { StateMessage } from '../../StateMessage'
 import { useModulesClient } from '../ModulesProvider'
+import { ChannelLogo } from './ChannelBits'
 
 const when = (seconds: number | null): string => (seconds ? new Date(seconds * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : t('never'))
 
@@ -80,11 +81,9 @@ function ChannelRow({ channel: c, busy, onEdit, onToggle, onRefresh, onRebuild }
   return (
     <li className={`glass rounded-2xl p-4 ${c.enabled ? '' : 'opacity-70'}`}>
       <div className="flex flex-wrap items-center gap-3">
-        <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-black tabular-nums text-white" style={{ background: c.color }}>
-          {c.number}
-        </span>
+        <ChannelLogo channel={c} />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold text-white">{c.name}</h3>
+          <h3 className="line-clamp-2 break-words text-base font-semibold leading-snug text-white">{c.name}</h3>
           <p className="text-xs text-neutral-400">
             {c.mode === 'grid' ? t('Weekly grid') : t('Marathon')} · {t('{count} titles', { count: c.poolSize })} · {t('read {when}', { when: when(c.poolRefreshedAt) })}
           </p>

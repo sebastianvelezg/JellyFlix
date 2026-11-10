@@ -88,3 +88,28 @@ export function mergePrograms(a: readonly Program[], b: readonly Program[]): Pro
 
 export const setChannelEnabled = (client: ModulesClient, id: string, enabled: boolean) =>
   client.post<Channel>(`/v1/channels/${encodeURIComponent(id)}/enabled`, { enabled })
+
+/** Keeps a channel first for the person signed in (or no longer does). The container remembers it for them, on every device. */
+export const setChannelFavorite = (client: ModulesClient, id: string, favorite: boolean) =>
+  client.post<{ favorite: boolean }>(`/v1/channels/${encodeURIComponent(id)}/favorite`, { favorite })
+
+/** `data` is the picture in base64 (a PNG, a JPEG or a WebP, up to 150 kB). */
+export const setChannelImage = (client: ModulesClient, id: string, data: string) => client.put<{ imageVersion: number }>(`/v1/channels/${encodeURIComponent(id)}/image`, { data })
+export const removeChannelImage = (client: ModulesClient, id: string) => client.del<{ ok: true }>(`/v1/channels/${encodeURIComponent(id)}/image`)
+
+const pictures = new Map<string, Promise<string>>()
+
+/**
+ * An address a picture of a channel can be shown from. The picture is read once per version (the version changes when it does) and
+ * kept for as long as the page lives; one that could not be read is asked for again next time.
+ */
+export function channelPicture(client: ModulesClient, id: string, version: number): Promise<string> {
+  const key = `${client.baseUrl}|${id}|${version}`
+  let found = pictures.get(key)
+  if (!found) {
+    found = client.blob(`/v1/channels/${encodeURIComponent(id)}/image?v=${version}`).then((blob) => URL.createObjectURL(blob))
+    found.catch(() => pictures.delete(key))
+    pictures.set(key, found)
+  }
+  return found
+}

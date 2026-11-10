@@ -19,6 +19,8 @@ export interface ModulesClient {
   post<T>(path: string, body?: unknown): Promise<T>
   put<T>(path: string, body?: unknown): Promise<T>
   del<T>(path: string): Promise<T>
+  /** A file (a picture), read with the same sign-in. */
+  blob(path: string): Promise<Blob>
 }
 
 export { isTrustedModulesAddress, modulesLinkTrust, normalizeModulesUrl } from './url'
@@ -55,6 +57,16 @@ export function createModulesClient(baseUrl: string, token: string, fetchImpl: F
     post: (path, body) => request('POST', path, body ?? {}),
     put: (path, body) => request('PUT', path, body ?? {}),
     del: (path) => request('DELETE', path),
+    async blob(path) {
+      let res: Response
+      try {
+        res = await fetchImpl(baseUrl + path, { headers: { authorization: `MediaBrowser Token="${token}"` }, signal: AbortSignal.timeout(timeoutMs) })
+      } catch {
+        throw new ModulesError(0, 'The modules container did not answer.')
+      }
+      if (!res.ok) throw new ModulesError(res.status, `The modules container answered with an error (HTTP ${res.status}).`)
+      return res.blob()
+    },
   }
 }
 

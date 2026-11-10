@@ -105,6 +105,7 @@ export interface Channel extends ChannelDef {
   /** When (seconds since the epoch), or null if never. */
   poolRefreshedAt: number | null
   createdAt: number
+  imageVersion?: number
 }
 
 export interface Program {
@@ -139,6 +140,10 @@ export interface ChannelSummary {
   /** How many titles the sources gave when they were last read, and when (seconds since the epoch; null if never). */
   poolSize: number
   poolRefreshedAt: number | null
+  /** True when the person asking keeps this channel first (false when missing, as an older container says). */
+  favorite?: boolean
+  /** Changes whenever the picture of the channel does; missing when it has none. Asked for at `GET /v1/channels/:id/image`. */
+  imageVersion?: number
   /** What is on right now, when the channel has a schedule. */
   now?: Program
   next?: Program
@@ -147,7 +152,7 @@ export interface ChannelSummary {
 /** `GET /v1/channels/:id/window`: programs around a moment. */
 export interface ChannelWindow {
   serverTime: number
-  channel: { id: string; number: number; name: string; color: string }
+  channel: { id: string; number: number; name: string; color: string; favorite?: boolean; imageVersion?: number }
   /** In order. */
   programs: Program[]
   /** The one that is on at `at`, or -1 when the channel is off the air. */
@@ -159,6 +164,10 @@ export interface GuideChannel {
   number: number
   name: string
   color: string
+  /** True when the person asking keeps this channel first (false when missing, as an older container says). */
+  favorite?: boolean
+  /** Changes whenever the picture of the channel does; missing when it has none. Asked for at `GET /v1/channels/:id/image`. */
+  imageVersion?: number
   programs: Program[]
 }
 

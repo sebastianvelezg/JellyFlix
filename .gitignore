@@ -35,3 +35,8 @@ Thumbs.db
 
 # Modules container: local data
 /modules/data/
+
+# Local exports of a library (titles of a person's server): never commit these
+tools/channels/*.json
+tools/channels/*.md
+tools/channels/import-log-*

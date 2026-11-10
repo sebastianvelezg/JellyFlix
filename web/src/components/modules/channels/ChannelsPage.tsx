@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '../../../core'
-import { channelGuide, getChannel, listChannels, type Channel, type ChannelSummary, type Guide, type GuideChannel, type Program } from '../../../core/modules'
+import { getChannel, listChannels, type Channel, type ChannelSummary } from '../../../core/modules'
 import { t } from '../../../i18n'
 import { errorText, useAsync } from '../../useAsync'
 import { StateMessage } from '../../StateMessage'
 import type { Navigate } from '../../route'
 import { useModulesClient } from '../ModulesProvider'
+import { ChannelLogo, FavoriteStar, useFavorites, type Favorites } from './ChannelBits'
+import { ChannelGuide } from './ChannelGuide'
 import { ChannelEditor } from './ChannelEditor'
 import { ManageChannels } from './ManageChannels'
 import { QuickChannels } from './QuickChannels'
+import { favouritesFirst } from './guideLayout'
 import { programTitle } from './programText'
 
-const PX_PER_HOUR = 240
-const GUIDE_BEFORE = 1800
-const GUIDE_AFTER = 5 * 3600
 const REFRESH_MS = 60_000
 
 const timeOf = (seconds: number): string => new Date(seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -33,10 +33,16 @@ export function ChannelsPage({ session, go }: { session: Session; go: Navigate }
 
   const load = useCallback(async () => {
     const serverNow = Math.floor(Date.now() / 1000 + skew)
-    const [channels, guide] = await Promise.all([listChannels(client), channelGuide(client, serverNow - GUIDE_BEFORE, serverNow + GUIDE_AFTER)])
-    return { channels, guide, now: serverNow, version }
+    return { channels: await listChannels(client), now: serverNow, version }
   }, [client, skew, version])
   const { state, retry } = useAsync(load)
+  const favorites = useFavorites(setNotice)
+  const { reset: resetFavorites } = favorites
+  // What the container says is looked at again, so the person's own changes are only kept until the next answer.
+  const channelsNow = state.status === 'ready' ? state.data.channels : null
+  useEffect(() => {
+    if (channelsNow) resetFavorites()
+  }, [channelsNow, resetFavorites])
 
   // The cards and the guide are looked at again every minute while this page is open (nothing runs when it is closed).
   useEffect(() => {
@@ -106,9 +112,9 @@ export function ChannelsPage({ session, go }: { session: Session; go: Navigate }
                 )}
               </StateMessage>
             ) : tab === 'now' ? (
-              <NowList channels={state.data.channels.filter((c) => c.enabled)} now={state.data.now} onWatch={(id) => go({ page: 'channel', id })} />
+              <NowList channels={state.data.channels.filter((c) => c.enabled)} now={state.data.now} favorites={favorites} onWatch={(id) => go({ page: 'channel', id })} />
             ) : (
-              <GuideGrid guide={state.data.guide} onWatch={(id) => go({ page: 'channel', id })} />
+              <ChannelGuide favorites={favorites} onWatch={(id) => go({ page: 'channel', id })} />
             ))}
         </>
       )}
@@ -116,20 +122,21 @@ export function ChannelsPage({ session, go }: { session: Session; go: Navigate }
   )
 }
 
-function NowList({ channels, now, onWatch }: { channels: ChannelSummary[]; now: number; onWatch: (id: string) => void }) {
+function NowList({ channels, now, favorites, onWatch }: { channels: ChannelSummary[]; now: number; favorites: Favorites; onWatch: (id: string) => void }) {
+  const ordered = favouritesFirst(channels, (id) => favorites.is(id, channels.find((c) => c.id === id)?.favorite))
   return (
     <ul className="grid gap-4 md:grid-cols-2">
-      {channels.map((c) => {
+      {ordered.map((c) => {
+        const favorite = favorites.is(c.id, c.favorite)
         const progress = c.now ? Math.min(100, Math.max(0, ((now - c.now.start) / (c.now.end - c.now.start)) * 100)) : 0
         return (
           <li key={c.id} className="glass flex flex-col gap-3 rounded-2xl p-4">
             <div className="flex items-center gap-3">
-              <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-black tabular-nums text-white" style={{ background: c.color }}>
-                {c.number}
-              </span>
+              <ChannelLogo channel={c} />
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-base font-semibold text-white">{c.name}</h3>
+                <h3 className="line-clamp-2 break-words text-base font-semibold leading-snug text-white">{c.name}</h3>
               </div>
+              <FavoriteStar name={c.name} on={favorite} onToggle={() => favorites.toggle(c.id, favorite)} />
               <button type="button" className="btn-primary shrink-0" disabled={!c.now} onClick={() => onWatch(c.id)} aria-label={t('Watch channel {name}', { name: c.name })}>
                 {t('Watch')}
               </button>
@@ -160,71 +167,5 @@ function NowList({ channels, now, onWatch }: { channels: ChannelSummary[]; now: 
         )
       })}
     </ul>
-  )
-}
-
-function GuideGrid({ guide, onWatch }: { guide: Guide; onWatch: (id: string) => void }) {
-  // The guide is drawn from the half hour before its start, so the time ruler lines up with whole half hours.
-  const from = Math.floor(guide.from / 1800) * 1800
-  const to = guide.to
-  const width = ((to - from) / 3600) * PX_PER_HOUR
-  const x = (seconds: number) => ((seconds - from) / 3600) * PX_PER_HOUR
-  const serverNow = guide.serverTime
-  const marks: number[] = []
-  for (let m = from; m < to; m += 1800) marks.push(m)
-
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10" role="region" aria-label={t('Channel guide')} tabIndex={0}>
-      <div style={{ width: width + 144 }} className="relative">
-        <div className="flex border-b border-white/10 text-xs text-neutral-400">
-          <div className="sticky left-0 z-10 w-36 shrink-0 bg-[var(--color-bg)] px-3 py-2">{t('Channel')}</div>
-          <div className="relative h-8" style={{ width }}>
-            {marks.map((m) => (
-              <span key={m} className="absolute top-2 border-l border-white/10 pl-1.5" style={{ left: x(m) }}>
-                {timeOf(m)}
-              </span>
-            ))}
-          </div>
-        </div>
-        {guide.channels.map((c) => (
-          <GuideRow key={c.id} channel={c} from={from} width={width} x={x} serverNow={serverNow} onWatch={onWatch} />
-        ))}
-        <div aria-hidden="true" className="pointer-events-none absolute bottom-0 top-0 w-px bg-red-500/80" style={{ left: 144 + x(serverNow) }} />
-      </div>
-    </div>
-  )
-}
-
-function GuideRow({ channel, from, width, x, serverNow, onWatch }: { channel: GuideChannel; from: number; width: number; x: (s: number) => number; serverNow: number; onWatch: (id: string) => void }) {
-  return (
-    <div className="flex border-b border-white/5 last:border-b-0">
-      <button type="button" onClick={() => onWatch(channel.id)} className="sticky left-0 z-10 flex w-36 shrink-0 items-center gap-2 bg-[var(--color-bg)] px-3 py-2 text-left hover:bg-white/5" aria-label={t('Watch channel {name}', { name: channel.name })}>
-        <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-black text-white" style={{ background: channel.color }}>
-          {channel.number}
-        </span>
-        <span className="truncate text-sm text-neutral-100">{channel.name}</span>
-      </button>
-      <div className="relative h-14" style={{ width }}>
-        {channel.programs.map((p: Program) => {
-          const left = Math.max(0, x(Math.max(p.start, from)))
-          const right = Math.min(width, x(p.end))
-          const onNow = p.start <= serverNow && serverNow < p.end
-          return (
-            <button
-              key={p.start}
-              type="button"
-              disabled={!onNow}
-              onClick={() => onNow && onWatch(channel.id)}
-              title={`${programTitle(p)}${p.subtitle ? ` · ${p.subtitle}` : ''} (${timeOf(p.start)} – ${timeOf(p.end)})`}
-              className={`absolute top-1 h-12 overflow-hidden rounded-lg border px-2 py-1 text-left text-xs ${onNow ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-white hover:bg-[var(--color-accent)]/30' : 'border-white/10 bg-white/[.04] text-neutral-300'}`}
-              style={{ left: left + 2, width: Math.max(0, right - left - 4) }}
-            >
-              <span className="block truncate font-medium">{programTitle(p)}</span>
-              <span className="block truncate text-neutral-400">{p.subtitle ?? `${timeOf(p.start)} – ${timeOf(p.end)}`}</span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
   )
 }

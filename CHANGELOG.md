@@ -5,6 +5,20 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-10
+
+The guide of Retro TV, made to be used with many channels.
+
+### Added
+- **The guide goes on as you scroll.** It shows what is on and the next six hours, and asks for more (six hours at a time, up to two days) when you scroll to the right. The channel names and the time ruler stay in view while the rest scrolls, inside the guide. *Now* takes you back to what is on, and the **−** and **+** buttons zoom the time scale (the choice is remembered). A mark with the day shows where a new day begins.
+- **The column of channel names can be made wider** by dragging its edge (or with the arrow keys; double click for the usual width), and long names are given two lines. The width is remembered.
+- **Favourites.** A star on each channel (in the cards and in the guide) keeps it first, always: the container remembers it for each person, on every device, and the web and the TV list favourites first.
+- **Pictures for channels.** In the editor, *Choose a picture* sets one (it is shrunk in your browser to fit); it shows in the cards, the guide and the administrator's list, with the channel number in a corner. The container keeps it (up to 150 kB, checked by what is inside it, never SVG) and sends it with nothing that could run in it.
+- **Tools to make many channels from your own library** (`tools/channels`): one reads the library into a file, and another creates the channels of a file (a dry run first, and it can be undone). Files with your titles are never committed.
+
+### Changed
+- Container 0.2.2: two new tables (favourites and pictures) are made by themselves when it starts. An older app shows nothing different; an older container just has no favourites or pictures.
+
 ## [1.7.1] - 2026-11-10
 
 Filling a Retro TV channel from a wall of posters, and more ways to programme it.

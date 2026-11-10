@@ -1,5 +1,6 @@
-import { HttpError, type Router } from '../../http/router.ts'
+import { HttpError, RawResponse, type Router } from '../../http/router.ts'
 import { parseChannelDef } from './def.ts'
+import { parseImage } from './image.ts'
 import type { ChannelsService } from './service.ts'
 
 const MAX_AHEAD_SECONDS = 48 * 3600
@@ -34,6 +35,35 @@ export function registerChannelRoutes(router: Router, service: ChannelsService, 
     const enabled = (ctx.body as { enabled?: unknown } | undefined)?.enabled
     if (typeof enabled !== 'boolean') throw new HttpError(400, 'enabled must be true or false.')
     return service.setEnabled(ctx.params.id as string, enabled, clock())
+  })
+  // A favourite is the person's own: any signed-in person keeps their channels first.
+  router.post('/v1/channels/:id/favorite', 'user', (ctx) => {
+    const favorite = (ctx.body as { favorite?: unknown } | undefined)?.favorite
+    if (typeof favorite !== 'boolean') throw new HttpError(400, 'favorite must be true or false.')
+    return service.setFavorite(ctx.user!, ctx.params.id as string, favorite)
+  })
+  // The picture of a channel: seen by everybody, set by the administrators. It is sent as it is, with nothing that could run in it.
+  router.get('/v1/channels/:id/image', 'user', (ctx) => {
+    const { mime, data } = service.image(ctx.params.id as string)
+    return new RawResponse(
+      200,
+      {
+        'content-type': mime,
+        'x-content-type-options': 'nosniff',
+        'content-security-policy': "default-src 'none'; sandbox",
+        // With the version in the address the picture never changes, so it can be kept; without it, it is asked for again.
+        'cache-control': ctx.query.get('v') ? 'private, max-age=31536000, immutable' : 'private, no-cache',
+      },
+      data,
+    )
+  })
+  router.put('/v1/channels/:id/image', 'admin', (ctx) => {
+    const { mime, bytes } = parseImage(ctx.body)
+    return service.setImage(ctx.params.id as string, mime, bytes, clock())
+  })
+  router.delete('/v1/channels/:id/image', 'admin', (ctx) => {
+    service.removeImage(ctx.params.id as string)
+    return { ok: true }
   })
   // "Apply now": the schedule from this moment on is made again.
   router.post('/v1/channels/:id/rebuild', 'admin', (ctx) => {
