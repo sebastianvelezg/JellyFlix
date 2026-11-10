@@ -137,10 +137,22 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
       .filter((d) => d.Id && !skip.has(d.Id) && (d.Type === 'Series' || d.RunTimeTicks))
       .map(toCard)
       .filter((c): c is MatchCard => c !== null && fitsLength(c, filters.length))
-    // With the container's own Jellyfin key, titles the other people already watched are left out too.
+    // With the container's own Jellyfin key the other people are looked at too (without it only the library of the person asking is
+    // known, and the people in a room should be able to see the same libraries).
     if (jellyfin.hasServiceKey && others.length) {
       for (const other of others) {
         if (cards.length === 0) break
+        // First, what that person may see at all: a title from a library hidden from them, or over their age limit, is never dealt to
+        // the room (their screen would show its name and picture). If Jellyfin cannot say, nothing is dealt: it is better to ask again.
+        try {
+          const visible = await jellyfin.getAsService<{ Items?: Dto[] }>('/Items', { userId: other, ids: cards.map((c) => c.id), limit: cards.length })
+          const seen = new Set((visible.Items ?? []).map((d) => d.Id))
+          cards = cards.filter((c) => seen.has(c.id))
+        } catch {
+          throw new HttpError(502, 'Jellyfin could not say what everybody in the room may watch. Try again.')
+        }
+        if (cards.length === 0) break
+        // Then, the ones they have not watched (a preference: if Jellyfin cannot say, the cards stay).
         try {
           const unplayed = await jellyfin.getAsService<{ Items?: Dto[] }>('/Items', { userId: other, ids: cards.map((c) => c.id), filters: ['IsUnplayed'] })
           const ok = new Set((unplayed.Items ?? []).map((d) => d.Id))
@@ -157,6 +169,9 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
   /** The person is the host or one of the people who vote. */
   const takesPart = (room: RoomData, userId: string): boolean => room.createdBy === userId || room.members.some((m) => m.id === userId)
 
+  /** Everybody who sees the cards, but the person asking: the people who vote and the host (whose screen shows them and plays the winner). */
+  const othersOf = (room: RoomData, user: AuthUser): string[] => [...new Set([room.createdBy, ...room.members.map((m) => m.id)])].filter((id) => id !== user.id)
+
   /** After a change: if the round is over, moves the room on (asking Jellyfin for a fresh set of cards when nobody agreed). */
   async function settle(user: AuthUser, room: RoomData, now: number): Promise<MatchRoomView> {
     const step = advance(room)
@@ -169,7 +184,7 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
       return viewFor(step.room, user.id, version)
     }
     // Nobody liked the same film: a fresh set.
-    const fresh = await candidates(user, step.room.deckSize, step.room.seen, filtersOf(step.room), step.room.members.map((m) => m.id).filter((id) => id !== user.id))
+    const fresh = await candidates(user, step.room.deckSize, step.room.seen, filtersOf(step.room), othersOf(step.room, user))
     // The room may have changed while Jellyfin answered.
     const { room: current } = load(room.id)
     if (current.round !== room.round || current.phase !== 'swipe') return viewFor(current, user.id, load(room.id).row.version)
@@ -220,7 +235,7 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
       if (room.createdBy !== user.id) throw new HttpError(403, 'Only the person who started the Match can start it.')
       if (room.phase !== 'lobby') throw new HttpError(409, 'This Match has already started.')
       if (room.members.length === 0) throw new HttpError(409, 'Nobody has joined yet.')
-      const deck = await candidates(user, room.deckSize, [], filtersOf(room), room.members.map((m) => m.id))
+      const deck = await candidates(user, room.deckSize, [], filtersOf(room), othersOf(room, user))
       if (deck.length < MIN_DECK) throw new HttpError(422, notEnough(filtersOf(room)))
       const { room: current } = load(id)
       const started = guard(() => startSwiping(current, deck))
@@ -274,7 +289,7 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
       const { room } = load(id)
       if (!takesPart(room, user.id)) throw new HttpError(403, 'You are not in this room.')
       if (room.phase !== 'done') throw new HttpError(409, 'The room has not finished.')
-      const fresh = await candidates(user, room.deckSize, room.seen, filtersOf(room), room.members.map((m) => m.id).filter((x) => x !== user.id))
+      const fresh = await candidates(user, room.deckSize, room.seen, filtersOf(room), othersOf(room, user))
       if (fresh.length < MIN_DECK) throw new HttpError(409, 'There are no more films to suggest.')
       // Somebody else may have started the next round while Jellyfin answered.
       const { room: latest } = load(id)

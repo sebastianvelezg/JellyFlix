@@ -320,6 +320,7 @@ function Shell({
   const { menu } = useAppearance()
   // The modules button exists only when a modules container answered; it goes last and is not part of the arrangeable menu (yet).
   const modules = useModules().state
+  const seerrReady = modules.status === 'ready' && modules.manifest.modules.some((m) => m.id === 'seerr' && m.state === 'ready')
   const tabs: NavTab[] = [...arrangeMenu(hasHome ? ['home', ...available] : available, menu), ...(modules.status === 'ready' ? (['modules'] as const) : [])]
   const current: NavTab | null =
     route.page === 'home'
@@ -644,6 +645,8 @@ function Shell({
             onOpenAlbum={openAlbum}
             onOpenArtist={openArtist}
             onPlay={(episode: Episode) => play(episode)}
+            // Only when a modules container is there with Seerr working: the offer to look the title up there.
+            {...(seerrReady ? { onSearchSeerr: (term: string) => go({ page: 'modules', module: 'seerr', q: term }) } : {})}
           />
         )}
         {route.page === 'movie' && (
@@ -699,7 +702,7 @@ function Shell({
         )}
         {route.page === 'modules' && (
           <Suspense fallback={<PageLoading />}>
-            <ModulesPage session={session} module={route.module} join={route.join} go={go} back={back} homeRoute={homeRoute} />
+            <ModulesPage session={session} module={route.module} join={route.join} query={route.q} go={go} back={back} homeRoute={homeRoute} />
           </Suspense>
         )}
         {route.page === 'person' && (

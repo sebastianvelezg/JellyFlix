@@ -15,6 +15,7 @@ import type { JellyfinClient } from '../../jellyfin/client.ts'
 import { newId } from '../../util.ts'
 import { emptyState, generate, type ChannelState, type PoolItem } from './engine.ts'
 import { loadPool, type Reader } from './pool.ts'
+import { createVisibility } from './visibility.ts'
 
 /** How far ahead a schedule is kept, whenever somebody looks at it. */
 const HORIZON_SECONDS = 12 * 3600
@@ -59,7 +60,8 @@ const toProgram = (r: ProgramRow): Program => ({
 })
 
 export interface ChannelsService {
-  list(now: number): ChannelSummary[]
+  /** What is on and next, for this person: a program of a title they may not see is a generic note. */
+  list(user: AuthUser, now: number): Promise<ChannelSummary[]>
   create(user: AuthUser, def: ChannelDef, now: number): Promise<Channel>
   update(user: AuthUser, id: string, def: ChannelDef, now: number): Promise<Channel>
   remove(id: string): void
@@ -67,8 +69,8 @@ export interface ChannelsService {
   rebuild(id: string, now: number, freeze: number): void
   refreshPool(user: AuthUser, id: string, now: number): Promise<Channel>
   refreshAllAsService(now: number): Promise<number>
-  window(id: string, at: number, before: number, after: number, now: number): ChannelWindow
-  guide(from: number, to: number, now: number): Guide
+  window(user: AuthUser, id: string, at: number, before: number, after: number, now: number): Promise<ChannelWindow>
+  guide(user: AuthUser, from: number, to: number, now: number): Promise<Guide>
   preview(user: AuthUser, def: ChannelDef, now: number): Promise<ChannelPreview>
   suggestions(user: AuthUser): Promise<ChannelSuggestions>
   auto(user: AuthUser, request: AutoChannelsRequest, now: number): Promise<Channel[]>
@@ -76,6 +78,7 @@ export interface ChannelsService {
 }
 
 export function createChannelsService(db: Db, jellyfin: JellyfinClient): ChannelsService {
+  const visibility = createVisibility(jellyfin)
   const rowOf = (id: string): ChannelRow => {
     const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as ChannelRow | undefined
     if (!row) throw new HttpError(404, 'That channel does not exist.')
@@ -170,14 +173,20 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
   return {
     get: (id) => channelOf(rowOf(id)),
 
-    list(now) {
+    async list(user, now) {
       const rows = db.prepare('SELECT * FROM channels ORDER BY number').all() as unknown as ChannelRow[]
-      return rows.map((row) => {
+      const shown = rows.map((row) => {
         const def = JSON.parse(row.def) as ChannelDef
         if (def.enabled) ensureTimeline(row, now, now + HORIZON_SECONDS)
         const upcoming = def.enabled ? programsBetween(row.id, now, now + HORIZON_SECONDS) : []
-        const current = upcoming.find((p) => p.start <= now)
-        const next = upcoming.find((p) => p.start > now)
+        return { row, def, current: upcoming.find((p) => p.start <= now), next: upcoming.find((p) => p.start > now) }
+      })
+      // One question to Jellyfin for all the programs on show.
+      const restricted = await visibility.restrict(user, shown.flatMap((s) => [...(s.current ? [s.current] : []), ...(s.next ? [s.next] : [])]))
+      let index = 0
+      return shown.map(({ row, def, current: rawCurrent, next: rawNext }) => {
+        const current = rawCurrent ? restricted[index++] : undefined
+        const next = rawNext ? restricted[index++] : undefined
         return {
           id: row.id,
           number: row.number,
@@ -253,7 +262,7 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
       return done
     },
 
-    window(id, at, before, after, now) {
+    async window(user, id, at, before, after, now) {
       const row = rowOf(id)
       ensureTimeline(row, now, Math.max(at, now) + HORIZON_SECONDS)
       const def = JSON.parse(row.def) as ChannelDef
@@ -262,7 +271,7 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
       const future = db
         .prepare('SELECT * FROM programs WHERE channel_id = ? AND start >= ? ORDER BY start LIMIT ?')
         .all(id, current ? current.end : at, after) as unknown as ProgramRow[]
-      const programs = [...past, ...(current ? [current] : []), ...future].map(toProgram)
+      const programs = await visibility.restrict(user, [...past, ...(current ? [current] : []), ...future].map(toProgram))
       return {
         serverTime: now,
         channel: { id: row.id, number: row.number, name: row.name, color: def.color },
@@ -271,16 +280,20 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
       }
     },
 
-    guide(from, to, now) {
+    async guide(user, from, to, now) {
       const end = Math.min(to, from + MAX_GUIDE_SECONDS)
       const rows = db.prepare('SELECT * FROM channels ORDER BY number').all() as unknown as ChannelRow[]
-      const channels = rows
+      const raw = rows
         .filter((row) => (JSON.parse(row.def) as ChannelDef).enabled)
         .map((row) => {
           ensureTimeline(row, now, Math.max(end, now + HORIZON_SECONDS))
           const def = JSON.parse(row.def) as ChannelDef
           return { id: row.id, number: row.number, name: row.name, color: def.color, programs: programsBetween(row.id, from, end) }
         })
+      // One round of questions to Jellyfin for the whole guide, then each channel gets its own programs back.
+      const restricted = await visibility.restrict(user, raw.flatMap((c) => c.programs))
+      let index = 0
+      const channels = raw.map((c) => ({ ...c, programs: restricted.slice(index, (index += c.programs.length)) }))
       return { serverTime: now, from, to: end, channels }
     },
 

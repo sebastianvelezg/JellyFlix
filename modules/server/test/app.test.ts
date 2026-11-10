@@ -9,7 +9,7 @@ import { createJellyfinClient } from '../src/jellyfin/client.ts'
 import type { Config } from '../src/config.ts'
 import { fakeJellyfin } from './fakeJellyfin.ts'
 
-const config: Config = { port: 0, host: '127.0.0.1', jellyfinUrl: 'http://jellyfin.test', apiKey: undefined, modules: ['channels', 'match'], dataDir: ':memory:', origins: ['*'], trustProxy: false, version: '0.0.0-test' }
+const config: Config = { port: 0, host: '127.0.0.1', jellyfinUrl: 'http://jellyfin.test', apiKey: undefined, modules: ['channels', 'match'], dataDir: ':memory:', origins: ['*'], trustProxy: false, seerrUrl: undefined, seerrApiKey: undefined, version: '0.0.0-test' }
 
 let server: Server
 let base = ''
@@ -114,7 +114,7 @@ describe('channels', () => {
     assert.ok(cur.start <= now && now < cur.end)
   })
 
-  it('does not ask Jellyfin anything just to say what is on', async () => {
+  it('does not ask Jellyfin again, for what is on, about what it already learned of the person', async () => {
     const before = fake.calls.filter((c) => c.path !== '/Users/Me').length
     await call('GET', `/v1/channels/${id}/window`, 'tok-ben')
     await call('GET', '/v1/guide', 'tok-ben')

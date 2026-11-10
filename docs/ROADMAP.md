@@ -100,11 +100,21 @@ After the three phases: update the version (web and TV together, as always), the
 
 These need something running on the server, or have problems from a browser (CORS), so they wait:
 
-- **Seerr / Jellyseerr**: requests, discovery rows and request status inside the title page.
+- **Seerr**: now a module of the modules container (search, request, my requests). Still open: request status inside the title page and discovery rows.
 - **Settings sync** between web and TV (theme, home rows, language).
 - **External ratings** (MDBList, TMDB, Rotten Tomatoes), which need an API key.
 - **Anime markers** (filler, recap, canon) and **messages from the administrator**.
 - Ordering and filtering by *my rating* on the server.
+
+## Ideas for Match and Retro TV (looked at 2026-11-10, not built)
+
+An outside review of the two modules gave these ideas. The ones that were security or consistency problems were fixed (see the changelog). The rest are features, ordered by how much they give for the work, with the reason for leaving them:
+
+- **Match: a way out when nobody agrees** (show the best matches by how many liked them, then let people compare them, bring five new ones or change a filter). Best next step: small, only a change of what a finished round offers, but it touches the rules of the game and both apps' screens.
+- **Match: save the finalists ("for another night")**. Needs somewhere to keep them (a playlist in Jellyfin or a table here) and a decision about who owns it.
+- **Retro TV: favourites, last channel and a guide that remembers where you were; a preview of tonight's schedule while editing a channel.** Each is a pleasant improvement, none is needed; the preview is the most useful because it makes the rules visible.
+- **Retro TV: a future block opens its sheet and can be added to My list.** Gives a reason to read the guide; needs a sheet for a title that is not playing.
+- **Match "couch mode" on the TV** (15 cards, favourites passed around with the remote). A whole new TV screen and flow: only worth it if the TV is where Match is mostly played.
 
 ## Not planned
 

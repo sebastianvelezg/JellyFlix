@@ -17,6 +17,9 @@ export interface Config {
    * web image's `/modules/` proxy) and not published on a port of its own: otherwise anybody could write it.
    */
   trustProxy: boolean
+  /** The Seerr module: the address of Seerr as seen from this container, and its API key (Seerr, Settings, General). They never leave the container. */
+  seerrUrl: string | undefined
+  seerrApiKey: string | undefined
   version: string
 }
 
@@ -34,6 +37,11 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     .filter(Boolean)
   const unknown = asked.filter((x) => !(MODULE_IDS as readonly string[]).includes(x))
   if (unknown.length) throw new Error(`JELLYFLIX_MODULES lists modules that do not exist: ${unknown.join(', ')}. Available: ${MODULE_IDS.join(', ')}`)
+  // The address is the administrator's, never a person's; still it must look like a plain web address (no user name or password in it).
+  const seerrUrl = clean(env.SEERR_URL).replace(/\/+$/, '') || undefined
+  if (seerrUrl && !/^https?:\/\/[^\s/@?#]+(\/[^\s?#]*)?$/.test(seerrUrl)) {
+    throw new Error('SEERR_URL must be an address such as http://seerr:5055 (no user name, password or query)')
+  }
   const port = Number(clean(env.PORT) || 8097)
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a number from 1 to 65535')
   return {
@@ -45,6 +53,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir: clean(env.DATA_DIR) || './data',
     origins: (clean(env.JELLYFLIX_ORIGINS) || '*').split(',').map((x) => x.trim()).filter(Boolean),
     trustProxy: /^(1|true|yes)$/i.test(clean(env.JELLYFLIX_TRUST_PROXY)),
-    version: '0.1.0',
+    seerrUrl,
+    seerrApiKey: clean(env.SEERR_API_KEY) || undefined,
+    version: '0.2.0',
   }
 }

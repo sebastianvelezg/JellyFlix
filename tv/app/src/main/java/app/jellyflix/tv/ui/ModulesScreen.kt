@@ -211,7 +211,7 @@ private fun ChannelCard(channel: ModuleChannel, now: Long, onClick: () -> Unit) 
                 Text(channel.name, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (on != null) {
-                Text(on.title, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(on.shownTitle(), fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 on.subtitle?.let { Text(it, fontSize = 13.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 val progress = ((now - on.start).toFloat() / (on.end - on.start).coerceAtLeast(1)).coerceIn(0f, 1f)
                 Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x33FFFFFF))) {
@@ -221,7 +221,7 @@ private fun ChannelCard(channel: ModuleChannel, now: Long, onClick: () -> Unit) 
             } else {
                 Text(stringResource(R.string.modules_nothing_on), fontSize = 15.sp, color = Palette.TextDim)
             }
-            channel.next?.let { Text(stringResource(R.string.modules_next_at, clockOf(it.start), it.title), fontSize = 13.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            channel.next?.let { Text(stringResource(R.string.modules_next_at, clockOf(it.start), it.shownTitle()), fontSize = 13.sp, color = Palette.TextDim, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }
@@ -250,10 +250,14 @@ private fun ChannelGuide(vm: AppViewModel, now: Long) {
     }
 }
 
+/** What a program is called on screen: its title, or a plain note when this account may not see the title (the container sends no name then). */
+@Composable
+fun ModuleProgram.shownTitle(): String = if (unavailable) stringResource(R.string.modules_program_unavailable) else title
+
 @Composable
 private fun guideLine(channel: ModuleChannel): String {
-    val now = channel.now?.let { "${clockOf(it.start)} ${it.title}" } ?: stringResource(R.string.modules_nothing_on)
-    val next = channel.next?.let { "   ›   ${clockOf(it.start)} ${it.title}" }.orEmpty()
+    val now = channel.now?.let { "${clockOf(it.start)} ${it.shownTitle()}" } ?: stringResource(R.string.modules_nothing_on)
+    val next = channel.next?.let { "   ›   ${clockOf(it.start)} ${it.shownTitle()}" }.orEmpty()
     return "${channel.number}  ${channel.name}   —   $now$next"
 }
 

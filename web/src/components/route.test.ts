@@ -58,6 +58,14 @@ describe('routes', () => {
     expect(parseRoute('#/modules/channels?join=ABCDE')).toEqual({ page: 'modules', module: 'channels' })
     expect(formatRoute({ page: 'modules', module: 'match', join: 'ABCDE' })).toBe('#/modules/match?join=ABCDE')
     expect(formatRoute({ page: 'channel', id: 'a b' })).toBe('#/channel/a%20b')
+    expect(parseRoute('#/modules/seerr')).toEqual({ page: 'modules', module: 'seerr' })
+    expect(parseRoute('#/modules/seerr?join=ABCDE')).toEqual({ page: 'modules', module: 'seerr' })
+    expect(parseRoute('#/modules/seerr?q=the%20matrix%20%26%20co')).toEqual({ page: 'modules', module: 'seerr', q: 'the matrix & co' })
+    expect(parseRoute('#/modules/seerr?q=%20%20')).toEqual({ page: 'modules', module: 'seerr' })
+    expect(parseRoute(`#/modules/seerr?q=${'a'.repeat(300)}`)).toEqual({ page: 'modules', module: 'seerr', q: 'a'.repeat(200) })
+    expect(parseRoute('#/modules/match?q=x')).toEqual({ page: 'modules', module: 'match' })
+    expect(formatRoute({ page: 'modules', module: 'seerr', q: 'the matrix & co' })).toBe('#/modules/seerr?q=the%20matrix%20%26%20co')
+    expect(formatRoute({ page: 'modules', module: 'seerr' })).toBe('#/modules/seerr')
   })
 
   it('knows the page a TV QR code opens, and only trusts a code made of six digits', () => {

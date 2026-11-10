@@ -5,8 +5,8 @@
 /** Bumped when an answer changes in a way an older app would misread. The app says which versions it understands. */
 export const API_VERSION = 1
 
-export type ModuleId = 'channels' | 'match'
-export const MODULE_IDS: readonly ModuleId[] = ['channels', 'match']
+export type ModuleId = 'channels' | 'match' | 'seerr'
+export const MODULE_IDS: readonly ModuleId[] = ['channels', 'match', 'seerr']
 
 export type ModuleState = 'ready' | 'needs-setup' | 'error'
 
@@ -111,7 +111,15 @@ export interface Program {
   seriesId?: string
   /** Seconds. */
   runtime: number
+  /**
+   * True when this person's Jellyfin account may not see the title (a library or an age limit hidden from them): nothing of it is given,
+   * `itemId` is empty and `title` is only a generic note. The times stay, so the shape of the schedule does.
+   */
+  unavailable?: boolean
 }
+
+/** What a program that cannot be shown to somebody is called (the apps translate it). */
+export const UNAVAILABLE_PROGRAM = 'Program not available'
 
 export interface ChannelSummary {
   id: string
@@ -289,4 +297,102 @@ export interface MatchCreateRequest extends MatchFilters {
   deckSize?: number
   /** "local" (the default) or "phones": see {@link MatchMode}. */
   mode?: MatchMode
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Seerr ("ask for what the library does not have")
+// ---------------------------------------------------------------------------------------------------------------------
+
+export type SeerrMediaType = 'movie' | 'tv'
+
+/**
+ * Where a title stands. "available": in the library. "partial": some of it is (some seasons). "processing": approved and being fetched.
+ * "pending": asked for, waiting for an administrator. "blocked": Seerr will not take requests for it. "none": nothing yet.
+ */
+export type SeerrStatus = 'available' | 'partial' | 'processing' | 'pending' | 'blocked' | 'none'
+
+export interface SeerrTitle {
+  mediaType: SeerrMediaType
+  /** The TMDb id (what Seerr and a request use). */
+  id: number
+  title: string
+  year?: number
+  overview?: string
+  /** A TMDb picture path such as "/abc.jpg"; the app builds the address (https://image.tmdb.org/t/p/w342 + path). */
+  posterPath?: string
+  status: SeerrStatus
+  /** The title's id in Jellyfin, when Seerr knows it is in the library: "Open in Jellyflix". */
+  jellyfinId?: string
+}
+
+export interface SeerrSearch {
+  page: number
+  totalPages: number
+  results: SeerrTitle[]
+}
+
+export interface SeerrSeason {
+  number: number
+  name: string
+  episodes?: number
+  status: SeerrStatus
+}
+
+export interface SeerrDetail extends SeerrTitle {
+  tagline?: string
+  /** Series only; the specials (season 0) are left out. */
+  seasons?: SeerrSeason[]
+}
+
+export interface SeerrQuota {
+  /** Requests allowed in `days` days; absent when there is no limit. */
+  limit?: number
+  days?: number
+  used: number
+  remaining?: number
+  /** True when the limit has been reached. */
+  restricted: boolean
+}
+
+/** `GET /v1/seerr/me`: whether this person is in Seerr and what they may do there. */
+export interface SeerrMe {
+  canRequest: { movie: boolean; tv: boolean }
+  quota: { movie?: SeerrQuota; tv?: SeerrQuota }
+}
+
+export interface SeerrRequestInput {
+  mediaType: SeerrMediaType
+  mediaId: number
+  /** Series only: every season, or these (season numbers). */
+  seasons?: 'all' | number[]
+}
+
+export type SeerrRequestStatus = 'pending' | 'approved' | 'declined' | 'failed' | 'completed'
+
+export interface SeerrRequestView {
+  id: number
+  mediaType: SeerrMediaType
+  mediaId: number
+  title: string
+  posterPath?: string
+  /** What the request is (an administrator may approve or decline it). */
+  status: SeerrRequestStatus
+  /** Where the title itself stands. */
+  mediaStatus: SeerrStatus
+  seasons?: number[]
+  /** ISO date. */
+  createdAt: string
+  jellyfinId?: string
+}
+
+export interface SeerrRequests {
+  page: number
+  totalPages: number
+  results: SeerrRequestView[]
+}
+
+/** What `POST /v1/seerr/requests` answers. */
+export interface SeerrRequestResult {
+  requestId: number
+  status: SeerrRequestStatus
 }

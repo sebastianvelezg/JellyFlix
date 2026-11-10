@@ -139,4 +139,13 @@ class ModulesTest {
         assertEquals(listOf("Ana" to 4, "Ben" to 4), done.summary!!.liked)
         assertEquals(listOf("Ana" to "A", "Ben" to "B"), done.summary!!.picks)
     }
+
+    @Test
+    fun `a program of a title this account may not see is read as unavailable, with no id to play`() {
+        val shown = parseProgram(JSONObject("""{"start":10,"end":20,"itemId":"","title":"Program not available","type":"Movie","runtime":10,"unavailable":true}"""))
+        assertTrue(shown.unavailable)
+        assertEquals("", shown.itemId)
+        val normal = parseProgram(JSONObject("""{"start":10,"end":20,"itemId":"00000000000000000000000000000001","title":"Film","type":"Movie","runtime":10}"""))
+        assertFalse(normal.unavailable)
+    }
 }

@@ -7,6 +7,7 @@ import { useModules } from './ModulesProvider'
 
 const ChannelsPage = lazy(() => import('./channels/ChannelsPage').then((m) => ({ default: m.ChannelsPage })))
 const MatchPage = lazy(() => import('./match/MatchPage').then((m) => ({ default: m.MatchPage })))
+const SeerrPage = lazy(() => import('./seerr/SeerrPage').then((m) => ({ default: m.SeerrPage })))
 
 const MODULE_TEXT: Record<ModuleKey, { title: string; description: string; action: string }> = {
   channels: {
@@ -19,6 +20,11 @@ const MODULE_TEXT: Record<ModuleKey, { title: string; description: string; actio
     description: tr('Swipe films with someone, each on your own phone, until you agree on one. Then press play.'),
     action: tr('Start a Match'),
   },
+  seerr: {
+    title: tr('Seerr'),
+    description: tr('Look up movies and series that your library does not have yet and ask for them, with your own Seerr account and its limits.'),
+    action: tr('Search and request'),
+  },
 }
 
 /**
@@ -29,6 +35,7 @@ export function ModulesPage({
   session,
   module,
   join,
+  query,
   go,
   back,
   homeRoute,
@@ -37,6 +44,8 @@ export function ModulesPage({
   module?: ModuleKey
   /** The code in an invitation link: Match joins that room. */
   join?: string
+  /** The text a search was handed over with (the Seerr module starts with it searched). */
+  query?: string
   go: Navigate
   back: (fallback: Route) => void
   homeRoute: Route
@@ -85,6 +94,12 @@ export function ModulesPage({
         <Suspense fallback={<p role="status" className="py-16 text-center text-neutral-400">{t('Loading…')}</p>}>
           {module === 'channels' && <ChannelsPage session={session} go={go} />}
           {module === 'match' && <MatchPage session={session} go={go} join={join} />}
+          {module === 'seerr' &&
+            (info.state === 'ready' ? (
+              <SeerrPage session={session} go={go} {...(query ? { initialQuery: query } : {})} />
+            ) : (
+              <StateMessage kind="error" message={info.detail ? t(info.detail) : t('This module needs setup.')} />
+            ))}
         </Suspense>
       </div>
     )
