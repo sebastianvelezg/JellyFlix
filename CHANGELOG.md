@@ -5,6 +5,22 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-10
+
+Filling a Retro TV channel from a wall of posters, and more ways to programme it.
+
+### Added
+- **Fill a Retro TV channel from a wall of posters.** The channel editor has a new *Browse the library* button that shows your films, series or collections as posters. Tick the ones you want (or *Pick all shown*), narrow them by genre, by name or by order (A–Z, recently added, year, rating), and load more as you go. A film that is in the library twice shows once. When a genre is chosen, *Add it as a rule* adds every film of that genre, now and whatever you add later. What was chosen is listed under the posters, so the posters do not move while you tick them. The search box by name is still there.
+- **More ways to programme a channel.** Under *How it is programmed*: a new order, *Oldest first, by year of release*; *Episodes in a row* (1 to 5) for the order that mixes series in; and *Leave out titles longer than* (30 minutes to 3 hours), which is ignored if it would leave nothing to show. Each option says in a line what it does. Older channels keep working as they were.
+
+### Changed
+- **A channel can hold up to 500 titles picked one by one** (it was 60, too few for a wall of posters), and a channel keeps up to 20,000 titles in all.
+- **Films picked one by one are read from Jellyfin in batches of 50** instead of one request each, so saving, previewing and the night refresh of a channel of many films are much quicker.
+
+### Fixed
+- **Lists with a scroll bar in the channel editor can be reached with the keyboard.**
+- **Quick channels and the rule form listed no genres on some Jellyfin servers** (seen on 12.4): the container read them only from the query filters, which can answer with an empty list. It now joins what `/Genres` and the filters say.
+
 ## [1.7.0] - 2026-11-10
 
 The Seerr module, and the guides of Retro TV and the cards of Match made to respect who is looking.

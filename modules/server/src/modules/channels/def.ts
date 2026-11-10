@@ -18,7 +18,9 @@ const integer = (value: unknown, what: string, min: number, max: number): number
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 const COLOR = /^#[0-9a-fA-F]{6}$/
-const ORDERS: ChannelOrder[] = ['interleave', 'sequential', 'shuffle']
+const ORDERS: ChannelOrder[] = ['interleave', 'sequential', 'shuffle', 'oldest']
+/** The most sources one channel may have (a wall of posters can tick hundreds; they are read in batches). */
+export const MAX_SOURCES = 500
 
 function source(raw: unknown, index: number): ChannelSource {
   const o = (raw ?? {}) as Record<string, unknown>
@@ -64,7 +66,7 @@ export function parseChannelDef(raw: unknown): ChannelDef {
   const o = raw as Record<string, unknown>
   const sourcesRaw = Array.isArray(o.sources) ? o.sources : []
   if (sourcesRaw.length === 0) bad('A channel needs at least one source.')
-  if (sourcesRaw.length > 60) bad('A channel can have up to 60 sources.')
+  if (sourcesRaw.length > MAX_SOURCES) bad(`A channel can have up to ${MAX_SOURCES} sources. A rule (a genre, a decade) can bring many more.`)
   const sources = sourcesRaw.map(source)
   const mode = o.mode === 'grid' ? 'grid' : 'marathon'
   const order = ORDERS.includes(o.order as ChannelOrder) ? (o.order as ChannelOrder) : 'interleave'
@@ -81,6 +83,8 @@ export function parseChannelDef(raw: unknown): ChannelDef {
     blocks: mode === 'grid' ? blocksRaw.map((b) => block(b, sources.length)) : [],
     timezone,
     avoidRepeat: o.avoidRepeat === undefined ? 5 : integer(o.avoidRepeat, 'Avoid repeating', 0, 50),
+    episodesInARow: o.episodesInARow === undefined ? 1 : integer(o.episodesInARow, 'Episodes in a row', 1, 5),
+    maxMinutes: o.maxMinutes === undefined ? 0 : integer(o.maxMinutes, 'The longest length', 0, 600),
     enabled: o.enabled !== false,
   }
 }

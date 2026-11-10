@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { activeBlock, buildRun, emptyState, generate, localParts, type PoolItem } from '../src/modules/channels/engine.ts'
+import { activeBlock, buildRun, emptyState, generate, localParts, playable, type PoolItem } from '../src/modules/channels/engine.ts'
 
 const movie = (n: number, source = 0): PoolItem => ({ id: `m${n}`, source, ord: n, name: `Film ${n}`, type: 'Movie', runtime: 6000 })
 const episode = (series: string, n: number, source = 0): PoolItem => ({
@@ -37,6 +37,48 @@ describe('buildRun', () => {
   it('leaves out a title twice in the sources and one without a usable length', () => {
     const run = buildRun([movie(1), movie(1, 1), { ...movie(2), runtime: 0 }], 'sequential', 'x')
     assert.deepEqual(run, ['m1'])
+  })
+})
+
+describe('settings of a marathon', () => {
+  const aged = (n: number, year: number | undefined, source = 0): PoolItem => ({ ...movie(n, source), ...(year ? { year } : {}) })
+
+  it('puts the oldest first, titles without a year last, and keeps the order of the sources within a year', () => {
+    const pool = [aged(1, 1999), aged(2, undefined), aged(3, 1980), aged(4, 1999, 1), aged(5, 1975)]
+    assert.deepEqual(buildRun(pool, 'oldest', 'x'), ['m5', 'm3', 'm1', 'm4', 'm2'])
+  })
+
+  it('gives a series the episodes in a row that were asked for, in order, and films one at a time', () => {
+    const pool = [movie(1), movie(2), ...[1, 2, 3, 4, 5].map((n) => episode('A', n)), ...[1, 2, 3].map((n) => episode('B', n))]
+    for (const row of [1, 2, 3, 9]) {
+      const run = buildRun(pool, 'interleave', 'seed', row)
+      assert.equal(run.length, pool.length)
+      assert.equal(new Set(run).size, pool.length)
+      for (const series of ['A', 'B']) {
+        const mine = run.filter((id) => id.startsWith(`${series}e`))
+        assert.deepEqual(mine, [...mine].sort()) // still in order
+      }
+    }
+    // With 3 in a row the episodes of A come in a block of up to 3 (5 = 3 + 2), never apart by a film in the middle of a block.
+    const run = buildRun(pool, 'interleave', 'seed', 3)
+    const a = run.map((id, i) => (id.startsWith('Ae') ? i : -1)).filter((i) => i >= 0)
+    assert.ok(a[1]! - a[0]! === 1 && a[2]! - a[1]! === 1)
+    assert.deepEqual(buildRun(pool, 'interleave', 'seed'), buildRun(pool, 'interleave', 'seed', 1)) // one in a row is what it always was
+  })
+
+  it('leaves out titles longer than the limit, and ignores a limit that nothing meets', () => {
+    const pool = [{ ...movie(1), runtime: 3600 }, { ...movie(2), runtime: 9000 }, { ...movie(3), runtime: 5400 }]
+    assert.deepEqual(playable(pool, { maxMinutes: 90 }).map((i) => i.id), ['m1', 'm3'])
+    assert.deepEqual(playable(pool, { maxMinutes: 0 }).map((i) => i.id), ['m1', 'm2', 'm3'])
+    assert.deepEqual(playable(pool, {}).map((i) => i.id), ['m1', 'm2', 'm3'])
+    assert.deepEqual(playable(pool, { maxMinutes: 10 }).map((i) => i.id), ['m1', 'm2', 'm3'])
+    const out = generate({ def: { ...marathon, maxMinutes: 90 }, seed: 'c', pool, state: emptyState(), from: 0, until: 100_000 })
+    assert.ok(out.programs.length > 0 && out.programs.every((p) => p.runtime <= 5400))
+  })
+
+  it('runs a stored channel that has none of the new settings', () => {
+    const out = generate({ def: marathon, seed: 'c', pool: [movie(1), episode('A', 1)], state: emptyState(), from: 0, until: 20_000 })
+    assert.ok(out.programs.length > 0)
   })
 })
 

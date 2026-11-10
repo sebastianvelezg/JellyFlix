@@ -154,7 +154,7 @@ describe('channels', () => {
 
   it('suggests genres and collections, and makes one channel per genre', async () => {
     const s = await call<{ genres: string[] }>('GET', '/v1/channels/suggestions', 'tok-admin')
-    assert.deepEqual(s.body.genres, ['Action', 'Comedy', 'Drama'])
+    assert.deepEqual(s.body.genres, ['Action', 'Comedy', 'Documentary', 'Drama']) // from /Genres and from the query filters, once each
     assert.equal((await call('GET', '/v1/channels/suggestions', 'tok-ben')).status, 403)
     const auto = await call<{ created: Array<{ number: number; name: string }> }>('POST', '/v1/channels/auto', 'tok-admin', { genres: ['Action', 'Drama'], collectionIds: [], types: ['Movie'] })
     assert.deepEqual(auto.body.created.map((c) => c.name), ['Action', 'Drama'])
@@ -166,6 +166,30 @@ describe('channels', () => {
     const p = await call<{ poolSize: number; programs: unknown[] }>('POST', '/v1/channels/preview', 'tok-admin', channelDef({ number: 99 }))
     assert.ok(p.body.poolSize > 0 && p.body.programs.length > 0)
     assert.equal((await call<unknown[]>('GET', '/v1/channels', 'tok-admin')).body.length, before)
+  })
+
+  it('reads many films with a few questions to Jellyfin, and says which one it could not find', async () => {
+    const films = Array.from({ length: 25 }, (_, i) => ({ kind: 'item' as const, id: `m${String(i + 1).padStart(2, '0')}`, name: `Film ${i + 1}`, itemType: 'Movie' }))
+    const asked = () => fake.calls.filter((c) => c.path === '/Items').length
+    const before = asked()
+    const p = await call<{ poolSize: number; warnings: string[] }>('POST', '/v1/channels/preview', 'tok-admin', channelDef({ number: 98, sources: [...films, { kind: 'item', id: 'zzzz', name: 'Gone' }] }))
+    assert.equal(p.status, 200)
+    assert.equal(p.body.poolSize, 25)
+    assert.deepEqual(p.body.warnings, ['“Gone” is not in Jellyfin (or this account cannot see it).'])
+    assert.equal(asked() - before, 1) // one batch, not twenty-six questions
+  })
+
+  it('keeps the settings of how a channel is programmed, with a default for an old channel, and refuses odd ones', async () => {
+    const ok = await call<{ programs: Array<{ itemId: string }> }>('POST', '/v1/channels/preview', 'tok-admin', channelDef({ number: 97, order: 'oldest', episodesInARow: 2, maxMinutes: 90 }))
+    assert.equal(ok.status, 200)
+    assert.ok(ok.body.programs.length > 0)
+    for (const bad of [{ episodesInARow: 6 }, { episodesInARow: 0 }, { maxMinutes: -1 }, { maxMinutes: 601 }, { maxMinutes: 1.5 }]) {
+      assert.equal((await call('POST', '/v1/channels/preview', 'tok-admin', { ...channelDef({ number: 96 }), ...bad })).status, 400, JSON.stringify(bad))
+    }
+    const { episodesInARow: _a, maxMinutes: _b, ...old } = channelDef({ number: 95 })
+    assert.equal((await call('POST', '/v1/channels/preview', 'tok-admin', old)).status, 200)
+    const many = Array.from({ length: 501 }, (_, i) => ({ kind: 'item' as const, id: `x${i}`, name: 'x' }))
+    assert.equal((await call('POST', '/v1/channels/preview', 'tok-admin', channelDef({ number: 94, sources: many }))).status, 400)
   })
 
   it('turns a channel off and on, and says how many titles it has', async () => {

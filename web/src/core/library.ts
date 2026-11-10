@@ -178,6 +178,8 @@ export interface BrowseOptions {
   advanced?: AdvancedFilters
   /** Only titles that sort from this letter on (the A-Z jump). Meaningful with the title sort. */
   fromLetter?: string
+  /** Only titles whose name matches this text (it can be combined with a genre, unlike `searchTitles`). */
+  search?: string
   /** Have the server count every match for `total` (the default). A row that shows no total leaves it out: it is the slow part of a short list. */
   withTotal?: boolean
 }
@@ -242,6 +244,7 @@ export async function getTitlePage(session: Session, kind: TitleKind, opts: Brow
     sortOrder: [sort.order],
     filters: FILTERS[opts.filter ?? 'all'],
     genres: opts.genre ? [opts.genre] : undefined,
+    searchTerm: opts.search?.trim() || undefined,
     ...filterQuery(opts.advanced ?? {}),
     nameStartsWithOrGreater: opts.fromLetter || undefined,
     startIndex: opts.startIndex,

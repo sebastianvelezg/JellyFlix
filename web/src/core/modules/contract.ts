@@ -34,8 +34,11 @@ export interface Manifest {
 // Channels ("Retro TV")
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** How the titles of a marathon follow each other. "interleave": series episode by episode, mixed with the rest. */
-export type ChannelOrder = 'interleave' | 'sequential' | 'shuffle'
+/**
+ * How the titles of a marathon follow each other. "interleave": series episode by episode, mixed with the rest.
+ * "oldest": by year of release, the oldest first (a title without a year comes last).
+ */
+export type ChannelOrder = 'interleave' | 'sequential' | 'shuffle' | 'oldest'
 
 /** Something Jellyfin has (a movie, an episode, a season, a series, a collection, a playlist, a library) that feeds a channel. */
 export interface ItemSource {
@@ -88,6 +91,10 @@ export interface ChannelDef {
   timezone: string
   /** A title is not repeated until this many others have been shown (grid mode). */
   avoidRepeat: number
+  /** Marathon in "interleave" order: how many episodes of a series are shown before the channel moves on (1 to 5; 1 when missing). */
+  episodesInARow?: number
+  /** Titles longer than this many minutes are left out; 0 or missing means no limit. Ignored if it would leave nothing to show. */
+  maxMinutes?: number
   enabled: boolean
 }
 

@@ -16,6 +16,7 @@ import {
 import { t } from '../../../i18n'
 import { errorText, useAsync } from '../../useAsync'
 import { useModulesClient } from '../ModulesProvider'
+import { LibraryPicker } from './LibraryPicker'
 
 const COLORS = ['#4d8dff', '#e5484d', '#30a46c', '#f5a524', '#8e4ec6', '#12a594', '#e93d82', '#0091ff']
 
@@ -37,8 +38,20 @@ const blank = (): ChannelDef => ({
   blocks: [],
   timezone: browserZone(),
   avoidRepeat: 5,
+  episodesInARow: 1,
+  maxMinutes: 0,
   enabled: true,
 })
+
+/** The longest length a channel may allow (0 is no limit). */
+const LENGTHS = [
+  { minutes: 0, label: 'No limit' },
+  { minutes: 30, label: '30 minutes' },
+  { minutes: 60, label: '1 hour' },
+  { minutes: 90, label: '1 hour 30 minutes' },
+  { minutes: 120, label: '2 hours' },
+  { minutes: 180, label: '3 hours' },
+]
 
 const weekday = (day: number): string => new Date(2024, 0, 7 + day).toLocaleDateString(undefined, { weekday: 'short' })
 const timeOf = (seconds: number): string => new Date(seconds * 1000).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })
@@ -115,6 +128,9 @@ export function ChannelEditor({ session, channel, onDone, onCancel }: { session:
             <option value="marathon">{t('Marathon: one title after another, for ever')}</option>
             <option value="grid">{t('Weekly grid: different titles at different times')}</option>
           </select>
+          <span className="mt-1 block text-xs text-neutral-500">
+            {def.mode === 'marathon' ? t('The channel goes through its titles and starts again when they run out.') : t('Each block of the week draws from the sources you tick for it.')}
+          </span>
         </label>
         {def.mode === 'marathon' ? (
           <label className="block text-sm text-neutral-300">
@@ -123,6 +139,7 @@ export function ChannelEditor({ session, channel, onDone, onCancel }: { session:
               <option value="interleave">{t('Series in order, mixed with the rest')}</option>
               <option value="sequential">{t('Exactly as listed')}</option>
               <option value="shuffle">{t('Shuffled')}</option>
+              <option value="oldest">{t('Oldest first, by year of release')}</option>
             </select>
           </label>
         ) : (
@@ -131,6 +148,31 @@ export function ChannelEditor({ session, channel, onDone, onCancel }: { session:
             <input className="field mt-1" type="number" min={0} max={50} value={def.avoidRepeat} onChange={(e) => set('avoidRepeat', Math.min(50, Math.max(0, Math.floor(Number(e.target.value) || 0))))} />
           </label>
         )}
+        {def.mode === 'marathon' && def.order === 'interleave' && (
+          <label className="block text-sm text-neutral-300">
+            {t('Episodes in a row')}
+            <select className="select mt-1 w-full" value={def.episodesInARow ?? 1} onChange={(e) => set('episodesInARow', Number(e.target.value))}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-neutral-500">{t('A series plays this many episodes before the channel moves on to something else.')}</span>
+          </label>
+        )}
+        <label className="block text-sm text-neutral-300">
+          {t('Leave out titles longer than')}
+          <select className="select mt-1 w-full" value={def.maxMinutes ?? 0} onChange={(e) => set('maxMinutes', Number(e.target.value))}>
+            {LENGTHS.some((l) => l.minutes === (def.maxMinutes ?? 0)) ? null : <option value={def.maxMinutes}>{t('{count} minutes', { count: def.maxMinutes ?? 0 })}</option>}
+            {LENGTHS.map((l) => (
+              <option key={l.minutes} value={l.minutes}>
+                {t(l.label)}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-neutral-500">{t('Longer films and episodes are left out of the schedule. If nothing is short enough, the limit is ignored.')}</span>
+        </label>
         <label className="flex items-center gap-2 text-sm text-neutral-300 sm:col-span-2">
           <input type="checkbox" checked={def.enabled} onChange={(e) => set('enabled', e.target.checked)} />
           {t('The channel is on')}
@@ -148,7 +190,7 @@ export function ChannelEditor({ session, channel, onDone, onCancel }: { session:
               {w}
             </p>
           ))}
-          <ol className="mt-3 max-h-64 space-y-1 overflow-y-auto text-sm">
+          <ol tabIndex={0} className="mt-3 max-h-64 space-y-1 overflow-y-auto text-sm">
             {preview.programs.map((p) => (
               <li key={p.start} className="flex gap-3">
                 <span className="w-28 shrink-0 tabular-nums text-neutral-500">{timeOf(p.start)}</span>
@@ -198,6 +240,7 @@ function Sources({ session, sources, onChange }: { session: Session; sources: Ch
   const [found, setFound] = useState<Found[]>([])
   const [searching, setSearching] = useState(false)
   const [rule, setRule] = useState(false)
+  const [browse, setBrowse] = useState(false)
 
   useEffect(() => {
     const text = term.trim()
@@ -234,25 +277,39 @@ function Sources({ session, sources, onChange }: { session: Session; sources: Ch
   }
   const kindName = (type: string) => (type === 'Series' ? t('Series') : type === 'BoxSet' ? t('Collection') : t('Movie'))
 
+  const chosen =
+    sources.length === 0 ? (
+      <p className="text-sm text-neutral-500">{t('Add films, series or collections, or a rule such as “comedies from the 90s”.')}</p>
+    ) : (
+      <ul tabIndex={0} className="max-h-56 space-y-1.5 overflow-y-auto">
+        {sources.map((s, i) => (
+          <li key={`${s.kind}-${i}`} className="flex items-center gap-2 rounded-lg bg-white/[.04] px-3 py-1.5 text-sm">
+            <span className="truncate text-neutral-100">{s.kind === 'item' ? s.name : describeRule(s)}</span>
+            <span className="shrink-0 text-xs text-neutral-500">{s.kind === 'item' ? kindName(s.itemType ?? 'Movie') : t('Rule')}</span>
+            <button type="button" className="btn-ghost ml-auto !px-2 !py-1 text-xs" aria-label={t('Remove {name}', { name: s.name })} onClick={() => onChange(sources.filter((_, j) => j !== i))}>
+              ✕
+            </button>
+          </li>
+        ))}
+      </ul>
+    )
+
   return (
     <section aria-label={t('What the channel shows')} className="glass space-y-3 rounded-2xl p-4">
       <h3 className="text-base font-semibold text-white">{t('What the channel shows')}</h3>
-      {sources.length === 0 ? (
-        <p className="text-sm text-neutral-500">{t('Add films, series or collections, or a rule such as “comedies from the 90s”.')}</p>
+      {browse ? (
+        // The wall of posters stays where it is while titles are ticked: what was chosen is listed under it, so it never moves the posters.
+        <>
+          <LibraryPicker session={session} sources={sources} onChange={onChange} onClose={() => setBrowse(false)} />
+          {chosen}
+        </>
       ) : (
-        <ul className="space-y-1.5">
-          {sources.map((s, i) => (
-            <li key={`${s.kind}-${i}`} className="flex items-center gap-2 rounded-lg bg-white/[.04] px-3 py-1.5 text-sm">
-              <span className="truncate text-neutral-100">
-                {s.kind === 'item' ? s.name : describeRule(s)}
-              </span>
-              <span className="shrink-0 text-xs text-neutral-500">{s.kind === 'item' ? kindName(s.itemType ?? 'Movie') : t('Rule')}</span>
-              <button type="button" className="btn-ghost ml-auto !px-2 !py-1 text-xs" aria-label={t('Remove {name}', { name: s.name })} onClick={() => onChange(sources.filter((_, j) => j !== i))}>
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {chosen}
+          <button type="button" className="btn-primary" onClick={() => setBrowse(true)}>
+            {t('Browse the library')}
+          </button>
+        </>
       )}
       <div>
         <label className="block text-sm text-neutral-300">
@@ -261,7 +318,7 @@ function Sources({ session, sources, onChange }: { session: Session; sources: Ch
         </label>
         {searching && <p role="status" className="mt-2 text-xs text-neutral-500">{t('Searching…')}</p>}
         {shown.length > 0 && (
-          <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+          <ul tabIndex={0} className="mt-2 max-h-56 space-y-1 overflow-y-auto">
             {shown.map((f) => (
               <li key={`${f.itemType}-${f.id}`}>
                 <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm hover:bg-white/[.06]" onClick={() => add(f)}>

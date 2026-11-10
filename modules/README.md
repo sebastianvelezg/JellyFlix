@@ -4,7 +4,7 @@ An **optional** second container for [Jellyflix](../README.md). When it is runni
 
 | Module | What it does |
 |---|---|
-| **Retro TV** (`channels`) | Channels made from your own library, with a guide: a marathon of one anime, Saturdays of Marvel, horror at midnight. Nothing is broadcast and nothing runs while nobody watches: a channel is a schedule, and tuning in plays the title that is on, at the minute it is at, with the normal Jellyflix player. Buttons: start over, next, previous, go live, channel up/down. |
+| **Retro TV** (`channels`) | Channels made from your own library, with a guide: a marathon of one anime, Saturdays of Marvel, horror at midnight. Nothing is broadcast and nothing runs while nobody watches: a channel is a schedule, and tuning in plays the title that is on, at the minute it is at, with the normal Jellyflix player. Buttons: start over, next, previous, go live, channel up/down. A channel is filled by ticking posters of your library (up to 500 picked by hand) or with a rule (a genre, a decade: it follows the library by itself), and is programmed as a marathon (series mixed in with 1 to 5 episodes in a row, as listed, shuffled, or oldest first) or as a weekly grid, with an optional longest length for a title. |
 | **Match** (`match`) | Two or more people, each on their own phone with their own Jellyfin account, swipe the same films. What everybody liked goes on to the next round until one is left; then play it here or on the TV. |
 
 | **Seerr** (`seerr`) | Look up movies and series your library does not have and ask for them, from Jellyflix Web, with **your own Seerr account** (its permissions and quota apply). Off unless you turn it on: see [Seerr](#seerr). |

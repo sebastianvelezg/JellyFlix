@@ -88,6 +88,8 @@ export function fakeJellyfin(): FakeJellyfin {
     const q = url.searchParams
     if (url.pathname === '/Users/Me') return json({ Id: user.id, Name: user.name, Policy: { IsAdministrator: user.admin } })
     if (url.pathname === '/Items/Filters') return json({ Genres: ['Drama', 'Action', 'Comedy'] })
+    // Jellyfin answers genres from here on some versions (and the filters from there on others): the module joins both.
+    if (url.pathname === '/Genres') return json({ Items: [{ Name: 'Documentary' }, { Name: 'Action' }] })
     const episodes = /^\/Shows\/([^/]+)\/Episodes$/.exec(url.pathname)
     if (episodes) return json({ Items: EPISODES.filter((e) => e.SeriesId === episodes[1]) })
     if (url.pathname === '/Items') {

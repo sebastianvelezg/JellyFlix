@@ -13,7 +13,7 @@ import { transaction, type Db } from '../../db/db.ts'
 import { HttpError, type AuthUser } from '../../http/router.ts'
 import type { JellyfinClient } from '../../jellyfin/client.ts'
 import { newId } from '../../util.ts'
-import { emptyState, generate, type ChannelState, type PoolItem } from './engine.ts'
+import { emptyState, generate, playable, type ChannelState, type PoolItem } from './engine.ts'
 import { loadPool, type Reader } from './pool.ts'
 import { createVisibility } from './visibility.ts'
 
@@ -300,11 +300,20 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
     async preview(user, def, now) {
       const { items, warnings } = await loadPool(readerFor(user), def.sources)
       const out = generate({ def, seed: 'preview', pool: items, state: emptyState(), from: now, until: now + 24 * 3600, maxPrograms: 40 })
-      return { poolSize: items.length, programs: out.programs, warnings }
+      return { poolSize: playable(items, def).length, programs: out.programs, warnings }
     },
 
     async suggestions(user) {
-      const filters = await jellyfin.get<{ Genres?: string[] }>('/Items/Filters', user.token, { userId: user.id, includeItemTypes: ['Movie', 'Series'] })
+      // Jellyfin does not answer the same on every version: some give the genres only from /Genres, others (12.2) only from the query
+      // filters, and without a library the filters can be empty (seen on 12.4). Ask both and join them.
+      const asked = await Promise.allSettled([
+        jellyfin.get<{ Items?: Array<{ Name?: string }> }>('/Genres', user.token, { userId: user.id, includeItemTypes: ['Movie', 'Series'] }),
+        jellyfin.get<{ Genres?: string[] }>('/Items/Filters', user.token, { userId: user.id, includeItemTypes: ['Movie', 'Series'] }),
+      ])
+      if (asked.every((a) => a.status === 'rejected')) throw (asked[0] as PromiseRejectedResult).reason
+      const names = new Set<string>()
+      if (asked[0].status === 'fulfilled') for (const g of asked[0].value.Items ?? []) if (g.Name) names.add(g.Name)
+      if (asked[1].status === 'fulfilled') for (const g of asked[1].value.Genres ?? []) if (g) names.add(g)
       const boxes = await jellyfin.get<{ Items?: Array<{ Id?: string; Name?: string }> }>('/Items', user.token, {
         userId: user.id,
         recursive: true,
@@ -313,7 +322,7 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
         limit: 300,
       })
       return {
-        genres: [...(filters.Genres ?? [])].sort((a, b) => a.localeCompare(b)),
+        genres: [...names].sort((a, b) => a.localeCompare(b)),
         collections: (boxes.Items ?? []).filter((c): c is { Id: string; Name: string } => !!c.Id && !!c.Name).map((c) => ({ id: c.Id, name: c.Name })),
       }
     },
