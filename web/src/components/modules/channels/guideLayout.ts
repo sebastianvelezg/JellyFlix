@@ -7,7 +7,7 @@ export const DEFAULT_ZOOM = 200
 /** How wide the column of channel names can be, in pixels. */
 export const NAME_MIN = 112
 export const NAME_MAX = 420
-export const NAME_DEFAULT = 176
+export const NAME_DEFAULT = 208
 export const NAME_STEP = 16
 
 export const clampNameWidth = (px: number): number => Math.min(NAME_MAX, Math.max(NAME_MIN, Number.isFinite(px) ? Math.round(px) : NAME_DEFAULT))

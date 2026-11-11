@@ -21,12 +21,14 @@ import {
   type MovieLibrary,
   type MusicFilter,
   type Session,
+  type Track,
   type TrackSort,
 } from '../../core'
 import { ShuffleIcon } from '../icons'
 import { PagedView } from '../PagedView'
-import { Row } from '../Row'
-import { MadeForYou } from './MadeForYou'
+import { ContinuePanel, MixesShelf, MixHero, MixList, useMadeForYou, type Mixes } from './MadeForYou'
+import { MusicNav } from './MusicNav'
+import { Shelf, ShelfItem } from './Shelf'
 import { useAsync } from '../useAsync'
 import { swrKey, swrScope, useSwr } from '../useSwr'
 import type { MusicTab } from '../route'
@@ -36,20 +38,13 @@ import {
   AlbumCardSkeleton,
   ArtistCard,
   PlaylistCard,
-  RowItem,
   SongsSkeleton,
+  TrackHeader,
   TrackItem,
   TrackList,
 } from './parts'
 import { t, tr } from '../../i18n'
 import { Toolbar, ToolbarSelect } from '../Toolbar'
-
-const TABS: Array<[MusicTab, string]> = [
-  ['home', tr('Home')],
-  ['albums', tr('Albums')],
-  ['artists', tr('Artists')],
-  ['songs', tr('Songs')],
-]
 
 const GRID = 'poster-grid'
 
@@ -59,7 +54,12 @@ interface Navigation {
   onOpenPlaylist: (id: string) => void
 }
 
-/** The Music section: a home with rows, and tabs for all albums, artists, songs and playlists. */
+const EMPTY: Track[] = []
+
+/**
+ * The Music section: a side column with its sections (home, albums, artists, songs) and the mixes made for you, and next to it the
+ * page of the section. On a narrow screen the sections are a row of pills above the page.
+ */
 export function MusicPage({
   session,
   libraries,
@@ -80,16 +80,30 @@ export function MusicPage({
   const libraryId = libraries.length === 1 ? libraries[0]?.id : undefined
   const [shuffling, setShuffling] = useState(false)
 
+  // What the home and the side column both need: what was played last, and what is a favourite (the mixes are made from them).
+  // What was seen last time is shown at once; `visit` is part of the loaders so they are read again each time the page is opened.
+  const scope = swrScope(session)
+  const recentlyPlayed = useSwr(
+    swrKey(scope, 'music', 'played', libraryId),
+    useCallback(() => getRecentlyPlayedTracks(session, libraryId).then((t) => ({ t, visit })), [session, libraryId, visit]),
+    { fresh: 0 },
+  ).state
+  const favorites = useSwr(
+    swrKey(scope, 'music', 'favorites', libraryId),
+    useCallback(() => getFavoriteTracks(session, libraryId, 8).then((t) => ({ t, visit })), [session, libraryId, visit]),
+    { fresh: 0 },
+  ).state
+  const recent = recentlyPlayed.status === 'ready' ? recentlyPlayed.data.t : EMPTY
+  const favored = favorites.status === 'ready' ? favorites.data.t : EMPTY
+  const mixes = useMadeForYou(session, libraryId, favored, recent)
+
   return (
-    <div className="pt-6">
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl">
-          <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)]" />
-          {t('Music')}
-        </h1>
+    <div className="bleed flex flex-col lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
+      <header className="order-1 flex flex-wrap items-center gap-3 px-[var(--gutter)] pb-4 pt-6 lg:col-start-2 lg:row-start-1 lg:px-10 lg:pt-8">
+        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{t('Music')}</h1>
         <button
           type="button"
-          className="btn-primary ml-auto"
+          className="btn ml-auto"
           disabled={shuffling}
           onClick={() => {
             setShuffling(true)
@@ -101,30 +115,26 @@ export function MusicPage({
         >
           <ShuffleIcon /> {t('Shuffle all')}
         </button>
+      </header>
+
+      <aside className="order-2 px-[var(--gutter)] pb-4 lg:order-none lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:border-r lg:border-white/[.06] lg:bg-white/[.015] lg:px-3 lg:pb-0">
+        <div className="lg:sticky lg:top-[var(--header-h)] lg:flex lg:max-h-[calc(100dvh-var(--header-h)-6rem)] lg:flex-col lg:gap-6 lg:py-8">
+          <h2 className="hidden px-3 text-lg font-bold tracking-tight text-white lg:block">{t('Your music')}</h2>
+          <MusicNav tab={tab} onTab={onTab} />
+          {mixes && (
+            <div className="hidden min-h-0 flex-1 flex-col border-t border-white/[.06] pt-6 lg:flex">
+              <MixList session={session} mixes={mixes} />
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <div className="order-3 min-w-0 px-[var(--gutter)] pb-6 pt-2 lg:col-start-2 lg:row-start-2 lg:px-10">
+        {tab === 'home' && <Home session={session} libraryId={libraryId} visit={visit} recent={recent} favorites={favored} mixes={mixes} onTab={onTab} {...nav} />}
+        {tab === 'albums' && <Albums session={session} libraryId={libraryId} {...nav} />}
+        {tab === 'artists' && <Artists session={session} libraryId={libraryId} {...nav} />}
+        {tab === 'songs' && <Songs session={session} libraryId={libraryId} {...nav} />}
       </div>
-
-      <nav aria-label={t('Music sections')} className="no-scrollbar -mx-1 mb-7 flex gap-1 overflow-x-auto px-1">
-        {TABS.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            aria-current={id === tab ? 'page' : undefined}
-            onClick={() => onTab(id)}
-            className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition pointer-coarse:py-3 ${
-              id === tab
-                ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/15 text-white'
-                : 'border-white/10 bg-white/[.04] text-neutral-300 hover:border-white/25 hover:text-white'
-            }`}
-          >
-            {t(label)}
-          </button>
-        ))}
-      </nav>
-
-      {tab === 'home' && <Home session={session} libraryId={libraryId} visit={visit} {...nav} />}
-      {tab === 'albums' && <Albums session={session} libraryId={libraryId} {...nav} />}
-      {tab === 'artists' && <Artists session={session} libraryId={libraryId} {...nav} />}
-      {tab === 'songs' && <Songs session={session} libraryId={libraryId} {...nav} />}
     </div>
   )
 }
@@ -135,17 +145,15 @@ function Home({
   session,
   libraryId,
   visit,
+  recent,
+  favorites,
+  mixes,
+  onTab,
   onOpenAlbum,
   onOpenArtist,
   onOpenPlaylist,
-}: { session: Session; libraryId?: string; visit: number } & Navigation) {
-  // What was seen last time is shown at once; `visit` is part of the loaders so "recently played" is read again each time.
+}: { session: Session; libraryId?: string; visit: number; recent: Track[]; favorites: Track[]; mixes: Mixes | null; onTab: (tab: MusicTab) => void } & Navigation) {
   const scope = swrScope(session)
-  const recentlyPlayed = useSwr(
-    swrKey(scope, 'music', 'played', libraryId),
-    useCallback(() => getRecentlyPlayedTracks(session, libraryId).then((t) => ({ t, visit })), [session, libraryId, visit]),
-    { fresh: 0 },
-  ).state
   const added = useSwr(swrKey(scope, 'music', 'added', libraryId), useCallback(() => getRecentAlbums(session, libraryId), [session, libraryId])).state
   const discover = useSwr(swrKey(scope, 'music', 'discover', libraryId), useCallback(() => getRandomAlbums(session, libraryId), [session, libraryId])).state
   const popular = useSwr(
@@ -153,17 +161,16 @@ function Home({
     useCallback(() => getPopularTracks(session, { libraryId, limit: 8 }).then((t) => ({ t, visit })), [session, libraryId, visit]),
     { fresh: 0 },
   ).state
-  const favorites = useSwr(
-    swrKey(scope, 'music', 'favorites', libraryId),
-    useCallback(() => getFavoriteTracks(session, libraryId, 8).then((t) => ({ t, visit })), [session, libraryId, visit]),
-    { fresh: 0 },
-  ).state
   const playlists = useSwr(swrKey(scope, 'music', 'playlists'), useCallback(() => getPlaylists(session), [session])).state
 
-  const jumpBack = recentlyPlayed.status === 'ready' ? albumsOfTracks(recentlyPlayed.data.t).slice(0, 16) : []
+  const jumpBack = albumsOfTracks(recent).slice(0, 16)
   const played = popular.status === 'ready' ? popular.data.t.filter((t) => t.playCount > 0) : []
   const loading = [added, discover].some((s) => s.status === 'loading')
   const empty = added.status === 'ready' && added.data.length === 0
+  const seeLibrary = { label: t('See library'), onClick: () => onTab('albums') }
+  const seeSongs = { label: t('See songs'), onClick: () => onTab('songs') }
+  // What to pick up: what was played last, or, for a new account, the favourites.
+  const pickUp = recent.length > 0 ? recent : favorites
 
   if (empty) {
     return (
@@ -172,57 +179,58 @@ function Home({
   }
 
   return (
-    <div className="space-y-9">
-      <MadeForYou
-        session={session}
-        libraryId={libraryId}
-        favorites={favorites.status === 'ready' ? favorites.data.t : []}
-        recent={recentlyPlayed.status === 'ready' ? recentlyPlayed.data.t : []}
-      />
+    <div className="space-y-10">
+      {(mixes || pickUp.length > 0) && (
+        <div className={`grid gap-8 ${mixes && pickUp.length > 0 ? 'xl:grid-cols-[minmax(0,1fr)_20rem]' : ''}`}>
+          {mixes && <MixHero session={session} mixes={mixes} />}
+          <ContinuePanel session={session} tracks={pickUp} />
+        </div>
+      )}
+      {mixes && <MixesShelf session={session} mixes={mixes} />}
       {jumpBack.length > 0 && (
-        <Row title={t('Jump back in')}>
+        <Shelf title={t('Jump back in')} action={seeLibrary}>
           {jumpBack.map((album) => (
-            <RowItem key={album.id}>
+            <ShelfItem key={album.id}>
               <AlbumCard session={session} album={album} onOpen={() => onOpenAlbum(album.id)} onOpenArtist={onOpenArtist} />
-            </RowItem>
+            </ShelfItem>
           ))}
-        </Row>
+        </Shelf>
       )}
       {added.status === 'ready' && added.data.length > 0 && (
-        <Row title={t('Recently added')}>
+        <Shelf title={t('Recently added')} action={seeLibrary}>
           {added.data.map((album) => (
-            <RowItem key={album.id}>
+            <ShelfItem key={album.id}>
               <AlbumCard session={session} album={album} onOpen={() => onOpenAlbum(album.id)} onOpenArtist={onOpenArtist} />
-            </RowItem>
+            </ShelfItem>
           ))}
-        </Row>
-      )}
-      {playlists.status === 'ready' && playlists.data.length > 0 && (
-        <Row title={t('Your playlists')}>
-          {playlists.data.map((playlist) => (
-            <RowItem key={playlist.id}>
-              <PlaylistCard session={session} playlist={playlist} onOpen={() => onOpenPlaylist(playlist.id)} />
-            </RowItem>
-          ))}
-        </Row>
-      )}
-      {discover.status === 'ready' && discover.data.length > 0 && (
-        <Row title={t('Discover')}>
-          {discover.data.map((album) => (
-            <RowItem key={album.id}>
-              <AlbumCard session={session} album={album} onOpen={() => onOpenAlbum(album.id)} onOpenArtist={onOpenArtist} />
-            </RowItem>
-          ))}
-        </Row>
+        </Shelf>
       )}
       {played.length > 0 && (
-        <SongSection title={t('Most played')}>
-          <TrackList session={session} tracks={played} onOpenAlbum={onOpenAlbum} />
+        <SongSection title={t('Most played')} action={seeSongs}>
+          <TrackList session={session} tracks={played} header onOpenAlbum={onOpenAlbum} />
         </SongSection>
       )}
-      {favorites.status === 'ready' && favorites.data.t.length > 0 && (
-        <SongSection title={t('Your favorite songs')}>
-          <TrackList session={session} tracks={favorites.data.t} onOpenAlbum={onOpenAlbum} />
+      {playlists.status === 'ready' && playlists.data.length > 0 && (
+        <Shelf title={t('Your playlists')}>
+          {playlists.data.map((playlist) => (
+            <ShelfItem key={playlist.id}>
+              <PlaylistCard session={session} playlist={playlist} onOpen={() => onOpenPlaylist(playlist.id)} />
+            </ShelfItem>
+          ))}
+        </Shelf>
+      )}
+      {discover.status === 'ready' && discover.data.length > 0 && (
+        <Shelf title={t('Discover')} action={seeLibrary}>
+          {discover.data.map((album) => (
+            <ShelfItem key={album.id}>
+              <AlbumCard session={session} album={album} onOpen={() => onOpenAlbum(album.id)} onOpenArtist={onOpenArtist} />
+            </ShelfItem>
+          ))}
+        </Shelf>
+      )}
+      {favorites.length > 0 && (
+        <SongSection title={t('Your favorite songs')} action={seeSongs}>
+          <TrackList session={session} tracks={favorites} header onOpenAlbum={onOpenAlbum} />
         </SongSection>
       )}
       {loading && (
@@ -236,16 +244,25 @@ function Home({
   )
 }
 
-function SongSection({ title, children }: { title: string; children: ReactNode }) {
+function SongSection({ title, action, children }: { title: string; action?: { label: string; onClick: () => void }; children: ReactNode }) {
   return (
     <section aria-label={title}>
-      <h2 className="mb-2 flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white sm:text-xl">
-        <span aria-hidden="true" className="h-5 w-1 rounded-full bg-[var(--color-accent)]" />
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center gap-3">
+        <h2 className="min-w-0 truncate text-xl font-bold tracking-tight text-white sm:text-[1.35rem]">{title}</h2>
+        {action && (
+          <button type="button" onClick={action.onClick} className="ml-auto shrink-0 rounded-full px-2 py-1 text-xs font-semibold text-[var(--color-accent)] hover:underline pointer-coarse:py-3">
+            {action.label}
+          </button>
+        )}
+      </div>
       {children}
     </section>
   )
+}
+
+/** The title of a section page (albums, artists, songs), above its controls. */
+function PageTitle({ children }: { children: ReactNode }) {
+  return <h2 className="mb-4 text-2xl font-bold tracking-tight text-white">{children}</h2>
 }
 
 // ---- toolbars --------------------------------------------------------------------------------------------------------
@@ -316,7 +333,8 @@ function Albums({ session, libraryId, onOpenAlbum, onOpenArtist }: { session: Se
   )
   return (
     <section aria-label={t('All albums')}>
-      <Toolbar className="mb-5">
+      <PageTitle>{t('Albums')}</PageTitle>
+      <Toolbar className="mb-6">
         <Select label={t('Show')} value={filter} options={FILTERS} onChange={setFilter} />
         {genres.status === 'ready' && genres.data.length > 0 && (
           <Select
@@ -356,7 +374,8 @@ function Artists({ session, libraryId, onOpenArtist }: { session: Session; libra
   )
   return (
     <section aria-label={t('All artists')}>
-      <Toolbar className="mb-5">
+      <PageTitle>{t('Artists')}</PageTitle>
+      <Toolbar className="mb-6">
         <SearchField label={t('Search artists')} value={search} onChange={setSearch} />
         <Select label={t('Show')} value={filter} options={FILTERS} onChange={setFilter} />
         <Select label={t('Sort by')} prefix={t('Sort')} value={sort} options={Object.entries(ARTIST_SORT_LABELS) as Array<[ArtistSort, string]>} onChange={setSort} />
@@ -388,12 +407,14 @@ function Songs({ session, libraryId, onOpenAlbum }: { session: Session; libraryI
   )
   return (
     <section aria-label={t('All songs')}>
-      <Toolbar className="mb-5">
+      <PageTitle>{t('Songs')}</PageTitle>
+      <Toolbar className="mb-6">
         <SearchField label={t('Search songs')} value={search} onChange={setSearch} />
         <Select label={t('Show')} value={filter} options={FILTERS} onChange={setFilter} />
         <Select label={t('Sort by')} prefix={t('Sort')} value={sort} options={Object.entries(TRACK_SORT_LABELS) as Array<[TrackSort, string]>} onChange={setSort} />
       </Toolbar>
       <PagedView
+        listHeader={<TrackHeader />}
         key={`${sort}|${filter}|${term}`}
         load={load}
         className="divide-y divide-white/[.05]"
@@ -406,6 +427,7 @@ function Songs({ session, libraryId, onOpenAlbum }: { session: Session; libraryI
           <TrackItem
             session={session}
             track={track}
+            number={index + 1}
             onOpenAlbum={onOpenAlbum}
             // The song plays, and the songs loaded below it follow.
             onPlay={() => music.play(loaded, index)}

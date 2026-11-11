@@ -174,10 +174,10 @@ export function ChannelGuide({ onWatch, favorites }: { onWatch: (id: string) => 
         </span>
       </div>
 
-      <div ref={box} role="region" aria-label={t('Channel guide')} tabIndex={0} onScroll={() => nearEnd() && void loadMore()} className="relative max-h-[calc(100dvh-14rem)] min-h-64 overflow-auto rounded-2xl border border-white/10">
+      <div ref={box} role="region" aria-label={t('Channel guide')} tabIndex={0} onScroll={() => nearEnd() && void loadMore()} className="relative max-h-[calc(100dvh-14rem)] min-h-64 overflow-auto rounded-2xl border border-white/10 bg-white/[.02] shadow-[0_18px_40px_-28px_rgba(0,0,0,0.9)]">
         <div style={{ width: nameWidth + width }} className="relative">
-          <div className="sticky top-0 z-20 flex border-b border-white/10 bg-[var(--color-bg)] text-xs text-neutral-400">
-            <div className="sticky left-0 z-30 shrink-0 bg-[var(--color-bg)] px-3 py-2" style={{ width: nameWidth }}>
+          <div className="sticky top-0 z-20 flex border-b border-white/10 bg-[var(--color-bg)] text-xs text-neutral-400 shadow-[0_8px_16px_-14px_rgba(0,0,0,0.9)]">
+            <div className="sticky left-0 z-30 shrink-0 bg-[var(--color-bg)] px-3 py-2 text-[11px] font-semibold uppercase tracking-wider" style={{ width: nameWidth }}>
               {t('Channel')}
               <div
                 role="separator"
@@ -222,6 +222,7 @@ export function ChannelGuide({ onWatch, favorites }: { onWatch: (id: string) => 
                   </span>
                 )
               })}
+              <span aria-hidden="true" className="absolute bottom-0 z-10 h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-red-500 ring-2 ring-[var(--color-bg)]" style={{ left: x(now) }} />
             </div>
           </div>
 
@@ -258,17 +259,17 @@ function GuideRow({
 }) {
   return (
     <div className="flex border-b border-white/5 last:border-b-0">
-      <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1 bg-[var(--color-bg)] pl-2 pr-1" style={{ width: nameWidth }}>
-        <button type="button" onClick={() => onWatch(channel.id)} className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-2 text-left hover:bg-white/5">
-          <ChannelLogo channel={channel} className="h-8 w-8 text-sm" />
+      <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1 border-r border-white/5 bg-[var(--color-bg)] pl-2 pr-1" style={{ width: nameWidth }}>
+        <button type="button" onClick={() => onWatch(channel.id)} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-2 text-left transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white">
+          <ChannelLogo channel={channel} round="rounded-lg" className="h-9 w-9 text-sm" />
           <span className="sr-only">{t('Watch channel {name}', { name: channel.name })}</span>
-          <span aria-hidden="true" className="line-clamp-2 min-w-0 break-words text-sm leading-tight text-neutral-100">
+          <span aria-hidden="true" className="line-clamp-2 min-w-0 break-words text-sm font-medium leading-tight text-neutral-100">
             {channel.name}
           </span>
         </button>
         <FavoriteStar name={channel.name} on={favorite} onToggle={onFavorite} />
       </div>
-      <div className="relative h-14" style={{ width }}>
+      <div className="relative h-16" style={{ width }}>
         {channel.programs.map((p: Program) => {
           const left = Math.max(0, x(Math.max(p.start, from)))
           const right = Math.min(width, x(p.end))
@@ -280,11 +281,12 @@ function GuideRow({
               disabled={!onNow}
               onClick={() => onNow && onWatch(channel.id)}
               title={`${programTitle(p)}${p.subtitle ? ` · ${p.subtitle}` : ''} (${clock(p.start)} – ${clock(p.end)})`}
-              className={`absolute top-1 h-12 overflow-hidden rounded-lg border px-2 py-1 text-left text-xs ${onNow ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/20 text-white hover:bg-[var(--color-accent)]/30' : 'border-white/10 bg-white/[.04] text-neutral-300'}`}
+              className={`absolute top-1.5 h-[3.25rem] overflow-hidden rounded-xl border px-2.5 py-1.5 text-left text-xs transition ${onNow ? 'border-[var(--color-accent)]/70 bg-[var(--color-accent)]/10 text-white hover:bg-[var(--color-accent)]/20' : 'border-white/10 bg-white/[.04] text-neutral-300'}`}
               style={{ left: left + 2, width: Math.max(0, right - left - 4) }}
             >
-              <span className="block truncate font-medium">{programTitle(p)}</span>
-              <span className="block truncate text-neutral-400">{p.subtitle ?? `${clock(p.start)} – ${clock(p.end)}`}</span>
+              {onNow && <span aria-hidden="true" className="absolute inset-y-0 left-0 bg-[var(--color-accent)]/20" style={{ width: `${Math.min(100, Math.max(0, ((now - p.start) / (p.end - p.start)) * 100))}%` }} />}
+              <span className="relative block truncate font-medium">{programTitle(p)}</span>
+              <span className="relative block truncate text-neutral-400">{p.subtitle ?? `${clock(p.start)} – ${clock(p.end)}`}</span>
             </button>
           )
         })}

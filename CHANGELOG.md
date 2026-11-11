@@ -5,6 +5,14 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+### Changed
+- **Retro TV looks better, with the pictures in front.** *On now* shows each channel as a card: a banner in the colour of the channel with its picture big in the middle, its number and its star, then what is on (with how far along it is and how many minutes are left) and what comes next; the whole card tunes in. Favourites have a heading of their own. The guide and *Set up* follow the same look (bigger pictures, a mark of how far along the programme on now is, a dot where *now* crosses the time ruler, and the channels of *Set up* as cards in two columns).
+- **The music page is redone, with the art in front.** A side column lists the sections (home, albums, artists, songs) and *Your mixes* (on a narrow screen the sections stay a row of pills above the page). The home opens with a big card for the mix of the day (with its covers laid out like a pile of records) and *Pick up where you left off*, then shelves of albums with *See library* links and arrows, and the most played and favourite songs as a table with the names of its columns. Albums, artists and songs have a title of their own above their controls. Only the look changes; the player and the top bar are as they were.
+- **More mixes.** Besides the mix of the day there are mixes of your favourites (in a new order each day), the radio of four artists you play most (it was two), a surprise, three genres (a different three each day) and the decades from the 80s that have songs: ten or more. The big card at the top of the music home shows them one after another every six seconds (it stays while you hover over it, and with reduced motion it does not move), and the dots and arrows go to one directly. *Make another mix* is now in the side column.
+
+### Fixed
+- **The menu of a card (the "⋯" button) is no longer cut off by its row.** In rows such as *Continue watching* the menu was drawn inside the row, so it was cut at the row's edge and the row could be scrolled up and down inside itself. The menu is now drawn over the page, under the button (or over it when there is no room), always inside the window.
+
 ## [1.7.2] - 2026-11-10
 
 The guide of Retro TV, made to be used with many channels.

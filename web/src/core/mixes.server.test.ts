@@ -5,9 +5,13 @@ import { connect } from './auth'
 import type { Session } from './jellyfin'
 import {
   blendMix,
+  buildLibraryMixes,
   buildMixOfTheDay,
   dayKey,
   DAY_MIX_SIZE,
+  decadeYears,
+  favoritesMix,
+  MIX_SIZE,
   favouriteArtists,
   getAlbumRadio,
   getArtistRadio,
@@ -100,5 +104,28 @@ describe('mix helpers', () => {
     }
     expect(blendMix([a, b], 2)).toHaveLength(2)
     expect(blendMix([], 5)).toEqual([])
+  })
+})
+
+describe('the other mixes', () => {
+  it('names the ten years of a decade', () => {
+    expect(decadeYears(1990)).toEqual([1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999])
+  })
+
+  it('puts the favourites in an order of the day, the same all day, at most a mix long', () => {
+    const favorites = Array.from({ length: 60 }, (_, i) => track(`f${i}`))
+    const a = favoritesMix(favorites, 'day-1')
+    expect(a).toHaveLength(MIX_SIZE)
+    expect(favoritesMix(favorites, 'day-1').map((x) => x.id)).toEqual(a.map((x) => x.id))
+    expect(favoritesMix(favorites, 'day-2').map((x) => x.id)).not.toEqual(a.map((x) => x.id))
+  })
+
+  it('makes a surprise and mixes of genres and decades from the library, each with songs and a way to get them all', async () => {
+    const mixes = await buildLibraryMixes(session, undefined, 'day-1')
+    expect(mixes.some((m) => m.kind === 'surprise')).toBe(true)
+    for (const mix of mixes) {
+      expect(mix.tracks.length).toBeGreaterThan(0)
+      expect((await mix.play()).length).toBeGreaterThan(0)
+    }
   })
 })
