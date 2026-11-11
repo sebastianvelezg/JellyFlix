@@ -345,9 +345,9 @@ export function MixList({ session, mixes }: { session: Session; mixes: Mixes }) 
                 type="button"
                 disabled={mixes.making}
                 onClick={() => mixes.play(mix)}
-                aria-label={t('Play {name}', { name: mixTitle(mix) })}
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-white/[.06] focus-visible:bg-white/[.06] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-60"
               >
+                <span className="sr-only">{t('Play')} </span>
                 {cover ? <Cover session={session} item={cover} width={96} className="w-9 shrink-0 !rounded-md" /> : <span aria-hidden="true" className="h-9 w-9 shrink-0 rounded-md bg-white/10" />}
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-medium text-neutral-100">{mixTitle(mix)}</span>

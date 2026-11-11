@@ -88,9 +88,18 @@ export function CardMenu({
       const target = e.target as Node
       if (!root.current?.contains(target) && !menu.current?.contains(target)) setOpen(false)
     }
-    // The menu is placed in the window, so it would not follow its card: it closes when anything scrolls or the window changes size.
+    // The menu is placed in the window, so it follows its button when something scrolls or the window changes size, and closes once
+    // the button is out of view.
     const leave = (e: Event) => {
-      if (!menu.current?.contains(e.target as Node)) setOpen(false)
+      if (menu.current?.contains(e.target as Node)) return
+      const box = menu.current
+      const button = trigger.current?.getBoundingClientRect()
+      if (!box || !button) return
+      if (button.bottom < 0 || button.top > window.innerHeight || button.right < 0 || button.left > window.innerWidth) {
+        setOpen(false)
+        return
+      }
+      setPlace(placeMenu(button, { width: box.offsetWidth, height: box.scrollHeight }, corner, { width: window.innerWidth, height: window.innerHeight }))
     }
     document.addEventListener('pointerdown', away)
     document.addEventListener('focusin', away)
@@ -102,7 +111,7 @@ export function CardMenu({
       window.removeEventListener('scroll', leave, true)
       window.removeEventListener('resize', leave)
     }
-  }, [open])
+  }, [open, corner])
 
   // Placed once it is on the page (its size is known then) and before it is painted, so it never shows in the wrong place.
   useLayoutEffect(() => {
