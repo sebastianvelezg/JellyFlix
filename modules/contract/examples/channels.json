@@ -1,0 +1,29 @@
+[
+  {
+    "id": "d58876fcec3e4c8097cbac425a5028ab",
+    "number": 7,
+    "name": "Comedy",
+    "color": "#e5484d",
+    "enabled": true,
+    "mode": "marathon",
+    "poolSize": 10,
+    "poolRefreshedAt": 1800000000,
+    "favorite": false,
+    "now": {
+      "start": 1800000000,
+      "end": 1800005400,
+      "itemId": "m17",
+      "title": "Film 17",
+      "type": "Movie",
+      "runtime": 5400
+    },
+    "next": {
+      "start": 1800005400,
+      "end": 1800012000,
+      "itemId": "m29",
+      "title": "Film 29",
+      "type": "Movie",
+      "runtime": 6600
+    }
+  }
+]

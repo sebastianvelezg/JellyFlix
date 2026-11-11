@@ -12,15 +12,17 @@ services:
       # The address of Jellyfin as seen from THIS container (the other container's name works when they share a Docker network).
       JELLYFIN_URL: "${JELLYFIN_URL:?Set JELLYFIN_URL in .env: the address of your Jellyfin as this container reaches it}"
       # Optional. An API key from Jellyfin (Dashboard > API keys): lets the container refresh the lists of titles of the channels by night
-      # and leave out films the other people of a Match already watched. Without it everything still works.
+      # and, in a Match on phones, checks what each person may see and has watched (a Match on phones is refused without it). The rest
+      # works without it.
       JELLYFIN_API_KEY: "${JELLYFIN_API_KEY:-}"
       # Which modules are on: channels, match, seerr (Seerr is off unless you add it, and then needs the two settings below).
       JELLYFLIX_MODULES: "${JELLYFLIX_MODULES:-channels,match}"
       # Only for the seerr module (Seerr 3.3 or later): its address as this container reaches it, and its API key (Settings, General).
       SEERR_URL: "${SEERR_URL:-}"
       SEERR_API_KEY: "${SEERR_API_KEY:-}"
-      # Optional: the sites allowed to call it from a browser, separated by commas. Empty means any (it uses tokens, not cookies).
-      JELLYFLIX_ORIGINS: "${JELLYFLIX_ORIGINS:-*}"
+      # Optional: the sites allowed to call it from a browser, separated by commas. Empty means any (it uses tokens, not cookies), or none
+      # when JELLYFLIX_TRUST_PROXY is on (behind the web image's proxy no browser call crosses sites).
+      JELLYFLIX_ORIGINS: "${JELLYFLIX_ORIGINS:-}"
       # Optional: 1 only when this container is reached through the web image's /modules/ proxy and the port above is removed. It
       # then tells callers apart by the address the proxy saw (to slow down whoever keeps sending tokens Jellyfin refuses).
       JELLYFLIX_TRUST_PROXY: "${JELLYFLIX_TRUST_PROXY:-}"

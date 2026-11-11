@@ -31,8 +31,26 @@ data class Profile(
     /** Wrong PINs in a row, and until when (ms since the epoch) the next try has to wait. */
     val failures: Int = 0,
     val lockedUntil: Long = 0,
+    /**
+     * How long the wait was, and what the device's running clock ([android.os.SystemClock.elapsedRealtime]) said when it began. That
+     * clock cannot be moved from Settings, so changing the date of the TV does not end a wait; after a restart (when it starts over)
+     * [lockedUntil] is what counts.
+     */
+    val lockedWaitMs: Long = 0,
+    val lockedAtElapsed: Long = 0,
     val lastUsed: Long = 0,
 ) {
+    /** Milliseconds left of the wait after wrong PINs (0: none), given both clocks now. */
+    fun waitLeftMs(wallNow: Long, elapsedNow: Long): Long {
+        if (lockedUntil <= 0) return 0
+        val sameRun = lockedWaitMs > 0 && elapsedNow >= lockedAtElapsed
+        val left = if (sameRun) lockedWaitMs - (elapsedNow - lockedAtElapsed) else lockedUntil - wallNow
+        return left.coerceIn(0, Pins.MAX_WAIT_MS)
+    }
+
+    /** The same, in whole seconds rounded up, for the screens. */
+    fun waitLeftSeconds(wallNow: Long, elapsedNow: Long): Int = ((waitLeftMs(wallNow, elapsedNow) + 999) / 1000).toInt()
+
     /** The key this account's own data is kept under: the server's user id, without dashes. */
     val id: String get() = profileId(userId)
     val needsSignIn: Boolean get() = token == null
@@ -96,8 +114,8 @@ data class ProfileBook(val profiles: List<Profile> = emptyList(), val activeId: 
     fun withPin(id: String, pin: PinLock?): ProfileBook =
         copy(profiles = update(id) { it.copy(pin = pin, failures = 0, lockedUntil = 0) })
 
-    fun withAttempts(id: String, failures: Int, lockedUntil: Long): ProfileBook =
-        copy(profiles = update(id) { it.copy(failures = failures, lockedUntil = lockedUntil) })
+    fun withAttempts(id: String, failures: Int, lockedUntil: Long, lockedWaitMs: Long = 0, lockedAtElapsed: Long = 0): ProfileBook =
+        copy(profiles = update(id) { it.copy(failures = failures, lockedUntil = lockedUntil, lockedWaitMs = lockedWaitMs, lockedAtElapsed = lockedAtElapsed) })
 
     private fun update(id: String, change: (Profile) -> Profile) = profiles.map { if (it.id == id) change(it) else it }
 }
@@ -120,6 +138,7 @@ object Pins {
     /** Wrong tries in a row before a wait starts, and the longest wait (fifteen minutes): the same rules as the web client's Kids mode. */
     const val FREE_TRIES = 5
     const val MAX_WAIT_SECONDS = 15 * 60
+    const val MAX_WAIT_MS = MAX_WAIT_SECONDS * 1000L
     private const val ROUNDS = 20_000
 
     fun isValid(pin: String): Boolean = pin.length in PIN_MIN_DIGITS..PIN_MAX_DIGITS && pin.all { it in '0'..'9' }
@@ -138,14 +157,15 @@ object Pins {
         if (failures < FREE_TRIES) 0 else minOf(MAX_WAIT_SECONDS.toLong(), 30L shl minOf(failures - FREE_TRIES, 20)).toInt()
 
     /** Checks [pin] against the profile's lock at time [now] and says what happened to the book. */
-    fun attempt(book: ProfileBook, id: String, pin: String, now: Long): PinResult {
+    fun attempt(book: ProfileBook, id: String, pin: String, now: Long, elapsed: Long = now): PinResult {
         val profile = book.find(id) ?: return PinResult.Right
         val lock = profile.pin ?: return PinResult.Right
-        if (now < profile.lockedUntil) return PinResult.Waiting(((profile.lockedUntil - now + 999) / 1000).toInt())
+        if (profile.waitLeftMs(now, elapsed) > 0) return PinResult.Waiting(profile.waitLeftSeconds(now, elapsed))
         if (matches(pin, lock)) return PinResult.Right
         val failures = profile.failures + 1
         val wait = waitSeconds(failures)
-        return PinResult.Wrong(book.withAttempts(id, failures, if (wait > 0) now + wait * 1000L else 0L), wait)
+        val waitMs = wait * 1000L
+        return PinResult.Wrong(book.withAttempts(id, failures, if (wait > 0) now + waitMs else 0L, if (wait > 0) waitMs else 0L, elapsed), wait)
     }
 
     private fun hash(pin: String, salt: String): String {
@@ -171,6 +191,8 @@ object ProfileCodec {
                 .put("name", p.name)
                 .put("failures", p.failures)
                 .put("lockedUntil", p.lockedUntil)
+                .put("lockedWaitMs", p.lockedWaitMs)
+                .put("lockedAtElapsed", p.lockedAtElapsed)
                 .put("lastUsed", p.lastUsed)
             p.token?.let { token ->
                 val sealed = vault.seal(token)
@@ -205,6 +227,8 @@ object ProfileCodec {
                         pin = if (salt.isNotEmpty() && hash.isNotEmpty()) PinLock(salt, hash) else null,
                         failures = j.optInt("failures"),
                         lockedUntil = j.optLong("lockedUntil"),
+                        lockedWaitMs = j.optLong("lockedWaitMs"),
+                        lockedAtElapsed = j.optLong("lockedAtElapsed"),
                         lastUsed = j.optLong("lastUsed"),
                     ),
                 )

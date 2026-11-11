@@ -58,7 +58,7 @@ private fun clock(ms: Long): String = DateFormat.getTimeFormat(LocalContext.curr
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun LiveTvScreen(vm: AppViewModel) {
-    val state = vm.liveTv
+    val state = vm.live.state
     // What is "on now" is worked out from the clock, which moves on while the page is open.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -71,7 +71,7 @@ fun LiveTvScreen(vm: AppViewModel) {
         snapshotFlow {
             if (state.guide) state.list.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             else state.grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-        }.collect { last -> if (last >= state.channels.size - 8) vm.loadLiveTv() }
+        }.collect { last -> if (last >= state.channels.size - 8) vm.live.load() }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -82,12 +82,12 @@ fun LiveTvScreen(vm: AppViewModel) {
         ) {
             Pill(
                 stringResource(R.string.live_channels),
-                onClick = { vm.showGuide(false) },
+                onClick = { vm.live.showGuide(false) },
                 selected = !state.guide,
                 modifier = Modifier.focusRequester(vm.contentEntry),
             )
-            Pill(stringResource(R.string.live_guide), onClick = { vm.showGuide(true) }, selected = state.guide)
-            vm.lastChannel?.let { last -> Pill(stringResource(R.string.live_last, last.name), onClick = { vm.watchLast() }) }
+            Pill(stringResource(R.string.live_guide), onClick = { vm.live.showGuide(true) }, selected = state.guide)
+            vm.live.lastChannel?.let { last -> Pill(stringResource(R.string.live_last, last.name), onClick = { vm.live.watchLast() }) }
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, bottom = 12.dp),
@@ -95,7 +95,7 @@ fun LiveTvScreen(vm: AppViewModel) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ChannelCategory.values().forEach { category ->
-                Pill(stringResource(categoryLabel(category)), onClick = { vm.setLiveCategory(category) }, selected = state.category == category)
+                Pill(stringResource(categoryLabel(category)), onClick = { vm.live.setCategory(category) }, selected = state.category == category)
             }
         }
         when {
@@ -127,7 +127,7 @@ private fun categoryLabel(category: ChannelCategory): Int = when (category) {
 
 @Composable
 private fun ChannelGrid(vm: AppViewModel, now: Long) {
-    val state = vm.liveTv
+    val state = vm.live.state
     LazyVerticalGrid(
         columns = GridCells.Fixed(Posters.columns(4)),
         state = state.grid,
@@ -147,7 +147,7 @@ private fun ChannelGrid(vm: AppViewModel, now: Long) {
                 title = channel.label,
                 // What is on, or else the notes of the name ("1080p · Not 24/7"); nothing when the server has neither.
                 subtitle = program?.let { "${it.title} · ${clock(it.startMs)} – ${clock(it.endMs)}" } ?: channel.name.tags.joinToString(" · ").ifEmpty { null },
-                onClick = { vm.watch(channel) },
+                onClick = { vm.live.watch(channel) },
                 restoreFocusTo = vm.restoreTarget,
                 onRestored = { vm.restoreTarget = null },
                 onFocused = { vm.lastFocused = it },
@@ -161,7 +161,7 @@ private fun ChannelGrid(vm: AppViewModel, now: Long) {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun GuideList(vm: AppViewModel, now: Long) {
-    val state = vm.liveTv
+    val state = vm.live.state
     LazyColumn(
         state = state.list,
         contentPadding = PaddingValues(start = 48.dp, end = 48.dp, bottom = 40.dp),
@@ -169,7 +169,7 @@ private fun GuideList(vm: AppViewModel, now: Long) {
         modifier = Modifier.fillMaxSize(),
     ) {
         items(state.channels, key = { it.id }) { channel ->
-            GuideRow(channel, channel.onAt(now), state.upNext[channel.id], now, onClick = { vm.watch(channel) })
+            GuideRow(channel, channel.onAt(now), state.upNext[channel.id], now, onClick = { vm.live.watch(channel) })
         }
         if (state.loading) item { Hint(stringResource(R.string.loading)) }
     }

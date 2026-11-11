@@ -8,6 +8,8 @@ import type { Config } from '../src/config.ts'
 import { openDb } from '../src/db/db.ts'
 import { createJellyfinClient } from '../src/jellyfin/client.ts'
 import { canRequest, detailOf, posterOf, quotaOf, statusOf, titleOf } from '../src/modules/seerr/normalize.ts'
+import { HttpError } from '../src/http/router.ts'
+import { createSeerrClient } from '../src/modules/seerr/client.ts'
 import { parseVersion } from '../src/modules/seerr/service.ts'
 import { fakeJellyfin } from './fakeJellyfin.ts'
 import { ADMIN, fakeSeerr, REQUEST, SEERR_KEY, type FakeSeerr } from './fakeSeerr.ts'
@@ -149,7 +151,17 @@ describe('the Seerr module', () => {
     assert.equal(r.status, 403)
     assert.match(r.body.error, /not in Seerr yet/)
     assert.equal(other.seerr.calls.some((c) => c.path === '/search'), false)
+    // It is remembered: typing more does not ask Seerr who this is again.
+    const asked = other.seerr.calls.length
+    for (let i = 0; i < 3; i += 1) assert.equal((await other.call('GET', '/v1/seerr/search?query=matrix', 'tok-ben')).status, 403)
+    assert.equal(other.seerr.calls.length, asked)
     other.close()
+  })
+
+  it('stops reading an answer from Seerr that has no length and goes on and on', async () => {
+    const big = new Response(new ReadableStream({ pull: (c) => c.enqueue(new Uint8Array(1024 * 1024)) }), { status: 200 })
+    const client = createSeerrClient('http://seerr.test', SEERR_KEY, async () => big)
+    await assert.rejects(client.get('/status'), (e: unknown) => e instanceof HttpError && /more than expected/.test(e.message))
   })
 
   it('searches movies and series with their state, leaves people out and ignores a picture path that is not one', async () => {

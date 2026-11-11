@@ -58,7 +58,7 @@ a banner that mixes movies and series, rows that follow what you are watching, a
 
 **A home that follows you**
 
-A banner mixing movies and series, *Discover something new* (a random movie, a series you never started, an album), Continue watching, Next up, Watch later, "New since your last visit", "Coming up" and "Because you watched…".
+A banner mixing movies and series, *Discover something new* (a random movie, a series you never started, an album), Continue watching (a title can be hidden from it, and a series from Next up, without touching what you have watched), Next up, Watch later, "New since your last visit", "Coming up" and "Because you watched…". An optional *Are you still watching?* stops a long run of titles that began by themselves, and a sleep timer stops the video at the time you choose.
 
 </td>
 <td width="33%" valign="top">
@@ -363,7 +363,7 @@ A native app built for a remote control and a TV seen from the sofa: big targets
 
 ## 🚀 Get started
 
-You need a **Jellyfin server** (10.10 or newer; developed against 12.x) and a normal Jellyfin user. No API key and no administrator account (only the administration tools and the Playback Reporting data need one).
+You need a **Jellyfin server** (10.10 or newer; developed against 12.x) and a normal Jellyfin user. No API key and no administrator account (only the administration tools and the Playback Reporting data need one; the optional modules container asks for a key for a Match on phones).
 
 > **One thing to know:** Jellyflix asks for your **Jellyfin server's address** as the device reaches it: the IP address (or domain name) of the machine that runs Jellyfin, such as `http://192.168.x.x:8096`.
 > Never `localhost`: that always means the device you are holding. The hosting guide explains this in detail.

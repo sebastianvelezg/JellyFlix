@@ -1,6 +1,6 @@
 import { useRef, type ReactNode } from 'react'
-import { t } from '../../i18n'
-import { ChevronLeftIcon, ChevronRightIcon } from '../icons'
+import { t } from '../i18n'
+import { ChevronLeftIcon, ChevronRightIcon } from './icons'
 
 const arrow =
   'hidden h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[.05] text-neutral-300 transition hover:border-white/25 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:flex pointer-coarse:hidden'

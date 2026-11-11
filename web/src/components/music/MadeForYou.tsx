@@ -18,7 +18,7 @@ import { ChevronLeftIcon, ChevronRightIcon, PlayIcon } from '../icons'
 import { useAsync } from '../useAsync'
 import { useMusic } from './MusicProvider'
 import { Cover, cardFrame } from './parts'
-import { Shelf, ShelfItem } from './Shelf'
+import { Shelf, ShelfItem } from '../Shelf'
 import { t } from '../../i18n'
 
 /** How long each mix stays up in the big card before it moves on. */

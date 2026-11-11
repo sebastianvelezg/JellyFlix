@@ -1,6 +1,8 @@
 # Store text with LF so Gradle, shell scripts and diffs behave the same on every machine.
 * text=auto eol=lf
 *.bat text eol=crlf
+# The Gradle wrapper script was committed with CRLF line endings: kept exactly as it is, so Git does not see it as changed on every checkout.
+tv/gradlew.bat -text
 
 # Binary files
 *.png binary

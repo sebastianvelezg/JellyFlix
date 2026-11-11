@@ -124,6 +124,8 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
     })
   }
 
+  const isNumberTaken = (e: unknown): boolean => e instanceof Error && /UNIQUE constraint failed: channels\.number/.test(e.message)
+
   function numberFree(number: number, except?: string): boolean {
     const row = db.prepare('SELECT id FROM channels WHERE number = ?').get(number) as { id: string } | undefined
     return !row || row.id === except
@@ -161,20 +163,31 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
     let channelId = id
     if (!channelId) {
       channelId = newId()
-      db.prepare('INSERT INTO channels (id, number, name, def, state, owner, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-        channelId,
-        def.number,
-        def.name,
-        JSON.stringify(def),
-        JSON.stringify(emptyState()),
-        user.id,
-        now,
-      )
+      try {
+        db.prepare('INSERT INTO channels (id, number, name, def, state, owner, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+          channelId,
+          def.number,
+          def.name,
+          JSON.stringify(def),
+          JSON.stringify(emptyState()),
+          user.id,
+          now,
+        )
+      } catch (e) {
+        // Somebody took the number while Jellyfin was being asked (the database refuses two channels with one number).
+        if (isNumberTaken(e)) throw new HttpError(409, `Channel ${def.number} already exists.`)
+        throw e
+      }
     } else {
       const row = rowOf(channelId)
       const state = JSON.parse(row.state) as ChannelState
       transaction(db, () => {
-        db.prepare('UPDATE channels SET number = ?, name = ?, def = ? WHERE id = ?').run(def.number, def.name, JSON.stringify(def), channelId)
+        try {
+          db.prepare('UPDATE channels SET number = ?, name = ?, def = ? WHERE id = ?').run(def.number, def.name, JSON.stringify(def), channelId)
+        } catch (e) {
+          if (isNumberTaken(e)) throw new HttpError(409, `Channel ${def.number} already exists.`)
+          throw e
+        }
         // What is on and what comes next is kept; what is further away is made again from the new list. The channel starts a new round of it.
         db.prepare('DELETE FROM programs WHERE channel_id = ? AND start >= ?').run(channelId, now + FREEZE_SECONDS)
         db.prepare('UPDATE channels SET state = ? WHERE id = ?').run(JSON.stringify({ ...state, run: [], pos: 0 }), channelId)
@@ -292,9 +305,10 @@ export function createChannelsService(db: Db, jellyfin: JellyfinClient): Channel
         .prepare('SELECT * FROM programs WHERE channel_id = ? AND start >= ? ORDER BY start LIMIT ?')
         .all(id, current ? current.end : at, after) as unknown as ProgramRow[]
       const programs = await visibility.restrict(user, [...past, ...(current ? [current] : []), ...future].map(toProgram))
+      const pictureVersion = imageVersions().get(row.id)
       return {
         serverTime: now,
-        channel: { id: row.id, number: row.number, name: row.name, color: def.color, favorite: favoritesOf(user.id).has(row.id), ...(imageVersions().has(row.id) ? { imageVersion: imageVersions().get(row.id) as number } : {}) },
+        channel: { id: row.id, number: row.number, name: row.name, color: def.color, favorite: favoritesOf(user.id).has(row.id), ...(pictureVersion !== undefined ? { imageVersion: pictureVersion } : {}) },
         programs,
         currentIndex: current ? past.length : -1,
       }

@@ -1,0 +1,115 @@
+{
+  "id": "34e1d6405d0b4b868125cc666c7b904c",
+  "code": "6AG5S",
+  "mode": "local",
+  "hostId": "u-admin",
+  "hostName": "Ana",
+  "filters": {
+    "genre": "Comedy"
+  },
+  "version": 1,
+  "phase": "swipe",
+  "round": 1,
+  "me": "u-admin",
+  "members": [
+    {
+      "id": "u-admin",
+      "name": "Ana",
+      "done": false
+    }
+  ],
+  "deck": [
+    {
+      "id": "m02",
+      "name": "Film 2",
+      "kind": "Movie",
+      "year": 1991,
+      "overview": "About film 2",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 90
+    },
+    {
+      "id": "m05",
+      "name": "Film 5",
+      "kind": "Movie",
+      "year": 1994,
+      "overview": "About film 5",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 120
+    },
+    {
+      "id": "m08",
+      "name": "Film 8",
+      "kind": "Movie",
+      "year": 1997,
+      "overview": "About film 8",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 100
+    },
+    {
+      "id": "m11",
+      "name": "Film 11",
+      "kind": "Movie",
+      "year": 2000,
+      "overview": "About film 11",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 80
+    }
+  ],
+  "myVotes": {},
+  "remaining": [
+    {
+      "id": "m02",
+      "name": "Film 2",
+      "kind": "Movie",
+      "year": 1991,
+      "overview": "About film 2",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 90
+    },
+    {
+      "id": "m05",
+      "name": "Film 5",
+      "kind": "Movie",
+      "year": 1994,
+      "overview": "About film 5",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 120
+    },
+    {
+      "id": "m08",
+      "name": "Film 8",
+      "kind": "Movie",
+      "year": 1997,
+      "overview": "About film 8",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 100
+    },
+    {
+      "id": "m11",
+      "name": "Film 11",
+      "kind": "Movie",
+      "year": 2000,
+      "overview": "About film 11",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 80
+    }
+  ],
+  "lastLiked": []
+}

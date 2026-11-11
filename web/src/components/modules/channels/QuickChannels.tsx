@@ -22,7 +22,17 @@ export function QuickChannels({ onDone, onCancel }: { onDone: () => void; onCanc
     setBusy(true)
     setError(null)
     try {
-      await autoChannels(client, { genres, collectionIds: boxes, types: episodes ? ['Movie', 'Episode'] : ['Movie'] })
+      // One at a time: each is a long read of the library, and a failure half way leaves the ones already made out of the selection
+      // (asking again would otherwise make them twice).
+      const types: Array<'Movie' | 'Episode'> = episodes ? ['Movie', 'Episode'] : ['Movie']
+      for (const genre of genres) {
+        await autoChannels(client, { genres: [genre], collectionIds: [], types })
+        setGenres((now) => now.filter((g) => g !== genre))
+      }
+      for (const box of boxes) {
+        await autoChannels(client, { genres: [], collectionIds: [box], types })
+        setBoxes((now) => now.filter((b) => b !== box))
+      }
       onDone()
     } catch (e) {
       setError(errorText(e))

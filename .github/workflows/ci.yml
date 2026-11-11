@@ -101,7 +101,7 @@ jobs:
           docker inspect -f '{{.HostConfig.ReadonlyRootfs}} {{.HostConfig.SecurityOpt}} {{.HostConfig.CapDrop}}' jellyflix-web
 
   tv:
-    name: TV (unit tests, lint, debug build)
+    name: TV (unit tests, lint, debug and release builds)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -117,4 +117,6 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - run: chmod +x gradlew
       # Android lint is part of the build's checks (its settings and the few findings it is told to ignore are in tv/app/lint.xml).
-      - run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      # The release build is made here too (with the debug key, which is enough): it is the one that goes through R8, and a shrinking
+      # problem would otherwise only show in the APK that gets published.
+      - run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease

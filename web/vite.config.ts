@@ -59,7 +59,11 @@ function pdfjsFiles(): Plugin {
   }
 }
 
+/** The version in package.json: the one place it is written (the app tells Jellyfin and the Settings page from it). */
+const appVersion = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   // Relative file addresses, so the app works from any folder or sub-path it is put in (its routes live after the #).
   base: './',
   plugins: [react(), tailwindcss(), serviceWorker(), pdfjsFiles()],

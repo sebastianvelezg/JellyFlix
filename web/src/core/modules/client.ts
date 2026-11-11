@@ -16,8 +16,9 @@ export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>
 export interface ModulesClient {
   baseUrl: string
   get<T>(path: string): Promise<T>
-  post<T>(path: string, body?: unknown): Promise<T>
-  put<T>(path: string, body?: unknown): Promise<T>
+  /** `timeoutMs` is for the few operations that are slow by nature (reading a whole library to make a channel). */
+  post<T>(path: string, body?: unknown, timeoutMs?: number): Promise<T>
+  put<T>(path: string, body?: unknown, timeoutMs?: number): Promise<T>
   del<T>(path: string): Promise<T>
   /** A file (a picture), read with the same sign-in. */
   blob(path: string): Promise<Blob>
@@ -26,17 +27,19 @@ export interface ModulesClient {
 export { isTrustedModulesAddress, modulesLinkTrust, normalizeModulesUrl } from './url'
 
 const REQUEST_TIMEOUT_MS = 15_000
+/** For the operations that read many titles from Jellyfin (making or reading a channel): the container keeps working after a shorter wait. */
+export const SLOW_REQUEST_TIMEOUT_MS = 120_000
 
 /** Signs requests with the same session token Jellyfin gave this app (the container asks Jellyfin who it is). */
 export function createModulesClient(baseUrl: string, token: string, fetchImpl: FetchLike = (url, init) => fetch(url, init), timeoutMs = REQUEST_TIMEOUT_MS): ModulesClient {
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: string, path: string, body?: unknown, waitMs: number = timeoutMs): Promise<T> {
     let res: Response
     try {
       res = await fetchImpl(baseUrl + path, {
         method,
         headers: { authorization: `MediaBrowser Token="${token}"`, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(waitMs),
       })
     } catch {
       throw new ModulesError(0, 'The modules container did not answer.')
@@ -54,8 +57,8 @@ export function createModulesClient(baseUrl: string, token: string, fetchImpl: F
   return {
     baseUrl,
     get: (path) => request('GET', path),
-    post: (path, body) => request('POST', path, body ?? {}),
-    put: (path, body) => request('PUT', path, body ?? {}),
+    post: (path, body, waitMs) => request('POST', path, body ?? {}, waitMs),
+    put: (path, body, waitMs) => request('PUT', path, body ?? {}, waitMs),
     del: (path) => request('DELETE', path),
     async blob(path) {
       let res: Response

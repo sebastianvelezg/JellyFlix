@@ -63,6 +63,7 @@
     <string name="player_pause">Pause</string>
     <string name="player_play">Play</string>
     <string name="error_play">Could not start playback.</string>
+    <string name="error_play_lost">Playback stopped: the connection to the server was lost.</string>
     <string name="error_channel">This channel did not start. It may be off the air or blocked where the server is. Try another one.</string>
     <string name="error_nothing_to_play">There is nothing to play yet.</string>
 

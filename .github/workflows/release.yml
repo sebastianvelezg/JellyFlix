@@ -76,33 +76,41 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
       - name: Accept Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-      - name: Use the release key, when the repository has one
+      - name: Use the release key (a release is never built without it)
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > tv/release.jks
-            {
-              echo "storeFile=release.jks"
-              echo "storePassword=$KEYSTORE_PASSWORD"
-              echo "keyAlias=$KEY_ALIAS"
-              echo "keyPassword=$KEY_PASSWORD"
-            } > tv/keystore.properties
-            echo "Signing with the release key."
-          else
-            echo "No release key in the repository secrets: the APK is signed with the debug key (fine for sideloading, not for updating over a build made with another key)."
-          fi
+          # An APK signed with another key cannot update the one already installed, so a missing secret stops the release
+          # instead of publishing a build nobody could update to.
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The repository secret for $name is missing: not publishing a TV APK signed with the debug key."
+              exit 1
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 -d > tv/release.jks
+          {
+            echo "storeFile=release.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > tv/keystore.properties
+          echo "Signing with the release key."
       - run: chmod +x gradlew && ./gradlew --no-daemon :app:assembleRelease
         working-directory: tv
-      - name: Name the APK
-        run: cp tv/app/build/outputs/apk/release/app-release.apk "jellyflix-tv-${GITHUB_REF_NAME}.apk"
+      - name: Name the APK, and write its SHA-256 next to it
+        run: |
+          cp tv/app/build/outputs/apk/release/app-release.apk "jellyflix-tv-${GITHUB_REF_NAME}.apk"
+          sha256sum "jellyflix-tv-${GITHUB_REF_NAME}.apk" > "jellyflix-tv-${GITHUB_REF_NAME}.apk.sha256"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: tv
-          path: jellyflix-tv-*.apk
+          path: |
+            jellyflix-tv-*.apk
+            jellyflix-tv-*.apk.sha256
 
   release:
     name: GitHub release

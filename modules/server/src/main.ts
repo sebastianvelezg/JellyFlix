@@ -15,7 +15,7 @@ try {
 }
 
 const db = openDb(join(config.dataDir, 'modules.db'))
-const jellyfin = createJellyfinClient(config.jellyfinUrl, config.apiKey)
+const jellyfin = createJellyfinClient(config.jellyfinUrl, config.apiKey, undefined, config.version)
 const app = createApp({ config, db, jellyfin })
 
 const server = createServer((req, res) => void app.handler(req, res))

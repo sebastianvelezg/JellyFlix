@@ -250,6 +250,35 @@ class ProfilesTest {
     }
 
     @Test
+    fun `moving the date of the TV forward does not end the wait`() {
+        val base = ProfileBook().signedIn(session("a"), 1)
+        val id = base.activeId!!
+        var book = base.withPin(id, Pins.create("1234"))
+        // Five wrong tries at 1 s of wall time and 50 s of running time.
+        repeat(5) { book = (Pins.attempt(book, id, "0000", now = 1_000, elapsed = 50_000) as PinResult.Wrong).book }
+        // The date is put a day ahead, but only 2 s of running time went by.
+        val dayLater = 1_000 + 86_400_000L
+        val result = Pins.attempt(book, id, "1234", now = dayLater, elapsed = 52_000)
+        assertTrue(result is PinResult.Waiting)
+        assertEquals(28, (result as PinResult.Waiting).seconds)
+        // After the 30 s really pass, the right PIN opens.
+        assertTrue(Pins.attempt(book, id, "1234", now = dayLater, elapsed = 81_000) is PinResult.Right)
+    }
+
+    @Test
+    fun `after a restart the running clock starts over and the date decides`() {
+        val base = ProfileBook().signedIn(session("a"), 1)
+        val id = base.activeId!!
+        var book = base.withPin(id, Pins.create("1234"))
+        repeat(5) { book = (Pins.attempt(book, id, "0000", now = 1_000, elapsed = 900_000) as PinResult.Wrong).book }
+        // Restarted: the running clock reads 5 s (less than when the wait began); 10 s of date went by.
+        val result = Pins.attempt(book, id, "1234", now = 11_000, elapsed = 5_000)
+        assertTrue(result is PinResult.Waiting)
+        assertEquals(20, (result as PinResult.Waiting).seconds)
+        assertTrue(Pins.attempt(book, id, "1234", now = 40_000, elapsed = 34_000) is PinResult.Right)
+    }
+
+    @Test
     fun `the tries survive storage so restarting the app does not reset them`() {
         val base = ProfileBook().signedIn(session("a"), 1)
         val id = base.activeId!!

@@ -30,6 +30,7 @@ import { clearRecentSearches } from './platform/web/recentSearches'
 import { setStorageOwner } from './platform/web/owner'
 import { startSyncWatcher } from './platform/web/sync'
 import { SearchPage } from './components/SearchPage'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { useLanguage } from './components/useLanguage'
 import { clearSwr, swrKey, swrScope, useSwr } from './components/useSwr'
 import {
@@ -480,242 +481,244 @@ function Shell({
       <KidsExitDialog open={leavingKids} onClose={() => setLeavingKids(false)} />
       <OfflineBanner />
       <main ref={mainRef} id="main" tabIndex={-1} className={`gutter-x pt-[var(--header-h)] outline-none ${queued || barShown ? 'pb-[calc(10rem+var(--nav-h))]' : 'pb-[calc(5rem+var(--nav-h))]'}`}>
-        {homeSeen && hasHome && sections.status === 'ready' && (
-          <div hidden={!onHome}>
-            <HomePage
-              session={session}
-              sections={sections.data}
-              overrides={overrides}
-              playbackVersion={playbackVersion}
-              onPlay={play}
-              onPlayShow={playShow}
-              onOpenMovie={openMovie}
-              onOpenBook={openBook}
-              onOpenShow={openShow}
-              onOpenSeries={openSeries}
-              onOpenAlbum={openAlbum}
-              onOpenArtist={openArtist}
-              onOpenCollection={openCollection}
-              onSeeCollections={seeCollections}
-              onOpenList={(id) => go({ page: 'list', id })}
-              onSeeLists={() => go({ page: 'lists' })}
-              onSection={(section) => go(section === 'music' ? { page: 'music', tab: musicTab } : sectionRoute(section))}
-            />
-          </div>
-        )}
-        {seen.includes('movies') && (
-          <div hidden={route.page !== 'browse'}>
-            <CatalogPage section="movies" onOpen={openMovie} {...catalog} />
-          </div>
-        )}
-        {(['series', 'anime', 'musicvideos', 'books'] as const)
-          .filter((x) => seen.includes(x))
-          .map((x) => (
-            <div key={x} hidden={!(route.page === 'section' && route.section === x)}>
-              {x === 'musicvideos' ? (
-                <MusicVideosPage
-                  onOpen={openMovie}
-                  onOpenFolder={(id) => go({ page: 'folder', id })}
-                  onPlayQueue={playQueue}
-                  {...catalog}
-                />
-              ) : (
-                <CatalogPage
-                  section={x}
-                  onOpen={x === 'books' ? openBook : openShow}
-                  {...catalog}
-                  {...(x === 'books' ? { onPlay: playOrOpenBook } : {})}
-                />
-              )}
-            </div>
-          ))}
-        {route.page === 'folder' && (
-          <FolderPage
-            key={route.id}
-            session={session}
-            id={route.id}
-            overrides={overrides}
-            onOpenFolder={(id) => go({ page: 'folder', id })}
-            onOpenLibrary={() => go(sectionRoute('musicvideos'))}
-            onOpenVideo={openMovie}
-            onPlayQueue={playQueue}
-            onBack={() => back(sectionRoute('musicvideos'))}
-          />
-        )}
-        {musicSeen && musicLibraries.length > 0 && (
-          <div hidden={!onMusic}>
-            <Suspense fallback={<PageLoading />}>
-              <MusicPage
+        <ErrorBoundary scope="page" resetKey={JSON.stringify(route)}>
+          {homeSeen && hasHome && sections.status === 'ready' && (
+            <div hidden={!onHome}>
+              <HomePage
                 session={session}
-                libraries={musicLibraries}
-                tab={musicTab}
-                visit={musicVisit}
-                onTab={(tab) => go({ page: 'music', tab })}
+                sections={sections.data}
+                overrides={overrides}
+                playbackVersion={playbackVersion}
+                onPlay={play}
+                onPlayShow={playShow}
+                onOpenMovie={openMovie}
+                onOpenBook={openBook}
+                onOpenShow={openShow}
+                onOpenSeries={openSeries}
                 onOpenAlbum={openAlbum}
                 onOpenArtist={openArtist}
-                onOpenPlaylist={openPlaylist}
+                onOpenCollection={openCollection}
+                onSeeCollections={seeCollections}
+                onOpenList={(id) => go({ page: 'list', id })}
+                onSeeLists={() => go({ page: 'lists' })}
+                onSection={(section) => go(section === 'music' ? { page: 'music', tab: musicTab } : sectionRoute(section))}
+              />
+            </div>
+          )}
+          {seen.includes('movies') && (
+            <div hidden={route.page !== 'browse'}>
+              <CatalogPage section="movies" onOpen={openMovie} {...catalog} />
+            </div>
+          )}
+          {(['series', 'anime', 'musicvideos', 'books'] as const)
+            .filter((x) => seen.includes(x))
+            .map((x) => (
+              <div key={x} hidden={!(route.page === 'section' && route.section === x)}>
+                {x === 'musicvideos' ? (
+                  <MusicVideosPage
+                    onOpen={openMovie}
+                    onOpenFolder={(id) => go({ page: 'folder', id })}
+                    onPlayQueue={playQueue}
+                    {...catalog}
+                  />
+                ) : (
+                  <CatalogPage
+                    section={x}
+                    onOpen={x === 'books' ? openBook : openShow}
+                    {...catalog}
+                    {...(x === 'books' ? { onPlay: playOrOpenBook } : {})}
+                  />
+                )}
+              </div>
+            ))}
+          {route.page === 'folder' && (
+            <FolderPage
+              key={route.id}
+              session={session}
+              id={route.id}
+              overrides={overrides}
+              onOpenFolder={(id) => go({ page: 'folder', id })}
+              onOpenLibrary={() => go(sectionRoute('musicvideos'))}
+              onOpenVideo={openMovie}
+              onPlayQueue={playQueue}
+              onBack={() => back(sectionRoute('musicvideos'))}
+            />
+          )}
+          {musicSeen && musicLibraries.length > 0 && (
+            <div hidden={!onMusic}>
+              <Suspense fallback={<PageLoading />}>
+                <MusicPage
+                  session={session}
+                  libraries={musicLibraries}
+                  tab={musicTab}
+                  visit={musicVisit}
+                  onTab={(tab) => go({ page: 'music', tab })}
+                  onOpenAlbum={openAlbum}
+                  onOpenArtist={openArtist}
+                  onOpenPlaylist={openPlaylist}
+                />
+              </Suspense>
+            </div>
+          )}
+          {onMusic && sections.status === 'ready' && musicLibraries.length === 0 && (
+            <p className="py-24 text-center text-neutral-400">
+              {t('This account has no music libraries. Add one in Jellyfin (a library of type Music) and it will appear here.')}
+            </p>
+          )}
+          {(route.page === 'album' || route.page === 'artist' || route.page === 'playlist') && (
+            <Suspense fallback={<PageLoading />}>
+              {route.page === 'album' && (
+                <AlbumPage key={route.id} session={session} id={route.id} onBack={backToMusic} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
+              )}
+              {route.page === 'artist' && (
+                <ArtistPage key={route.id} session={session} id={route.id} onBack={backToMusic} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
+              )}
+              {route.page === 'playlist' && (
+                <PlaylistPage key={route.id} session={session} id={route.id} onBack={backToMusic} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
+              )}
+            </Suspense>
+          )}
+          {route.page === 'collections' && (
+            <Suspense fallback={<PageLoading />}>
+              <CollectionsPage session={session} onOpen={openCollection} onBack={() => back({ page: 'browse' })} />
+            </Suspense>
+          )}
+          {route.page === 'collection' && (
+            <Suspense fallback={<PageLoading />}>
+              <CollectionPage
+                key={route.id}
+                session={session}
+                id={route.id}
+                overrides={overrides}
+                onPlay={(item) => go({ page: 'play', id: item.id, startOver: false, collectionId: route.id })}
+                onOpen={openMovie}
+                onBack={() => back({ page: 'collections' })}
               />
             </Suspense>
-          </div>
-        )}
-        {onMusic && sections.status === 'ready' && musicLibraries.length === 0 && (
-          <p className="py-24 text-center text-neutral-400">
-            {t('This account has no music libraries. Add one in Jellyfin (a library of type Music) and it will appear here.')}
-          </p>
-        )}
-        {(route.page === 'album' || route.page === 'artist' || route.page === 'playlist') && (
-          <Suspense fallback={<PageLoading />}>
-            {route.page === 'album' && (
-              <AlbumPage key={route.id} session={session} id={route.id} onBack={backToMusic} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
-            )}
-            {route.page === 'artist' && (
-              <ArtistPage key={route.id} session={session} id={route.id} onBack={backToMusic} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
-            )}
-            {route.page === 'playlist' && (
-              <PlaylistPage key={route.id} session={session} id={route.id} onBack={backToMusic} onOpenAlbum={openAlbum} onOpenArtist={openArtist} />
-            )}
-          </Suspense>
-        )}
-        {route.page === 'collections' && (
-          <Suspense fallback={<PageLoading />}>
-            <CollectionsPage session={session} onOpen={openCollection} onBack={() => back({ page: 'browse' })} />
-          </Suspense>
-        )}
-        {route.page === 'collection' && (
-          <Suspense fallback={<PageLoading />}>
-            <CollectionPage
-              key={route.id}
+          )}
+          {route.page === 'admin' && (
+            <Suspense fallback={<PageLoading />}>
+              <AdminPage session={session} onBack={() => back({ page: 'settings' })} />
+            </Suspense>
+          )}
+          {route.page === 'link' && (
+            <Suspense fallback={<PageLoading />}>
+              <LinkPage session={session} code={route.code} onDone={() => go(homeRoute, { replace: true })} />
+            </Suspense>
+          )}
+          {route.page === 'stats' && (
+            <Suspense fallback={<PageLoading />}>
+              <StatsPage session={session} onBack={() => back({ page: 'settings' })} />
+            </Suspense>
+          )}
+          {route.page === 'lists' && (
+            <Suspense fallback={<PageLoading />}>
+              <ListsPage session={session} onOpen={(id) => go({ page: 'list', id })} onBack={() => back(homeRoute)} />
+            </Suspense>
+          )}
+          {route.page === 'list' && (
+            <Suspense fallback={<PageLoading />}>
+              <ListPage
+                key={route.id}
+                session={session}
+                id={route.id}
+                overrides={overrides}
+                onPlay={(item) => go({ page: 'play', id: item.id, startOver: false, listId: route.id })}
+                onShuffle={(item, seed) => go({ page: 'play', id: item.id, startOver: false, listId: route.id, shuffle: seed })}
+                onOpenMovie={openMovie}
+                onOpenSeries={openSeries}
+                onBack={() => back({ page: 'lists' })}
+              />
+            </Suspense>
+          )}
+          {route.page === 'search' && (
+            <SearchPage
+              key={route.q}
+              term={route.q}
               session={session}
-              id={route.id}
               overrides={overrides}
-              onPlay={(item) => go({ page: 'play', id: item.id, startOver: false, collectionId: route.id })}
-              onOpen={openMovie}
-              onBack={() => back({ page: 'collections' })}
-            />
-          </Suspense>
-        )}
-        {route.page === 'admin' && (
-          <Suspense fallback={<PageLoading />}>
-            <AdminPage session={session} onBack={() => back({ page: 'settings' })} />
-          </Suspense>
-        )}
-        {route.page === 'link' && (
-          <Suspense fallback={<PageLoading />}>
-            <LinkPage session={session} code={route.code} onDone={() => go(homeRoute, { replace: true })} />
-          </Suspense>
-        )}
-        {route.page === 'stats' && (
-          <Suspense fallback={<PageLoading />}>
-            <StatsPage session={session} onBack={() => back({ page: 'settings' })} />
-          </Suspense>
-        )}
-        {route.page === 'lists' && (
-          <Suspense fallback={<PageLoading />}>
-            <ListsPage session={session} onOpen={(id) => go({ page: 'list', id })} onBack={() => back(homeRoute)} />
-          </Suspense>
-        )}
-        {route.page === 'list' && (
-          <Suspense fallback={<PageLoading />}>
-            <ListPage
-              key={route.id}
-              session={session}
-              id={route.id}
-              overrides={overrides}
-              onPlay={(item) => go({ page: 'play', id: item.id, startOver: false, listId: route.id })}
-              onShuffle={(item, seed) => go({ page: 'play', id: item.id, startOver: false, listId: route.id, shuffle: seed })}
+              hasMusic={musicLibraries.length > 0}
+              hasMusicVideos={sections.status === 'ready' && sections.data.musicvideos.length > 0}
+              hasBooks={sections.status === 'ready' && sections.data.books.length > 0}
+              onOpenBook={openBook}
               onOpenMovie={openMovie}
-              onOpenSeries={openSeries}
-              onBack={() => back({ page: 'lists' })}
+              onOpenShow={openShow}
+              onOpenCollection={openCollection}
+              onOpenAlbum={openAlbum}
+              onOpenArtist={openArtist}
+              onPlay={(episode: Episode) => play(episode)}
+              // Only when a modules container is there with Seerr working: the offer to look the title up there.
+              {...(seerrReady ? { onSearchSeerr: (term: string) => go({ page: 'modules', module: 'seerr', q: term }) } : {})}
             />
-          </Suspense>
-        )}
-        {route.page === 'search' && (
-          <SearchPage
-            key={route.q}
-            term={route.q}
-            session={session}
-            overrides={overrides}
-            hasMusic={musicLibraries.length > 0}
-            hasMusicVideos={sections.status === 'ready' && sections.data.musicvideos.length > 0}
-            hasBooks={sections.status === 'ready' && sections.data.books.length > 0}
-            onOpenBook={openBook}
-            onOpenMovie={openMovie}
-            onOpenShow={openShow}
-            onOpenCollection={openCollection}
-            onOpenAlbum={openAlbum}
-            onOpenArtist={openArtist}
-            onPlay={(episode: Episode) => play(episode)}
-            // Only when a modules container is there with Seerr working: the offer to look the title up there.
-            {...(seerrReady ? { onSearchSeerr: (term: string) => go({ page: 'modules', module: 'seerr', q: term }) } : {})}
-          />
-        )}
-        {route.page === 'movie' && (
-          <DetailsPage
-            key={route.id}
-            session={session}
-            id={route.id}
-            onPlay={play}
-            onOpen={openMovie}
-            onPerson={(person) => go({ page: 'person', id: person.id, name: person.name })}
-            onBack={() => back(homeRoute)}
-            onChanged={remember}
-          />
-        )}
-        {route.page === 'show' && (
-          <Suspense fallback={<PageLoading />}>
-            <SeriesPage
+          )}
+          {route.page === 'movie' && (
+            <DetailsPage
               key={route.id}
               session={session}
               id={route.id}
-              onPlay={(episode) => play(episode)}
-              onOpen={openShow}
+              onPlay={play}
+              onOpen={openMovie}
               onPerson={(person) => go({ page: 'person', id: person.id, name: person.name })}
               onBack={() => back(homeRoute)}
               onChanged={remember}
             />
-          </Suspense>
-        )}
-        {(route.page === 'section' && route.section === 'livetv') || route.page === 'live' ? (
-          <div hidden={route.page !== 'section'}>
+          )}
+          {route.page === 'show' && (
             <Suspense fallback={<PageLoading />}>
-              <LiveTvPage session={session} paused={route.page === 'live'} onPlay={(channel) => go({ page: 'live', id: channel.id })} />
+              <SeriesPage
+                key={route.id}
+                session={session}
+                id={route.id}
+                onPlay={(episode) => play(episode)}
+                onOpen={openShow}
+                onPerson={(person) => go({ page: 'person', id: person.id, name: person.name })}
+                onBack={() => back(homeRoute)}
+                onChanged={remember}
+              />
             </Suspense>
-          </div>
-        ) : null}
-        {route.page === 'book' && (
-          <Suspense fallback={<PageLoading />}>
-            <BookPage
+          )}
+          {(route.page === 'section' && route.section === 'livetv') || route.page === 'live' ? (
+            <div hidden={route.page !== 'section'}>
+              <Suspense fallback={<PageLoading />}>
+                <LiveTvPage session={session} paused={route.page === 'live'} onPlay={(channel) => go({ page: 'live', id: channel.id })} />
+              </Suspense>
+            </div>
+          ) : null}
+          {route.page === 'book' && (
+            <Suspense fallback={<PageLoading />}>
+              <BookPage
+                key={route.id}
+                session={session}
+                id={route.id}
+                onRead={(book) => go({ page: 'read', id: book.id })}
+                onListen={listen}
+                onBack={() => back({ page: 'section', section: 'books' })}
+                onChanged={remember}
+              />
+            </Suspense>
+          )}
+          {route.page === 'settings' && (
+            <Suspense fallback={<PageLoading />}>
+              <SettingsPage session={session} onBack={() => back(homeRoute)} onSignOut={onSignOut} onStats={() => go({ page: 'stats' })} onAdmin={() => go({ page: 'admin' })} />
+            </Suspense>
+          )}
+          {route.page === 'modules' && (
+            <Suspense fallback={<PageLoading />}>
+              <ModulesPage session={session} module={route.module} join={route.join} query={route.q} go={go} back={back} homeRoute={homeRoute} />
+            </Suspense>
+          )}
+          {route.page === 'person' && (
+            <PersonPage
               key={route.id}
               session={session}
               id={route.id}
-              onRead={(book) => go({ page: 'read', id: book.id })}
-              onListen={listen}
-              onBack={() => back({ page: 'section', section: 'books' })}
-              onChanged={remember}
+              name={route.name}
+              overrides={overrides}
+              onOpen={openMovie}
+              onBack={() => back(homeRoute)}
             />
-          </Suspense>
-        )}
-        {route.page === 'settings' && (
-          <Suspense fallback={<PageLoading />}>
-            <SettingsPage session={session} onBack={() => back(homeRoute)} onSignOut={onSignOut} onStats={() => go({ page: 'stats' })} onAdmin={() => go({ page: 'admin' })} />
-          </Suspense>
-        )}
-        {route.page === 'modules' && (
-          <Suspense fallback={<PageLoading />}>
-            <ModulesPage session={session} module={route.module} join={route.join} query={route.q} go={go} back={back} homeRoute={homeRoute} />
-          </Suspense>
-        )}
-        {route.page === 'person' && (
-          <PersonPage
-            key={route.id}
-            session={session}
-            id={route.id}
-            name={route.name}
-            overrides={overrides}
-            onOpen={openMovie}
-            onBack={() => back(homeRoute)}
-          />
-        )}
+          )}
+        </ErrorBoundary>
       </main>
       <ShortcutsDialog />
       <SetupWizard suppressed={kids.enabled} />

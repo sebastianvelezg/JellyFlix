@@ -76,6 +76,8 @@ Each app's README has its features, how to host or install it, its architecture 
 - Keep changes focused. A bug fix does not need a refactor next to it.
 - Add or update tests with the behaviour. For the web app the mock server in `web/test/mock/mockJellyfin.ts` is the model of Jellyfin; extend it rather than faking at the call site.
 - Do not add a dependency lightly. Say what it costs (size, licence, maintenance) in the pull request.
+- The first screen of the web app has a size ceiling (`web/scripts/size-budget.json`, checked by `npm run size`). It is not to be raised: move code out of the first screen (a lazy route) instead.
+- A change to an answer of the modules container updates `modules/contract/` (and `npm run contract:sync` for the web copy) and the examples in `modules/contract/examples/` (see `modules/README.md`).
 
 ## Adding a language
 

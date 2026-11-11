@@ -47,9 +47,22 @@ export function createSeerrClient(baseUrl: string, apiKey: string, fetchImpl: Fe
 async function readLimited(res: Response): Promise<string> {
   const length = Number(res.headers.get('content-length') ?? 0)
   if (length > MAX_BYTES) throw new HttpError(502, 'Seerr sent more than expected.')
-  const text = await res.text()
-  if (text.length > MAX_BYTES) throw new HttpError(502, 'Seerr sent more than expected.')
-  return text
+  if (!res.body) return ''
+  // Read by pieces and stop at the limit, so an answer with no (or a false) length cannot fill the memory.
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > MAX_BYTES) {
+      await reader.cancel().catch(() => undefined)
+      throw new HttpError(502, 'Seerr sent more than expected.')
+    }
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks).toString('utf8')
 }
 
 /**

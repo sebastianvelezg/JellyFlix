@@ -248,7 +248,7 @@ fun Avatar(profile: Profile, size: Int) {
 private fun PinGate(vm: AppViewModel, profile: Profile) {
     var attempt by remember { mutableIntStateOf(0) }
     var wrong by remember { mutableStateOf(false) }
-    var wait by remember { mutableIntStateOf(((profile.lockedUntil - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0)) }
+    var wait by remember { mutableIntStateOf(profile.waitLeftSeconds(System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime())) }
     // A PIN is being checked (off the main thread): the pad does not send another one meanwhile.
     var checking by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -305,7 +305,7 @@ fun PinTaskScreen(vm: AppViewModel, task: app.jellyflix.tv.PinTask) {
     var first by remember { mutableStateOf("") }
     var attempt by remember { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }
-    var wait by remember { mutableIntStateOf(((profile.lockedUntil - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0)) }
+    var wait by remember { mutableIntStateOf(profile.waitLeftSeconds(System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime())) }
     var checking by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(wait > 0) {
