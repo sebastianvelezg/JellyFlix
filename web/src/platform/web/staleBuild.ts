@@ -21,6 +21,8 @@ export function reloadForStaleBuild(reload: () => void = () => location.reload()
 
 export function watchForStaleBuild(): void {
   window.addEventListener('vite:preloadError', (event) => {
+    // Offline, a file fails because there is no network, not because the build is old: a reload would only lose the page's state.
+    if (!navigator.onLine) return
     if (reloadForStaleBuild()) event.preventDefault()
   })
 }
