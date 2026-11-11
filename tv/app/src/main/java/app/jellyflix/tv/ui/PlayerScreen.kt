@@ -62,6 +62,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem as PlayerMediaItem
@@ -70,10 +72,11 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaSession
+import app.jellyflix.tv.authorizedHttp
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
 import app.jellyflix.tv.ChannelUi
@@ -104,6 +107,9 @@ private fun seekStep(repeat: Int): Long = when {
 }
 private const val HIDE_AFTER_MS = 4_000L
 private const val REPORT_EVERY_MS = 10_000L
+/** A converted stream that breaks is asked for again this many times, this long after each failure, before the viewer is told. */
+private const val MAX_RETRIES = 2
+private const val RETRY_AFTER_MS = 2_000L
 
 /** What the player asks of the app around it. */
 class PlayerActions(
@@ -124,6 +130,8 @@ class PlayerActions(
     /** The "Next episode" button, shown in the last stretch of an episode. */
     val onNextEpisode: () -> Unit,
     val onExit: () -> Unit,
+    /** The video failed for good (the converted stream broke and retrying did not help): say so, and leave. */
+    val onFailed: () -> Unit = onExit,
     /** A live channel: change to the one before (-1) or after (+1) this one. */
     val onChannelStep: (Int) -> Unit = {},
     /** A live channel: the names of the channels before and after it, for the hint that says what up and down do. */
@@ -158,9 +166,7 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val player = remember(plan) {
-        val http = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(mapOf("Authorization" to "MediaBrowser Token=\"$accessToken\""))
-            .setAllowCrossProtocolRedirects(true)
+        val http = authorizedHttp(plan.url, accessToken)
         val item = PlayerMediaItem.Builder().setUri(plan.url).apply {
             plan.subtitleUrl?.let { url ->
                 setSubtitleConfigurations(
@@ -291,6 +297,16 @@ fun PlayerScreen(
         showControls()
     }
 
+    // Failed tries since the picture last played, and the signal to try again (after a short wait, cancelled if the screen goes).
+    var retries by remember(player) { mutableStateOf(0) }
+    var retryTick by remember(player) { mutableStateOf(0) }
+    LaunchedEffect(retryTick) {
+        if (retryTick > 0) {
+            delay(RETRY_AFTER_MS)
+            player.prepare()
+        }
+    }
+
     DisposableEffect(player) {
         var audioApplied = false
         val listener = object : Player.Listener {
@@ -320,6 +336,7 @@ fun PlayerScreen(
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 playing = isPlaying
+                if (isPlaying) retries = 0
             }
 
             override fun onPlaybackStateChanged(state: Int) {
@@ -329,15 +346,34 @@ fun PlayerScreen(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                if (!plan.transcoding) actions.onFallback(now()) else actions.onExit()
+                if (!plan.transcoding) {
+                    actions.onFallback(now())
+                } else if (retries < MAX_RETRIES) {
+                    // A converted stream that breaks (a Wi-Fi hiccup) is asked for again, from where it was, before giving up.
+                    retries += 1
+                    retryTick += 1
+                } else {
+                    actions.onFailed()
+                }
             }
         }
         player.addListener(listener)
+        // The system knows a video is playing: voice commands, Bluetooth and HDMI-CEC remotes and the "Now playing" card reach it.
+        val mediaSession = MediaSession.Builder(context, player).setId("jellyflix-video").build()
         onDispose {
             player.removeListener(listener)
             actions.onStopped(player.currentPosition)
+            mediaSession.release()
             player.release()
         }
+    }
+
+    // Home, another app or the TV going to sleep stop the activity but leave this screen composed: without this the picture would play on
+    // unseen (the sound over the launcher, the next episode chained and marked as watched). It is paused and the server told where it was;
+    // it is not resumed by itself, the viewer presses play.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        if (player.playWhenReady) player.pause()
+        actions.onProgress(player.currentPosition, true)
     }
 
     // What another Jellyfin app asks of this video ("Play on the TV" from the web: pause, resume, seek, stop, next).

@@ -2,7 +2,8 @@ import { BaseItemKind } from '@jellyfin/sdk/lib/generated-client/models/base-ite
 import { getInstantMixApi } from '@jellyfin/sdk/lib/utils/api/instant-mix-api'
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api'
 import type { Session } from './jellyfin'
-import { getFavoriteTracks, getRandomTracks, getRecentlyPlayedTracks, toTrack, type Track } from './music'
+import { ItemSortBy } from '@jellyfin/sdk/lib/generated-client/models/item-sort-by'
+import { getFavoriteTracks, getMusicGenres, getRandomTracks, getRecentlyPlayedTracks, toTrack, type Track } from './music'
 
 /**
  * Songs picked for you. "Radio" is the server's own instant mix (songs that go with an artist, an album or a song);
@@ -185,3 +186,67 @@ export async function buildMixOfTheDay(session: Session, libraryId: string | und
   ]
   return blendMix(parts, DAY_MIX_SIZE)
 }
+
+// ---- more mixes: genres, decades, a surprise, the favourites ---------------------------------------------------------
+
+/** The decades that get a mix (their first year and their name), and how many genres get one each day. */
+export const DECADES: ReadonlyArray<readonly [number, string]> = [
+  [1980, '80s'],
+  [1990, '90s'],
+  [2000, '2000s'],
+  [2010, '2010s'],
+  [2020, '2020s'],
+]
+export const GENRE_MIXES = 3
+/** How many songs a mix has when it is played (what is read to show its covers is only a handful). */
+export const MIX_SIZE = 40
+
+/** The ten years of a decade. Pure. */
+export const decadeYears = (start: number): number[] => Array.from({ length: 10 }, (_, i) => start + i)
+
+/** Random songs of a genre or of some years. */
+export async function getRandomTracksWhere(session: Session, libraryId: string | undefined, where: { genre?: string; years?: number[] }, limit: number): Promise<Track[]> {
+  const { data } = await getLibraryApi(session.api).getItems({
+    userId: session.userId,
+    parentId: libraryId,
+    includeItemTypes: [BaseItemKind.Audio],
+    recursive: true,
+    genres: where.genre ? [where.genre] : undefined,
+    years: where.years,
+    sortBy: [ItemSortBy.Random],
+    limit,
+    enableUserData: true,
+    enableImages: true,
+    imageTypeLimit: 1,
+  })
+  return toTracks(data.Items)
+}
+
+/** What kind of mix it is, the name it is made from (a genre, a decade; empty for the others), a few songs to show its covers, and how to get all of them. */
+export interface MixSpec {
+  kind: 'surprise' | 'genre' | 'decade'
+  label: string
+  tracks: Track[]
+  play: () => Promise<Track[]>
+}
+
+/**
+ * The mixes that come from the whole library and not from what you play: a surprise (random songs), a few genres (a different few
+ * each day) and the decades that have songs. Each one reads only a handful of songs now (for its covers) and all of them when it is
+ * played. A mix that gives nothing, or fails, is left out. `seed` should be the day plus something of yours.
+ */
+export async function buildLibraryMixes(session: Session, libraryId: string | undefined, seed: string): Promise<MixSpec[]> {
+  const none = [] as Track[]
+  const genres = await getMusicGenres(session, libraryId).catch(() => [] as string[])
+  const chosen = seededShuffle(genres, `${seed}:genres`).slice(0, GENRE_MIXES)
+  const specs: Array<{ kind: MixSpec['kind']; label: string; read: (limit: number) => Promise<Track[]> }> = [
+    { kind: 'surprise', label: '', read: (limit) => getRandomTracks(session, libraryId, limit) },
+    ...chosen.map((genre) => ({ kind: 'genre' as const, label: genre, read: (limit: number) => getRandomTracksWhere(session, libraryId, { genre }, limit) })),
+    ...DECADES.map(([start, name]) => ({ kind: 'decade' as const, label: name, read: (limit: number) => getRandomTracksWhere(session, libraryId, { years: decadeYears(start) }, limit) })),
+  ]
+  const samples = await Promise.all(specs.map((spec) => spec.read(4).catch(() => none)))
+  return specs.flatMap((spec, i) => ((samples[i] as Track[]).length > 0 ? [{ kind: spec.kind, label: spec.label, tracks: samples[i] as Track[], play: () => spec.read(MIX_SIZE) }] : []))
+}
+
+/** The favourites in a new order for the day (the same all day). Pure. */
+export const favoritesMix = (favorites: readonly Track[], seed: string): Track[] => seededShuffle(favorites, `${seed}:favorites-mix`).slice(0, MIX_SIZE)

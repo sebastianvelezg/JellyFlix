@@ -5,7 +5,9 @@ import { BlockedTitle, getKidsGuard, guardResponse, guardUrl } from './parental'
 import { createGate, priorityOf } from './requestGate'
 
 export const CLIENT_NAME = 'Jellyflix Web'
-export const CLIENT_VERSION = '1.7.2'
+declare const __APP_VERSION__: string | undefined
+/** Injected from package.json when building (and testing); a tool that does not run through Vite gets a plain "0.0.0". */
+export const CLIENT_VERSION: string = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'
 
 const REQUEST_TIMEOUT_MS = 15_000
 

@@ -13,12 +13,13 @@ export interface JellyfinClient {
 
 const TIMEOUT_MS = 20_000
 
-function authorization(token: string): string {
+function authorizationFor(token: string, version: string): string {
   // Jellyfin 12 refuses the token as a query value; the header is the way. The client name only shows up in its dashboard.
-  return `MediaBrowser Client="Jellyflix Modules", Device="modules", DeviceId="jellyflix-modules", Version="0.1.0", Token="${token}"`
+  return `MediaBrowser Client="Jellyflix Modules", Device="modules", DeviceId="jellyflix-modules", Version="${version}", Token="${token}"`
 }
 
-export function createJellyfinClient(baseUrl: string, apiKey: string | undefined, fetchImpl: FetchLike = fetch): JellyfinClient {
+export function createJellyfinClient(baseUrl: string, apiKey: string | undefined, fetchImpl: FetchLike = fetch, version = '0.0.0'): JellyfinClient {
+  const authorization = (token: string): string => authorizationFor(token, version)
   async function call<T>(path: string, token: string, query: Record<string, string | number | boolean | string[] | undefined> = {}): Promise<T> {
     const url = new URL(baseUrl + path)
     for (const [key, value] of Object.entries(query)) {

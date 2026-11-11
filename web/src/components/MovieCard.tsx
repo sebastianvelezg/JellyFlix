@@ -14,7 +14,7 @@ import {
 import { CardMenu } from './CardMenu'
 import { useCardActions, usePlayVideo } from './cardActions'
 import type { PlayQueueRef } from './route'
-import { CheckIcon, HeartIcon, InfoIcon, PlayIcon } from './icons'
+import { CheckIcon, HeadphonesIcon, HeartIcon, InfoIcon, PlayIcon } from './icons'
 import { Img } from './Img'
 import { useAppearance } from '../platform/web/appearance'
 import { Subtext } from './Subtext'
@@ -128,7 +128,8 @@ export function MovieCard({
   const runtime = movie.runtimeTicks ? formatRuntime(ticksToSeconds(movie.runtimeTicks)) : undefined
   // A music video's picture is a wide frame, not a poster; the artist goes under the title.
   const wide = !!movie.musicVideo
-  const subtext = wide ? [movie.artist, movie.year].filter(Boolean).join(' · ') : movie.book ? [kindLabel, movie.year].filter(Boolean).join(' · ') : movie.year
+  // A book's line says who wrote it (or, when that is not known, what kind it is) and when.
+  const subtext = wide ? [movie.artist, movie.year].filter(Boolean).join(' · ') : movie.book ? [movie.author || kindLabel, movie.year].filter(Boolean).join(' · ') : movie.year
   const canPlay = wide && !!playVideo
 
   return (
@@ -140,7 +141,7 @@ export function MovieCard({
       aria-label={t('Open {label}', { label })}
       {...hover}
     >
-      <div className={`${wide ? 'aspect-video' : 'aspect-[2/3]'} ${frame}`}>
+      <div className={`${wide ? 'aspect-video' : 'aspect-[2/3]'} ${frame} ${movie.book ? '!rounded-lg shadow-[0_12px_28px_-16px_rgba(0,0,0,0.9)]' : ''}`}>
         <Img
           session={session}
           src={wide ? wideImageUrl(session.serverUrl, { ...movie, backdropTag: undefined }) : posterUrl(session.serverUrl, movie)}
@@ -148,6 +149,18 @@ export function MovieCard({
           fallback={<Placeholder name={movie.name} />}
         />
         <HoverPlay runtime={runtime} real={canPlay} />
+        {movie.book && (
+          // The edge of the spine: a thin line and a soft light across the cover, so it reads as a book.
+          <>
+            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[5%] w-px bg-white/25" />
+            <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/[.12] via-transparent to-black/20" />
+          </>
+        )}
+        {movie.book === 'audiobook' && (
+          <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-black/65 p-1.5 text-neutral-100 backdrop-blur" title={t('Audiobook')}>
+            <HeadphonesIcon />
+          </span>
+        )}
         {movie.favorite && (
           <span className="absolute left-2 top-2 rounded-full bg-black/60 p-1 text-rose-400 backdrop-blur" title={t('Favorite')}>
             <HeartIcon filled />

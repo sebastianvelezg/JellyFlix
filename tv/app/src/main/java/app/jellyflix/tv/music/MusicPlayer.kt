@@ -13,8 +13,9 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
+import app.jellyflix.tv.authorizedHttp
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.jellyflix.tv.data.SleepChoice
 import app.jellyflix.tv.data.Song
@@ -33,13 +34,13 @@ interface MusicReporter {
  */
 class MusicPlayer(
     context: Context,
+    serverUrl: String,
     token: String,
     private val urlFor: (Song) -> String,
     private val reporter: MusicReporter,
 ) {
-    private val http = DefaultHttpDataSource.Factory()
-        .setDefaultRequestProperties(mapOf("Authorization" to "MediaBrowser Token=\"$token\""))
-        .setAllowCrossProtocolRedirects(true)
+    // (The token goes only to the server's own host: the address of a song tells which.)
+    private val http = authorizedHttp(serverUrl, token)
 
     val player: ExoPlayer = ExoPlayer.Builder(context)
         .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(http))
@@ -49,6 +50,10 @@ class MusicPlayer(
         )
         .setHandleAudioBecomingNoisy(true)
         .build()
+
+    // Tells the system what is playing, so the voice assistant ("pause", "next"), Bluetooth and HDMI-CEC remotes and the "Now playing"
+    // card reach this player.
+    private val mediaSession = MediaSession.Builder(context, player).setId("jellyflix-music").build()
 
     var queue by mutableStateOf<List<Song>>(emptyList())
         private set
@@ -215,6 +220,7 @@ class MusicPlayer(
     fun release() {
         handler.removeCallbacks(sleepNow)
         reported?.let { reporter.stopped(it, positionMs) }
+        mediaSession.release()
         player.release()
     }
 }

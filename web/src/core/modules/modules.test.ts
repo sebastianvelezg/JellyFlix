@@ -47,12 +47,12 @@ describe('the address of the modules container', () => {
 describe('addresses a link may name', () => {
   const trust = (address: string) => isTrustedModulesAddress(address, 'flix.example.com', 'https://jellyfin.example.com')
   it('accepts this site, the Jellyfin server, a path and addresses inside a home network', () => {
-    for (const ok of ['/modules', 'https://flix.example.com:8097', 'http://jellyfin.example.com:8097', 'http://192.168.1.10:8097', 'http://10.0.0.5:8097', 'http://172.20.1.1:8097', 'http://nas.local:8097', 'http://localhost:8097']) {
+    for (const ok of ['/modules', 'https://flix.example.com:8097', 'http://jellyfin.example.com:8097', 'http://192.168.1.10:8097', 'http://10.0.0.5:8097', 'http://172.20.1.1:8097', 'http://nas.local:8097', 'http://localhost:8097', 'http://100.101.2.3:8097', 'http://169.254.1.1:8097', 'http://[fd12:3456::1]:8097', 'http://[fe80::1]:8097', 'http://[::1]:8097']) {
       expect(trust(ok), ok).toBe(true)
     }
   })
   it('refuses a stranger: the app would send the session token there', () => {
-    for (const bad of ['https://evil.example', 'http://172.32.0.1:8097', 'http://192.169.1.1', 'http://8.8.8.8:8097', 'https://flix.example.com.evil.example', 'http://localhost.evil.example']) {
+    for (const bad of ['https://evil.example', 'http://172.32.0.1:8097', 'http://192.169.1.1', 'http://8.8.8.8:8097', 'https://flix.example.com.evil.example', 'http://localhost.evil.example', 'http://100.128.0.1:8097', 'http://100.63.0.1:8097', 'http://[2001:db8::1]:8097', 'http://[fec0::1]:8097']) {
       expect(trust(bad), bad).toBe(false)
     }
   })

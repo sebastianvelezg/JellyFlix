@@ -9,18 +9,18 @@ import type {
   Guide,
   Program,
 } from './contract'
-import type { ModulesClient } from './client'
+import { SLOW_REQUEST_TIMEOUT_MS, type ModulesClient } from './client'
 
 export const listChannels = (client: ModulesClient) => client.get<ChannelSummary[]>('/v1/channels')
 export const getChannel = (client: ModulesClient, id: string) => client.get<Channel>(`/v1/channels/${encodeURIComponent(id)}`)
-export const createChannel = (client: ModulesClient, def: ChannelDef) => client.post<Channel>('/v1/channels', def)
-export const updateChannel = (client: ModulesClient, id: string, def: ChannelDef) => client.put<Channel>(`/v1/channels/${encodeURIComponent(id)}`, def)
+export const createChannel = (client: ModulesClient, def: ChannelDef) => client.post<Channel>('/v1/channels', def, SLOW_REQUEST_TIMEOUT_MS)
+export const updateChannel = (client: ModulesClient, id: string, def: ChannelDef) => client.put<Channel>(`/v1/channels/${encodeURIComponent(id)}`, def, SLOW_REQUEST_TIMEOUT_MS)
 export const deleteChannel = (client: ModulesClient, id: string) => client.del<{ ok: true }>(`/v1/channels/${encodeURIComponent(id)}`)
-export const rebuildChannel = (client: ModulesClient, id: string) => client.post<Channel>(`/v1/channels/${encodeURIComponent(id)}/rebuild`)
-export const refreshChannel = (client: ModulesClient, id: string) => client.post<Channel>(`/v1/channels/${encodeURIComponent(id)}/refresh`)
-export const previewChannel = (client: ModulesClient, def: ChannelDef) => client.post<ChannelPreview>('/v1/channels/preview', def)
+export const rebuildChannel = (client: ModulesClient, id: string) => client.post<Channel>(`/v1/channels/${encodeURIComponent(id)}/rebuild`, undefined, SLOW_REQUEST_TIMEOUT_MS)
+export const refreshChannel = (client: ModulesClient, id: string) => client.post<Channel>(`/v1/channels/${encodeURIComponent(id)}/refresh`, undefined, SLOW_REQUEST_TIMEOUT_MS)
+export const previewChannel = (client: ModulesClient, def: ChannelDef) => client.post<ChannelPreview>('/v1/channels/preview', def, SLOW_REQUEST_TIMEOUT_MS)
 export const channelSuggestions = (client: ModulesClient) => client.get<ChannelSuggestions>('/v1/channels/suggestions')
-export const autoChannels = (client: ModulesClient, request: AutoChannelsRequest) => client.post<{ created: Channel[] }>('/v1/channels/auto', request)
+export const autoChannels = (client: ModulesClient, request: AutoChannelsRequest) => client.post<{ created: Channel[] }>('/v1/channels/auto', request, SLOW_REQUEST_TIMEOUT_MS)
 
 /** The programs around a moment (seconds, in the container's clock); the moment defaults to now. */
 export function channelWindow(client: ModulesClient, id: string, options: { at?: number; before?: number; after?: number } = {}) {

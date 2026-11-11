@@ -1,0 +1,105 @@
+{
+  "id": "34e1d6405d0b4b868125cc666c7b904c",
+  "code": "6AG5S",
+  "mode": "local",
+  "hostId": "u-admin",
+  "hostName": "Ana",
+  "filters": {
+    "genre": "Comedy"
+  },
+  "summary": {
+    "rounds": 1,
+    "firstRound": {
+      "total": 4,
+      "both": 1,
+      "percent": 25,
+      "liked": [
+        {
+          "id": "u-admin",
+          "name": "Ana",
+          "count": 1
+        }
+      ]
+    },
+    "picks": []
+  },
+  "version": 5,
+  "phase": "done",
+  "round": 1,
+  "me": "u-admin",
+  "members": [
+    {
+      "id": "u-admin",
+      "name": "Ana",
+      "done": true
+    }
+  ],
+  "deck": [
+    {
+      "id": "m02",
+      "name": "Film 2",
+      "kind": "Movie",
+      "year": 1991,
+      "overview": "About film 2",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 90
+    },
+    {
+      "id": "m05",
+      "name": "Film 5",
+      "kind": "Movie",
+      "year": 1994,
+      "overview": "About film 5",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 120
+    },
+    {
+      "id": "m08",
+      "name": "Film 8",
+      "kind": "Movie",
+      "year": 1997,
+      "overview": "About film 8",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 100
+    },
+    {
+      "id": "m11",
+      "name": "Film 11",
+      "kind": "Movie",
+      "year": 2000,
+      "overview": "About film 11",
+      "genres": [
+        "Comedy"
+      ],
+      "runtimeMinutes": 80
+    }
+  ],
+  "myVotes": {
+    "m02": "like",
+    "m05": "pass",
+    "m08": "pass",
+    "m11": "pass"
+  },
+  "remaining": [],
+  "lastLiked": [
+    "m02"
+  ],
+  "winner": {
+    "id": "m02",
+    "name": "Film 2",
+    "kind": "Movie",
+    "year": 1991,
+    "overview": "About film 2",
+    "genres": [
+      "Comedy"
+    ],
+    "runtimeMinutes": 90
+  },
+  "winnerBy": "agreement"
+}

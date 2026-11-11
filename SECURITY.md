@@ -24,7 +24,9 @@ You can expect an answer within about a week. This is a volunteer project, so th
   server's WebSocket (a browser cannot add headers to a socket), which is how Jellyfin's own web client works.
 - The web app is served with a strict Content-Security-Policy (only its own scripts run: no inline script, no `eval`, nothing from another site), and signing out also forgets
   the recent searches and the last Live TV channel kept in the browser.
-- On the TV the session is excluded from Android's cloud backup and from device-to-device transfer.
+- On the TV the session is excluded from Android's cloud backup and from device-to-device transfer. The TV's players add the token only to requests for the Jellyfin server's own host; a PIN on the TV (hashed with a salt) guards opening an account from that TV, and its wait after wrong tries does not depend on the TV's date.
+- In the modules container, the Jellyfin API key and the Seerr key are read from its environment, stay inside the container and are never put in an answer. A Match on phones is refused without the Jellyfin key, because without it the container cannot check what each person may watch. The apps' session token is only used to ask Jellyfin who is calling and to read the library as that person.
+- The TV release is signed with a key kept outside the repository; the release workflow refuses to publish without it and attaches the SHA-256 of the APK.
 - There is no telemetry and no server of ours to receive anything.
 
 ## Hosting advice

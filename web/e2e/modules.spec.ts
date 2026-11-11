@@ -224,10 +224,11 @@ test('with the container: a Modules tab, channels made in one go, and tuning in 
 
 test('Match on phones: the screen opens a lobby with a QR code, a phone joins by the link, the host starts it, the phone swipes, and the screen plays the winner and shows how it went', async ({ page, browser }) => {
   mock = await startMock({ movieCount: 20 })
-  const modulesUrl = await startContainer(mock.url)
+  const modulesUrl = await startContainer(mock.url, { JELLYFIN_API_KEY: 'service-key-for-match' })
   await withModulesAt(page, modulesUrl)
   await signIn(page, mock, { start: '/#/modules/match' })
 
+  // (A Match on phones needs the service key in the container: it is how the container knows what each person may watch.)
   // The first choice is how to play; the second what to watch (chips to tap).
   await expect(page.getByRole('heading', { name: 'What are we watching tonight?' })).toBeVisible()
   await axe(page, 'match start')

@@ -72,6 +72,17 @@ const MIGRATIONS: string[] = [
     updated_at INTEGER NOT NULL
   );
   `,
+  // 4: two channels never share a number. (If two already do, the later ones move to the numbers after the highest, so this cannot fail.)
+  `
+  CREATE TEMP TABLE duplicate_numbers AS
+    SELECT id, ROW_NUMBER() OVER (ORDER BY rowid) AS n FROM channels WHERE rowid NOT IN (SELECT MIN(rowid) FROM channels GROUP BY number);
+  UPDATE channels
+    SET number = (SELECT MAX(number) FROM channels WHERE id NOT IN (SELECT id FROM duplicate_numbers)) + (SELECT n FROM duplicate_numbers d WHERE d.id = channels.id)
+    WHERE id IN (SELECT id FROM duplicate_numbers);
+  UPDATE channels SET def = json_set(def, '$.number', number) WHERE id IN (SELECT id FROM duplicate_numbers);
+  DROP TABLE duplicate_numbers;
+  CREATE UNIQUE INDEX channels_number ON channels (number);
+  `,
 ]
 
 /** Opens (and creates) the database and brings its schema up to date. `path` may be ":memory:" for tests. */

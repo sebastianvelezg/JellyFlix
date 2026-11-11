@@ -15,6 +15,7 @@ import {
   type ChannelWindow,
   type Program,
 } from '../../../core/modules'
+import { doneWatching, markWatching, noteWatched, PENDING_SAVE_EVERY_SECONDS, restoreLeftOver } from '../../../platform/web/channelPending'
 import { t } from '../../../i18n'
 import { ChannelDownIcon, ChannelUpIcon, GuideIcon, NextEpisodeIcon, PreviousProgramIcon, StartOverIcon } from '../../icons'
 import { iconButton, type ChannelChrome } from '../../player/Controls'
@@ -82,6 +83,7 @@ export function ChannelPlayer({
   const [osd, setOsd] = useState<{ key: string; joined: number | null } | null>(null)
   const [tunedIn, setTunedIn] = useState(false)
   const played = useRef(0)
+  const lastSaved = useRef(0)
   // The program after the one in view, got ready while the viewer is near the end of this one.
   const ahead = useRef<{ key: string; movie: Promise<Movie>; plan: Promise<PlaybackPlan> } | null>(null)
   const programsRef = useRef<Program[]>([])
@@ -106,6 +108,11 @@ export function ChannelPlayer({
     setChannel(win.channel)
     setPrograms((before) => mergePrograms(before, win.programs))
   }, [])
+
+  // A title left half way by a page that died (closed tab, crash) gets its place back now.
+  useEffect(() => {
+    void restoreLeftOver(session)
+  }, [session])
 
   // ---- first look: what is on now, and where in it ------------------------------------------------------------------
   useEffect(() => {
@@ -152,6 +159,7 @@ export function ChannelPlayer({
     }
     let cancelled = false
     played.current = 0
+    lastSaved.current = 0
     // A program that was got ready ahead of time starts without asking the server again.
     const early = ahead.current?.key === programKey ? ahead.current : null
     ahead.current = null
@@ -160,6 +168,7 @@ export function ChannelPlayer({
       .then((found) => {
         if (cancelled) return
         resume.current = { itemId: found.id, ticks: found.resumeTicks, runtime: current.runtime }
+        markWatching(session.userId, found.id, found.resumeTicks, current.runtime)
         setMovie(found)
         setPrepared(early ? { plan: early.plan, nonce } : null)
       })
@@ -174,7 +183,10 @@ export function ChannelPlayer({
       resume.current = null
       setMovie(null)
       setPrepared(null)
-      if (left) window.setTimeout(() => void restoreResumePosition(session, left.itemId, left.ticks, played.current, left.runtime), TIDY_DELAY_MS)
+      if (left) {
+        const playedNow = played.current
+        window.setTimeout(() => void restoreResumePosition(session, left.itemId, left.ticks, playedNow, left.runtime).finally(() => doneWatching(session.userId, left.itemId)), TIDY_DELAY_MS)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, programKey])
@@ -200,6 +212,11 @@ export function ChannelPlayer({
     const onTime = (e: Event) => {
       if (!(e.target instanceof HTMLVideoElement)) return
       played.current = e.target.currentTime
+      // Written down now and then: if the page dies, the next visit knows where the channel left the title.
+      if (resume.current && Math.abs(played.current - lastSaved.current) >= PENDING_SAVE_EVERY_SECONDS) {
+        lastSaved.current = played.current
+        noteWatched(session.userId, resume.current.itemId, played.current)
+      }
       prepareAhead(e.target)
     }
     const onEnded = (e: Event) => {

@@ -331,7 +331,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val anime = LibraryState(Section.Anime)
     val musicVideos = LibraryState(Section.MusicVideos)
     val books = LibraryState(Section.Books)
-    val liveTv = LiveTvState().also { it.category = ChannelCategory.of(store.liveCategory) }
 
     /** The optional modules container: retro TV channels and Match. With no address set it never makes a request. */
     val modules = ModulesController(
@@ -353,9 +352,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         openById = { id -> launchSafe { session?.let { s -> open(io { repo.details(s, id) }) } } },
     )
 
-    /** The channel watched last, kept across visits (and forgotten on signing out). */
-    var lastChannel by mutableStateOf(store.lastChannel?.let { (id, name) -> runCatching { LastChannel(UUID.fromString(id), name) }.getOrNull() })
-        private set
+    /** Live TV: the channels, the guide, and the channel watched last. */
+    val live = LiveTvController(
+        launch = { block -> launchSafe(block) },
+        repo = repo,
+        store = store,
+        session = { session },
+        isBusy = { busy },
+        play = { item -> play(item, startMs = 0) },
+        fail = { fail(it) },
+    )
     val collectionList = LibraryState(Section.Collections)
 
     // Music
@@ -770,9 +776,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // The hash is slow on purpose, so it is not computed on the thread that draws the screen. One check at a time: two quick
         // presses cannot both be counted against the same number of wrong tries.
         val before = profiles
-        val result = withContext(Dispatchers.Default) { Pins.attempt(before, id, pin, System.currentTimeMillis()) }
+        val result = withContext(Dispatchers.Default) { Pins.attempt(before, id, pin, System.currentTimeMillis(), SystemClock.elapsedRealtime()) }
         when (result) {
-            is PinResult.Wrong -> result.book.find(id)?.let { commit(profiles.withAttempts(id, it.failures, it.lockedUntil)) }
+            is PinResult.Wrong -> result.book.find(id)?.let { commit(profiles.withAttempts(id, it.failures, it.lockedUntil, it.lockedWaitMs, it.lockedAtElapsed)) }
             PinResult.Right -> profiles.find(id)?.takeIf { it.failures > 0 || it.lockedUntil > 0 }?.let { commit(profiles.withAttempts(id, 0, 0)) }
             is PinResult.Waiting -> Unit
         }
@@ -812,7 +818,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         errorText = null
         errorRes = null
         tab = Tab.Home
-        lastChannel = store.lastChannel?.let { (id, name) -> runCatching { LastChannel(UUID.fromString(id), name) }.getOrNull() }
+        live.restoreLast()
         hidden = store.hidden
         // The look is each account's own.
         appearance = store.appearance
@@ -936,13 +942,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         screensaverShown = false
         screensaverPictures = emptyList()
         screensaverFor = null
-        lastChannel = null
+        live.forgetLast()
         libs = null
         hasCollections = false
         pages.clear()
         resetHome()
         for (lib in listOf(movies, series, anime, musicVideos, books, collectionList)) resetLibrary(lib)
-        liveTv.reset()
+        live.state.reset()
         results = null
         musicResults = emptyList<Album>() to emptyList()
         query = ""
@@ -1015,99 +1021,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val state = libraryOf(next)
         if (state != null && !state.loaded) loadMore(state)
         if (next == Tab.Music) loadMusic()
-        if (next == Tab.LiveTv && !liveTv.loaded) loadLiveTv()
-    }
-
-    // ---- Live TV ------------------------------------------------------------------------------------------------
-
-    /** Reads the next page of channels (from the start when [restart] is set), then what comes after each one's current programme. */
-    fun loadLiveTv(restart: Boolean = false) {
-        val s = session ?: return
-        if (restart) liveTv.reset()
-        if (liveTv.loading || (liveTv.loaded && liveTv.channels.size >= liveTv.total)) return
-        liveTv.loading = true
-        val category = liveTv.category
-        val generation = liveTv.generation
-        launchSafe {
-            try {
-                val page = io { repo.channels(s, liveTv.channels.size, LIVE_PAGE, category) }
-                if (generation != liveTv.generation) return@launchSafe
-                liveTv.channels.addAll(page.items)
-                page.total?.let { liveTv.total = it }
-                liveTv.loaded = true
-                refreshUpNext(page.items)
-            } catch (e: Exception) {
-                fail(e)
-            } finally {
-                // Only the load that belongs to the list now showing may say it is done.
-                if (generation == liveTv.generation) liveTv.loading = false
-            }
-        }
-    }
-
-    private fun refreshUpNext(channels: List<TvChannel>) {
-        val s = session ?: return
-        launchSafe {
-            val now = System.currentTimeMillis()
-            val found = runCatching { io { repo.programs(s, channels.map { it.id }, now, now + 3 * 3_600_000L) } }.getOrDefault(emptyMap())
-            liveTv.upNext = liveTv.upNext + found.mapNotNull { (id, programs) -> nextProgram(programs, now)?.let { id to it } }
-        }
-    }
-
-    fun showGuide(guide: Boolean) {
-        liveTv.guide = guide
-    }
-
-    /** Narrows the channels to one kind (the arrows of the player then change channel inside it). It is remembered. */
-    fun setLiveCategory(category: ChannelCategory) {
-        if (liveTv.category == category) return
-        liveTv.category = category
-        store.liveCategory = category.key
-        loadLiveTv(restart = true)
-    }
-
-    /** Watches a channel. */
-    fun watch(channel: TvChannel) = play(channel.item, startMs = 0)
-
-    /** Goes back to the channel watched last. */
-    fun watchLast() {
-        val s = session ?: return
-        val last = lastChannel ?: return
-        liveTv.channels.firstOrNull { it.id == last.id }?.let { return watch(it) }
-        launchSafe {
-            try {
-                play(io { repo.details(s, last.id) }, startMs = 0)
-            } catch (e: Exception) {
-                fail(e)
-            }
-        }
-    }
-
-    /** The names of the channels before and after this one in the list being browsed, for the hint in the player. */
-    fun liveNeighbours(plan: PlaybackPlan): Pair<String, String>? {
-        val before = neighbourChannel(liveTv.channels, plan.item.id, -1) ?: return null
-        val after = neighbourChannel(liveTv.channels, plan.item.id, 1) ?: return null
-        return before.label to after.label
-    }
-
-    private fun rememberChannel(item: MediaItem) {
-        val last = LastChannel(item.id, splitChannelName(item.title).title)
-        lastChannel = last
-        store.lastChannel = last.id.toString() to last.name
-    }
-
-    /** Changes channel from the player: the one [step] places on in the list (the list is read first when it has not been). */
-    fun stepChannel(plan: PlaybackPlan, step: Int) {
-        val s = session ?: return
-        if (busy) return
-        launchSafe {
-            // The list being browsed (it may be only the favorites); when it does not hold this channel, the first page of all of them.
-            var list: List<TvChannel> = liveTv.channels
-            if (list.none { it.item.id == plan.item.id }) {
-                list = runCatching { io { repo.channels(s, 0, LIVE_PAGE) } }.getOrNull()?.items ?: return@launchSafe
-            }
-            neighbourChannel(list, plan.item.id, step)?.let { play(it.item, startMs = 0) }
-        }
+        if (next == Tab.LiveTv && !live.state.loaded) live.load()
     }
 
     /**
@@ -1126,7 +1040,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private companion object {
-        const val LIVE_PAGE = 60
         const val SCREENSAVER_CHECK_MS = 10_000L
     }
 
@@ -1649,7 +1562,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 launchFor(s) { io { repo.reportSongProgress(s, song, positionMs, paused) } }
             }
         }
-        val player = MusicPlayer(getApplication(), s.accessToken, { repo.audioUrl(s, it) }, reporter)
+        val player = MusicPlayer(getApplication(), s.serverUrl, s.accessToken, { repo.audioUrl(s, it) }, reporter)
         music = player
         musicTicker = launchSafe {
             while (true) {
@@ -1683,6 +1596,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** A short confirmation over the screen ("Added to Watch later"); it goes away by itself. */
+    /** The video could not go on: the player is left and the reason is shown over the screen that follows. */
+    fun playbackFailed() {
+        back()
+        errorRes = R.string.error_play_lost
+    }
+
     var notice by mutableStateOf<String?>(null)
         private set
 
@@ -2168,7 +2087,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     val resume = if (target === item) startMs else target.resumeMs
                     val plan = io { repo.plan(s, target, null, null, resume, mediaSourceId = mediaSourceId.takeIf { target === item }, limits = settings.limits, remembered = rememberedFor(target)) }
-                    if (target.isChannel) rememberChannel(target)
+                    if (target.isChannel) live.remember(target)
                     val top = pages.lastIndex
                     if (top >= 0 && pages[top] is Page.Player) pages[top] = Page.Player(plan) else pages.add(Page.Player(plan))
                     if (target.kind == BaseItemKind.MUSIC_VIDEO && playContext == null) queueFolderOf(s, target)

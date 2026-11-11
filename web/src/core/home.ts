@@ -170,8 +170,11 @@ const FRESH_TRIES = 8
 export async function getFreshSeries(session: Session, libraryIds: string[], random = Math.random): Promise<FreshSeries | null> {
   for (const libraryId of libraryIds.length ? shuffle(libraryIds, random) : [undefined]) {
     const candidates = await getRandomTitles(session, 'series', { libraryId, unwatched: true, limit: FRESH_TRIES })
-    for (const show of candidates) {
-      const episodes = (await getEpisodes(session, show.id, { limit: 30 }).catch(() => [])).filter((e) => e.seasonNumber !== 0)
+    // Every candidate is looked at at once (not one after the other); the first that qualifies, in the order picked, is the one used.
+    const looked = await Promise.all(
+      candidates.map(async (show) => ({ show, episodes: (await getEpisodes(session, show.id, { limit: 30 }).catch(() => [])).filter((e) => e.seasonNumber !== 0) })),
+    )
+    for (const { show, episodes } of looked) {
       const first = episodes[0]
       if (first && !episodes.some((e) => e.played || e.resumeTicks > 0)) return { show, episode: first }
     }

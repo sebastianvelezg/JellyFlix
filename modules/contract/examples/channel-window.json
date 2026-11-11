@@ -1,0 +1,69 @@
+{
+  "serverTime": 1800000000,
+  "channel": {
+    "id": "d58876fcec3e4c8097cbac425a5028ab",
+    "number": 7,
+    "name": "Comedy",
+    "color": "#e5484d",
+    "favorite": false
+  },
+  "programs": [
+    {
+      "start": 1800000000,
+      "end": 1800005400,
+      "itemId": "m17",
+      "title": "Film 17",
+      "type": "Movie",
+      "runtime": 5400
+    },
+    {
+      "start": 1800005400,
+      "end": 1800012000,
+      "itemId": "m29",
+      "title": "Film 29",
+      "type": "Movie",
+      "runtime": 6600
+    },
+    {
+      "start": 1800012000,
+      "end": 1800018000,
+      "itemId": "m23",
+      "title": "Film 23",
+      "type": "Movie",
+      "runtime": 6000
+    },
+    {
+      "start": 1800018000,
+      "end": 1800025200,
+      "itemId": "m05",
+      "title": "Film 5",
+      "type": "Movie",
+      "runtime": 7200
+    },
+    {
+      "start": 1800025200,
+      "end": 1800032400,
+      "itemId": "m20",
+      "title": "Film 20",
+      "type": "Movie",
+      "runtime": 7200
+    },
+    {
+      "start": 1800032400,
+      "end": 1800037200,
+      "itemId": "m26",
+      "title": "Film 26",
+      "type": "Movie",
+      "runtime": 4800
+    },
+    {
+      "start": 1800037200,
+      "end": 1800042000,
+      "itemId": "m11",
+      "title": "Film 11",
+      "type": "Movie",
+      "runtime": 4800
+    }
+  ],
+  "currentIndex": 0
+}

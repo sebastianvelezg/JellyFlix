@@ -5,6 +5,47 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-11
+
+A new look for Retro TV, music and books, and an audit of the web app, the TV app and the modules container with what it found fixed. Container 0.3.0 has a new migration (made by itself when it starts), and a Match on phones now needs the Jellyfin API key.
+
+### Fixed
+- **The TV stops the video when the app leaves the screen.** Pressing Home, switching to another app or the TV going to sleep now pauses the video and tells Jellyfin where it was, instead of letting it play on unseen (and chain the next episode). It does not resume by itself. Music keeps playing, as before.
+- **The TV tries again before giving up when a converted stream breaks.** A hiccup of the network during a conversion is retried twice, from where it was; if it still fails the player closes with "Playback stopped: the connection to the server was lost." instead of closing without a word.
+- **Match can no longer get stuck.** When nobody agreed and there were no films left (or Jellyfin could not answer), the last vote was lost and the room could not go on. The votes are kept and everybody chooses a favourite among the last cards, so the room always finishes.
+- **Match asks Jellyfin about the other people in batches of 50 titles.** With the "series" or "length" filter, up to 300 titles went in one address, which Jellyfin refuses above 8 kB.
+- **Retro TV puts back the place a title had even if the page dies.** Watching a channel moves the title's place in Jellyfin and the page put it back when you left; if the tab was closed first, it was not put back. The place is now written down on this device while you watch and put back on the next visit.
+- **Making Retro TV channels no longer looks like a failure.** Making, editing, previewing and reading channels wait up to two minutes (they read the library), and *Quick channels* makes one channel per request; if it stops half way, the ones already made are not made again.
+- **Two Retro TV channels can no longer have the same number** (a new migration; if a container already had duplicates, the later ones are moved to the numbers after the highest instead of failing to start).
+- **Seerr:** a search checks the request limit before looking for the account; an account that is not in Seerr is remembered for a minute (typing in the search box no longer asks Seerr with each key); an answer from Seerr is read in pieces and cut at 4 MB even without a length.
+- **A page that fails shows an error inside the page,** with *Try again* and *Reload*, and the menu and the music go on. (The error screen existed but was not in use.) After an update, a tab that asks for a file of the old build reloads itself once.
+- **The wait after wrong PINs on the TV cannot be ended by changing the date** of the TV. It uses the device's running clock; restarting the TV and changing the date still skips it.
+- **The links `?modules=` accept Tailscale (100.64.0.0/10), link-local and local IPv6 addresses** as part of your network, asking first like other local addresses.
+- **The TV sends the sign-in token only to the Jellyfin server's own host** for video, subtitles and music. (A redirect that the server itself sends is still followed with the same headers.)
+- **The TV tells Jellyfin its real version and its device id** in the audio address and in the stats query, and the container and the web app take their version from their `package.json`.
+- **`tv/gradlew.bat` no longer shows up as changed on every checkout.**
+
+### Added
+- **The TV tells the system what is playing** (a media session for video and one for music): voice commands to the assistant, Bluetooth and HDMI-CEC remotes and the "now playing" card reach the player while the app is open.
+- **Contract examples for the TV.** The container's tests keep example answers in `modules/contract/examples/` and the TV's tests read them with its own parsers, so a change in an answer that the TV does not follow makes a test fail.
+- **A section about backups in `modules/README.md`** (how to take a consistent copy of `modules.db` from a running container and restore it).
+- **CI builds the TV's release variant (R8) on every change,** and the release workflow now stops if the signing key is not in the repository secrets, and attaches the SHA-256 of the APK.
+- **Dependabot also watches `modules/`** (npm and Docker), and the container's base image is pinned by digest.
+
+### Changed
+- **Match on phones needs the Jellyfin API key in the container** (the TV app's Match only plays on phones). Without it, the container could not know what each account may watch and would have shown titles to accounts that cannot open them. Retro TV and a Match on one device work without it.
+- **Without `JELLYFLIX_ORIGINS`, the container opens no site to browsers when it sits behind the web image's proxy** (`JELLYFLIX_TRUST_PROXY=1`); elsewhere it still accepts any.
+- The TV logs through `slf4j-nop` instead of `logback-android` (the APK is 64 kB smaller; the SDK's own logs are no longer kept).
+- The size budget of the first screen is a ceiling (256 kB of JavaScript, 23 kB of CSS, gzip) and is not to be raised again.
+- The Live TV code of the TV moved out of `AppViewModel` into its own class, without changing what it does.
+- **Retro TV looks better, with the pictures in front.** *On now* shows each channel as a card: a banner in the colour of the channel with its picture big in the middle, its number and its star, then what is on (with how far along it is and how many minutes are left) and what comes next; the whole card tunes in. Favourites have a heading of their own. The guide and *Set up* follow the same look (bigger pictures, a mark of how far along the programme on now is, a dot where *now* crosses the time ruler, and the channels of *Set up* as cards in two columns).
+- **The music page is redone, with the art in front.** A side column lists the sections (home, albums, artists, songs) and *Your mixes* (on a narrow screen the sections stay a row of pills above the page). The home opens with a big card for the mix of the day (with its covers laid out like a pile of records) and *Pick up where you left off*, then shelves of albums with *See library* links and arrows, and the most played and favourite songs as a table with the names of its columns. Albums, artists and songs have a title of their own above their controls. Only the look changes; the player and the top bar are as they were.
+- **More mixes.** Besides the mix of the day there are mixes of your favourites (in a new order each day), the radio of four artists you play most (it was two), a surprise, three genres (a different three each day) and the decades from the 80s that have songs: ten or more. The big card at the top of the music home shows them one after another every six seconds (it stays while you hover over it, and with reduced motion it does not move), and the dots and arrows go to one directly. *Make another mix* is now in the side column.
+- **The books page looks like a shelf.** It opens with a big card that goes through the books you are reading (how far you are, and a button to go on) and then the newest ones, one every five seconds: the book in the middle slides to the left, the one on the right takes its place and a new one comes in on the right (it stays while you hover over it, and the dots go to a book directly). The rows have a plain title with their link and arrows, book covers have the edge of a spine, a book's line says who wrote it when that is known, and an audiobook has a small headphones mark. *Continue listening* (audiobooks) is no longer called *Continue watching*.
+
+### Fixed
+- **The menu of a card (the "⋯" button) is no longer cut off by its row.** In rows such as *Continue watching* the menu was drawn inside the row, so it was cut at the row's edge and the row could be scrolled up and down inside itself. The menu is now drawn over the page, under the button (or over it when there is no room), always inside the window.
+
 ## [1.7.2] - 2026-11-10
 
 The guide of Retro TV, made to be used with many channels.

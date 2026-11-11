@@ -7,9 +7,10 @@ import { createApp } from '../src/app.ts'
 import { openDb } from '../src/db/db.ts'
 import { createJellyfinClient } from '../src/jellyfin/client.ts'
 import type { Config } from '../src/config.ts'
-import { fakeJellyfin } from './fakeJellyfin.ts'
+import { fakeJellyfin, SERVICE_KEY } from './fakeJellyfin.ts'
 
-const config: Config = { port: 0, host: '127.0.0.1', jellyfinUrl: 'http://jellyfin.test', apiKey: undefined, modules: ['channels', 'match'], dataDir: ':memory:', origins: ['*'], trustProxy: false, seerrUrl: undefined, seerrApiKey: undefined, version: '0.0.0-test' }
+// (With the container's own key: a Match on phones needs it, to know what everybody in the room may watch.)
+const config: Config = { port: 0, host: '127.0.0.1', jellyfinUrl: 'http://jellyfin.test', apiKey: SERVICE_KEY, modules: ['channels', 'match'], dataDir: ':memory:', origins: ['*'], trustProxy: false, seerrUrl: undefined, seerrApiKey: undefined, version: '0.0.0-test' }
 
 let server: Server
 let base = ''
@@ -18,7 +19,7 @@ const fake = fakeJellyfin()
 
 before(async () => {
   const db = openDb(':memory:')
-  const app = createApp({ config, db, jellyfin: createJellyfinClient(config.jellyfinUrl, undefined, fake.fetch), clock: () => now })
+  const app = createApp({ config, db, jellyfin: createJellyfinClient(config.jellyfinUrl, SERVICE_KEY, fake.fetch), clock: () => now })
   server = createServer((req, res) => void app.handler(req, res))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -346,6 +347,27 @@ describe('match', () => {
     const first = new Set(started.deck.map((c) => c.id))
     assert.ok(view.deck.every((c) => !first.has(c.id) && c.genres.includes('Comedy')))
     assert.deepEqual(view.filters, { genre: 'Comedy' })
+  })
+
+  it('when nobody agrees and no films are left, keeps the last votes and lets everybody choose a favourite', async () => {
+    // There are ten comedies: sets of 4, 4 and 2 are dealt, and everybody passes on every one.
+    const started = await phonesRoom({ deckSize: 4, genre: 'Comedy' })
+    let view = started
+    for (let guard = 0; guard < 6 && view.phase === 'swipe'; guard += 1) {
+      for (const c of view.deck) {
+        await swipeAs('tok-admin', started.id, c.id, 'pass')
+        await swipeAs('tok-ben', started.id, c.id, 'pass')
+      }
+      view = await room('tok-ben', started.id)
+    }
+    assert.equal(view.phase, 'pick', 'the room is not stuck in the swiping')
+    assert.equal(view.deck.length, 2)
+    // They choose, and the Match ends with a winner.
+    await call('POST', `/v1/match/rooms/${started.id}/pick`, 'tok-admin', { cardId: view.deck[0]!.id })
+    await call('POST', `/v1/match/rooms/${started.id}/pick`, 'tok-ben', { cardId: view.deck[0]!.id })
+    view = await room('tok-ben', started.id)
+    assert.equal(view.phase, 'done')
+    assert.equal(view.winner?.id, view.deck[0]!.id)
   })
 
   it('only deals the films that fit the filters, and says what they were', async () => {

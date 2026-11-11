@@ -1,5 +1,23 @@
+import { readFileSync } from 'node:fs'
 import type { ModuleId } from '../../contract/index.ts'
 import { MODULE_IDS } from '../../contract/index.ts'
+
+/** The version in package.json (the one place it is written), read once at start. */
+function packageVersion(): string {
+  try {
+    const parsed = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version?: unknown }
+    return typeof parsed.version === 'string' ? parsed.version : '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+
+/** The sites allowed to call from a browser: the list given, else any ("*"), else none when the container sits behind the proxy. */
+export function originsOf(listed: string, behindProxy: boolean): string[] {
+  const given = listed.split(',').map((x) => x.trim()).filter(Boolean)
+  if (given.length > 0) return given
+  return behindProxy ? [] : ['*']
+}
 
 export interface Config {
   port: number
@@ -51,10 +69,12 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     apiKey: clean(env.JELLYFIN_API_KEY) || undefined,
     modules: [...new Set(asked)] as ModuleId[],
     dataDir: clean(env.DATA_DIR) || './data',
-    origins: (clean(env.JELLYFLIX_ORIGINS) || '*').split(',').map((x) => x.trim()).filter(Boolean),
+    // Unset: any site may call it from a browser (it uses tokens, not cookies), except behind the web image's proxy, where the app and
+    // the container share one address and no browser call crosses sites, so nothing is opened.
+    origins: originsOf(clean(env.JELLYFLIX_ORIGINS), /^(1|true|yes)$/i.test(clean(env.JELLYFLIX_TRUST_PROXY))),
     trustProxy: /^(1|true|yes)$/i.test(clean(env.JELLYFLIX_TRUST_PROXY)),
     seerrUrl,
     seerrApiKey: clean(env.SEERR_API_KEY) || undefined,
-    version: '0.2.2',
+    version: packageVersion(),
   }
 }

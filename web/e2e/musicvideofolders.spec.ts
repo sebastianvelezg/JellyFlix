@@ -166,6 +166,8 @@ test('a playlist of music videos can be shuffled (and the section has no Playlis
   await picker.getByLabel('New playlist name').fill('Mix tape')
   await picker.getByRole('button', { name: 'Create' }).click()
   await expect(picker).toBeHidden()
+  // The notice of the first playlist sits over the bottom of the window, so the button is brought to the middle first.
+  await more('002').evaluate((el) => el.scrollIntoView({ block: 'center' }))
   await more('002').click({ force: true })
   await page.getByRole('menuitem', { name: 'Add to a playlist…' }).click()
   await picker.getByRole('button', { name: /^Mix tape/ }).click()

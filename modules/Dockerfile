@@ -1,8 +1,8 @@
-# Jellyflix Modules: the optional container with extra modules (retro TV channels, Match).
+# Jellyflix Modules: the optional container with extra modules (retro TV channels, Match, and Seerr when it is turned on).
 #   docker build -t jellyflix-modules .        (from this folder)
 # It has no dependencies to install: Node runs the TypeScript files as they are (type stripping) and keeps its data in SQLite (node:sqlite).
-# The base image is a tag here; Dependabot proposes updates (pin it by digest, as the web image does, when publishing releases).
-FROM node:24-alpine
+# The base image is pinned by digest (the same one the web image builds with); Dependabot proposes updates to it.
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
 
 ENV NODE_ENV=production \
     DATA_DIR=/data \

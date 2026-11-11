@@ -18,6 +18,8 @@ What differs is how it is used: everything is built for a remote control and a T
 ### Sign in
 - **Sign in with a code (Quick Connect)** or with server address, user and password; the session and the last address are remembered. The screen shows a large six-digit code; you type it in Jellyfin on a phone or computer
   (user menu, Quick Connect, or the web client's Settings → Devices) and the TV signs in by itself, so nothing is typed with the remote. The server needs Quick Connect on (Dashboard → General).
+- **Several accounts on one TV.** Add the other people of the house (password or Quick Connect) and a *Who's watching?* screen opens at the start. Each account has its own Home, libraries, history, look and optional **PIN** (4 to 6 digits, kept only as a salted hash; after five wrong tries in a row the next try waits 30 seconds, doubling up to fifteen minutes; the wait cannot be ended by changing the TV's date). The PIN guards opening the account from this TV; what the account may watch is still decided by Jellyfin. Switching stops the video or music of the account in use.
+- **A QR code beside the Quick Connect code.** Scanning it opens a page of the web app that asks, with the code in front of you, whether to let that TV sign in as you. The QR holds only the web app's address and the six digits.
 - A rejected token (revoked from the Jellyfin dashboard) returns to the sign-in screen with a message; a network failure shows a message instead of closing the app.
 - The tabs depend on the libraries the account has: Home, Movies, Series, Anime, Music videos, Books, Live TV, Music, Collections, Search, Settings. Appearance → Top menu changes their order and turns some off (Home stays; Search and Settings always stay at the right end), and Appearance → Menu buttons shows icons and names, only icons or only names. The bar scrolls with the remote, so Settings is always reachable.
 
@@ -62,6 +64,10 @@ What differs is how it is used: everything is built for a remote control and a T
 - **Pictures on the seek bar** (trickplay) when the server has made them. Nothing is asked until the bar first shows, then only the one sheet that holds the picture is downloaded.
 - **Info panel** (the Info button or the remote's Info key): how the title is played (as it is, or converted, with the picture copied or re-encoded and **why**), the file's container and bitrate, video, audio, what the player is decoding right now with dropped frames, and what the screen is doing.
 - **Frame-rate matching**: "seamless only" asks the screen for the video's rate when that does not blink; "always" also switches the screen to the mode that suits the video (24 Hz for a film) and puts it back after.
+- **Leaving the app pauses the video.** Home, another app or the TV going to sleep pause it and tell Jellyfin where it was; it does not resume by itself. If a converted stream breaks (a Wi-Fi hiccup) the player asks for it again twice before closing with a message.
+- **Are you still watching?** After 2, 3, 4, 6 or 8 titles in a row that began by themselves (never by default; Settings, Playback), the next one waits for your answer and playback stops if nobody answers in a minute. A **sleep timer** (15 to 120 minutes, or at the end of the episode) is in the player's buttons.
+- **Hide from Continue watching / Next up.** The long-press menu of a card hides a title from *Continue watching* or a series from *Next up* (kept for each account on this TV; *Undo* at once, *Restore* in Settings). Jellyfin has no way to hide them, so nothing you have watched changes.
+- **The system knows what plays:** a media session for video and music, so the assistant's voice commands and Bluetooth or HDMI-CEC remotes reach the player while the app is open.
 - Position and watched state go back to Jellyfin. Errors are shown in plain words; a spinner shows while a video is being prepared and while it buffers.
 
 ### Music
@@ -107,7 +113,7 @@ Settings → Appearance (the choices stay on the TV):
 ### Modules (optional)
 With the optional `jellyflix-modules` container running (see [`modules/`](../modules/README.md)) a **Modules** button appears in the top bar; without it the app asks for nothing and shows nothing. Set it up in **Settings > Modules**: the container's address (for example `http://192.168.1.10:8097`) and the web app's address (so the QR code of a Match opens it on a phone); both have a "use the suggested one" button built from the server's address.
 - **Retro TV**: channels made from your library, shown as a grid of what is on now and as a guide. Tuning in plays the title that is on, at the right minute. The player shows one glass panel with what is on, start over, previous / next program, go live, channel up/down (the remote's CH keys and Up / Down also change channel) and the guide of the channel over the picture; a card says what is on and next when the program changes, and the next one is prepared before the current one ends. Channels are made on the web app (administrators only).
-- **Match**: the TV is the screen only. It creates the room, shows a QR code and the people who joined, and when the host starts, everybody swipes on their phone; the TV shows the rounds and plays the winner.
+- **Match**: the TV is the screen only. It needs the Jellyfin API key in the modules container (that is how the container knows what each person may watch); without it the TV shows the container's message. It creates the room, shows a QR code and the people who joined, and when the host starts, everybody swipes on their phone; the TV shows the rounds and plays the winner.
 
 ### Settings
 In tabs (left and right move between the tabs, down goes into the open one):
@@ -120,7 +126,7 @@ In tabs (left and right move between the tabs, down goes into the open one):
 | **Display** | text size (normal, large, larger) and **screen margin** for TVs that cut off the edges of the picture (everything except the video stays inside it), and what this TV plays |
 | **Appearance** | see above |
 | **Plugins** | see above |
-| **Account** | who is signed in, Your stats, clear the picture cache, sign out (asks twice) |
+| **Account** | who is signed in, the other accounts of this TV (add, remove, PIN), *Sync preferences* (optional: theme, menu, Home rows and a few playback choices the same as on the web app), the titles you hid, Your stats, clear the picture cache, sign out (asks twice) |
 
 <p align="center"><img src="../docs/screenshots/tv-settings.jpg" alt="Settings, Playback" width="70%"></p>
 
@@ -254,12 +260,12 @@ Jellyfin returns playlist ids without dashes, so they are never parsed as UUIDs.
 
 ## Testing and compatibility
 
-- **Logic:** the pure parts have JVM unit tests (`./gradlew testDebugUnitTest`), including one that fails if a list call forgets to say whether it needs a count.
+- **Logic:** the pure parts have JVM unit tests (`./gradlew testDebugUnitTest`), including one that fails if a list call forgets to say whether it needs a count and one that reads the example answers of the modules container (`modules/contract/examples/`) with the TV's own parsers. Every change also builds the release variant (R8) in CI.
 - **Screens:** checked by hand on the Android Studio `Television_1080p` emulator (Google TV, API 36) against a real Jellyfin 12.x server: sign-in with Quick Connect, Home, library grids with the letter jump, series and movie pages, search, Settings,
   music playback with the now-playing bar, video playback (direct play and the server's HLS conversion), the Info panel, chapters, the Google TV *Continue watching* row and a title started from the web app.
 - **Devices:** Android TV and Google TV running Android 9 or newer. The emulator only offers software decoders and one 60 Hz mode, so a few things can only be confirmed on a real TV: HDR and Dolby decisions, 4K, the automatic frame-rate switch,
   a screen that crops the picture (the *Screen margin* setting) and the version picker for merged titles. If you try one of these, please [open an issue](https://github.com/sebastianvelezg/JellyFlix/issues/new/choose) with what you saw.
-- **Modules on the TV:** the data layer, the QR code and the channel logic have unit tests; the Modules screens and the channel player were compiled and built (debug and release) but **have not been tried on a screen yet**; try them with a container on your network and report what you see.
+- **Modules on the TV:** the data layer, the QR code and the channel logic have unit tests; the Modules screens and the channel player were built (debug and release) and checked on the Android TV emulator against the container (tuning a channel, the guide, the player panel, the Match lobby with its QR) but **not on a physical TV**; try them with a container on your network and report what you see.
 - **Servers:** developed against Jellyfin 12.x. Skip intro / recap / credits need segments from the server (for example the Intro Skipper plugin); without them the buttons simply do not appear.
 - **Not built:** voice search, music playing after you leave the app, server discovery on the network, recording and timers for live TV, a reader for books, watching together (SyncPlay), Kids mode, trailers and the first-run setup (web only for now). Administration tools are on the web app only, on purpose.
 

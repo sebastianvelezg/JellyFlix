@@ -63,6 +63,7 @@
     <string name="player_pause">Pausar</string>
     <string name="player_play">Reproducir</string>
     <string name="error_play">No se pudo iniciar la reproducción.</string>
+    <string name="error_play_lost">La reproducción se detuvo: se perdió la conexión con el servidor.</string>
     <string name="error_channel">Este canal no arrancó. Puede estar fuera del aire o bloqueado donde está el servidor. Prueba con otro.</string>
     <string name="error_nothing_to_play">Aún no hay nada que reproducir.</string>
 

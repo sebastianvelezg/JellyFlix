@@ -7,7 +7,6 @@ import {
   filterNextUp,
   filterResume,
   getContinueEpisodes,
-  getBooks,
   getContinueWatching,
   getFeaturedPool,
   getNextUp,
@@ -32,7 +31,8 @@ import {
   type TitleKind,
   type WatchFilter,
 } from '../core'
-import { BOOK_FINISHED_PERCENT, readAllBookProgress, readBrowsePrefs, readUiPrefs, writeBrowsePrefs } from '../platform/web/prefs'
+import { readBrowsePrefs, readUiPrefs, writeBrowsePrefs } from '../platform/web/prefs'
+import { BooksTop, useReadingBooks } from './BooksHome'
 import { CollectionsRow } from './CollectionCard'
 import { HeroCarousel, HeroSkeleton } from './Hero'
 import { FiltersButton, FiltersPanel } from './LibraryFilters'
@@ -41,6 +41,7 @@ import { usePlayVideo } from './cardActions'
 import { ContinueCard, RowCard } from './MovieCard'
 import { PagedGrid } from './PagedGrid'
 import { Row } from './Row'
+import { Shelf } from './Shelf'
 import { LazyMount } from './LazyMount'
 import { LetterBar } from './LetterBar'
 import { Toolbar, ToolbarSelect } from './Toolbar'
@@ -119,6 +120,31 @@ function emptyLibraryText(kind: TitleKind, library: string): string {
         ? t('No books in “{library}” yet.', { library })
         : t('No music videos in “{library}” yet.', { library })
     : t('Nothing in “{library}” yet. If Jellyfin is still scanning this library, titles will appear here as soon as it finds them.', { library })
+}
+
+/** A titled row of cards; the books get the shelf look (a plain title, the link and the arrows at its right). */
+function Rail({ kind, title, seeAll, children }: { kind: TitleKind; title: string; seeAll?: { label: string; onClick: () => void }; children: ReactNode }) {
+  if (kind === 'book') {
+    return (
+      <Shelf title={title} action={seeAll}>
+        {children}
+      </Shelf>
+    )
+  }
+  return (
+    <Row
+      title={title}
+      action={
+        seeAll && (
+          <button type="button" className="text-[var(--color-accent)] hover:underline" onClick={seeAll.onClick}>
+            {seeAll.label}
+          </button>
+        )
+      }
+    >
+      {children}
+    </Row>
+  )
 }
 
 const kindOf = (section: Section): TitleKind => (section === 'movies' ? 'movie' : section === 'musicvideos' ? 'musicvideo' : section === 'books' ? 'book' : 'series')
@@ -257,10 +283,13 @@ function LibraryView({
           onBackdropFail={(title) => setFailed({ libraryId: library.id, ids: [...failedIds, title.id] })}
         />
       )}
-      <div className={`space-y-9 ${showRows && (bannerPending || featured.length > 0) ? 'relative -mt-14' : 'pt-6'}`}>
+      <div className={`${kind === 'book' ? 'space-y-10' : 'space-y-9'} ${showRows && (bannerPending || featured.length > 0) ? 'relative -mt-14' : 'pt-6'}`}>
         {toolbar}
         {showRows && (
           <>
+            {kind === 'book' && recent.status === 'ready' && (
+              <BooksTop session={session} playbackVersion={playbackVersion} recent={recent.data} onPlay={onPlay} onOpen={onOpen} />
+            )}
             {kind !== 'series' ? (
               <ContinueRow
                 kind={kind}
@@ -283,11 +312,11 @@ function LibraryView({
             )}
             {kind === 'book' && <ReadingRow key={`reading-${library.id}`} session={session} playbackVersion={playbackVersion} overrides={overrides} onOpen={onOpen} />}
             {recent.status === 'ready' && recent.data.length > 0 && (
-              <Row title={t('Recently added')}>
+              <Rail kind={kind} title={t('Recently added')}>
                 {recent.data.map((m) => (
                   <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} list={recent.data} />
                 ))}
-              </Row>
+              </Rail>
             )}
             {kind === 'movie' && (
               <LazyMount height={300}>
@@ -324,10 +353,14 @@ function LibraryView({
 
         <section aria-label={copy.all}>
           <div className="mb-4">
-            <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl">
-              <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)]" />
-              {library.name}
-            </h1>
+            {kind === 'book' ? (
+              <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">{library.name}</h1>
+            ) : (
+              <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight sm:text-2xl">
+                <span aria-hidden="true" className="h-6 w-1 rounded-full bg-[var(--color-accent)]" />
+                {library.name}
+              </h1>
+            )}
           </div>
           <Toolbar className="mb-4">
             {libraries.length > 1 && (
@@ -513,42 +546,24 @@ function GenreRow({
   const { state } = useSwr(swrKey(swrScope(session), 'genre-row', kind, libraryId, genre), load, { fresh: 5 * 60_000 })
   if (state.status !== 'ready' || state.data.length < MIN_IN_GENRE_ROW || rank >= GENRE_ROWS + 3) return null
   return (
-    <Row
-      title={t('Top rated in {genre}', { genre })}
-      action={
-        <button type="button" className="text-[var(--color-accent)] hover:underline" onClick={() => onSeeAll(genre)}>
-          {t('See all')}
-        </button>
-      }
-    >
+    <Rail kind={kind} title={t('Top rated in {genre}', { genre })} seeAll={{ label: t('See all'), onClick: () => onSeeAll(genre) }}>
       {state.data.map((m) => (
         <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} list={state.data} />
       ))}
-    </Row>
+    </Rail>
   )
 }
 
-/** "Continue reading": the books you opened in the reader and did not finish, from what this browser remembers (the server keeps no place in a book). */
+/** "Continue reading": the books you opened in the reader and did not finish (see {@link useReadingBooks}). */
 function ReadingRow({ session, playbackVersion, overrides, onOpen }: Pick<CatalogCommon, 'session' | 'playbackVersion' | 'overrides' | 'onOpen'>) {
-  // `playbackVersion` is part of the callback identity so the row is read again after the reader is closed.
-  const load = useCallback(async () => {
-    const saved = readAllBookProgress().filter(([, progress]) => progress.percent > 0 && progress.percent < BOOK_FINISHED_PERCENT).slice(0, 12)
-    const found = await getBooks(session, saved.map(([id]) => id))
-    const books = saved.flatMap(([id, progress]) => {
-      const book = found.find((b) => b.id === id)
-      // The picture's bar shows how far you are: the percent stands in for a position in a length of 100 000.
-      return book && book.book === 'book' ? [{ ...book, resumeTicks: progress.percent * 1000, runtimeTicks: 100_000 }] : []
-    })
-    return { books, playbackVersion }
-  }, [session, playbackVersion])
-  const { state } = useSwr(swrKey(swrScope(session), 'reading-books'), load, { fresh: 0 })
-  if (state.status !== 'ready' || state.data.books.length === 0) return null
+  const books = useReadingBooks(session, playbackVersion)
+  if (books.length === 0) return null
   return (
-    <Row title={t('Continue reading')}>
-      {state.data.books.map((m) => (
+    <Rail kind="book" title={t('Continue reading')}>
+      {books.map((m) => (
         <RowCard key={m.id} session={session} movie={overrides[m.id] ?? m} onOpen={onOpen} />
       ))}
-    </Row>
+    </Rail>
   )
 }
 
@@ -572,12 +587,12 @@ function ContinueRow({
   const movies = filterResume(hidden, state.data.rows.map((m) => overrides[m.id] ?? m).filter((m) => m.resumeTicks > 0))
   if (movies.length === 0) return null
   return (
-    <Row title={t('Continue watching')}>
+    <Rail kind={kind} title={kind === 'book' ? t('Continue listening') : t('Continue watching')}>
       {movies.map((m) => (
         // A music video goes on with the next ones of the row.
         <ContinueCard key={m.id} session={session} movie={m} rowKind="continue" onPlay={(v) => (v.musicVideo && playVideo ? playVideo(v, { list: movies }) : onPlay(v))} onOpen={onOpen} />
       ))}
-    </Row>
+    </Rail>
   )
 }
 
@@ -650,10 +665,10 @@ function FavoritesRow({
   const movies = [...added, ...state.data.map((m) => overrides[m.id] ?? m)].filter((m) => m.favorite)
   if (movies.length === 0) return null
   return (
-    <Row title={t('Your favorites')}>
+    <Rail kind={kind} title={t('Your favorites')}>
       {movies.map((m) => (
         <RowCard key={m.id} session={session} movie={m} onOpen={onOpen} list={movies} />
       ))}
-    </Row>
+    </Rail>
   )
 }

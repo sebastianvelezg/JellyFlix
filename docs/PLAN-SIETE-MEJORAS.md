@@ -1,5 +1,7 @@
 # Plan de siete mejoras en cuatro fases
 
+> **Documento histórico (en español).** El estado de abajo es el de 2026-11-09; lo construido desde entonces (varias cuentas con PIN, QR, ocultar títulos, "¿Sigues viendo?", sincronización de preferencias) está en el [changelog](../CHANGELOG.md). Las ramas que menciona ya están fusionadas.
+
 Estado (2026-11-09): **la fase 1 está construida en la rama `feature/tv-profiles` (sin commit) salvo lo de Google Play, que se **aparcó por decisión del usuario** (1.5-1.7 y el spike S5): por ahora no se publica nada y se sigue distribuyendo el APK como hasta ahora.** Las fases 2 y 3 también están construidas; la 4 (Seerr) pasó a ser un módulo (2026-11-10). Sobre `main` en `6706a37`, versión 1.5.0. **Las cuatro fases salen juntas en una sola versión, la 1.6.0** (decisión del 2026-11-09; las versiones 1.7-1.9 que aparecían antes ya no existen). Cada entrega se puede probar sola, y termina con tests, textos en los cinco idiomas web (y EN/ES en TV) y la comprobación de accesibilidad (`e2e/a11y.spec.ts`).
 
 Leyenda de dependencias: **J** = depende de Jellyfin (versión/servidor), **S** = depende de Seerr, **P** = depende de Google Play / Play Console. Tamaños: S = un día o menos, M = unos días, L = una semana o más.

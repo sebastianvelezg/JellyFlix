@@ -35,7 +35,19 @@ curl http://localhost:8097/v1/health
 
 Settings (in `.env`): `JELLYFIN_URL` (required), `JELLYFIN_API_KEY` (optional, see below), `JELLYFLIX_MODULES` (`channels,match`; add `seerr` to turn that one on), `SEERR_URL` and `SEERR_API_KEY` (only for Seerr), `MODULES_PORT` (`8097`), `JELLYFLIX_ORIGINS` (sites allowed to call it from a browser; empty means any, which is fine because it uses tokens, not cookies), `JELLYFLIX_TRUST_PROXY` (`1` only when the container is reached through the web image's `/modules/` proxy and its port is not published; see Exposure).
 
-**API key (optional).** Created in Jellyfin: *Dashboard → API keys*. With it the container refreshes each channel's list of titles by night and a Match leaves out films the other people already watched. Without it everything works; an administrator presses *Read titles again* on a channel after adding things to the library. The key never leaves the container.
+**API key (optional, but needed for a Match on phones).** Created in Jellyfin: *Dashboard → API keys*. With it the container refreshes each channel's list of titles by night, and a Match on phones checks what each person in the room may see and has watched. Without it Retro TV and a Match on one device work; an administrator presses *Read titles again* on a channel after adding things to the library; a Match on phones (and so the TV app's Match) is refused, because the container could not know what each account may watch. The key never leaves the container.
+
+### Backing up
+
+Everything the container keeps is one SQLite file, `modules.db`, in the `modules-data` volume: the channels you made, their pictures, the favourites and the Match rooms. If the volume is lost, the channels are lost with it (the lists of titles are read again from Jellyfin, but your channels' settings are not). To keep a copy, ask the running container for a consistent one (copying the file while it runs can catch it half written):
+
+```bash
+docker exec jellyflix-modules node --disable-warning=ExperimentalWarning -e "new (require('node:sqlite').DatabaseSync)('/data/modules.db').exec(\"VACUUM INTO '/data/backup.db'\")"
+docker cp jellyflix-modules:/data/backup.db ./modules-backup.db
+docker exec jellyflix-modules rm /data/backup.db
+```
+
+To restore it: `docker compose stop`, put the copy in the volume as `modules.db` (and delete `modules.db-wal` and `modules.db-shm` if they are there), then `docker compose up -d`. Keep the copy somewhere other than the machine that runs the container.
 
 ### Seerr
 
@@ -108,9 +120,9 @@ Not checked yet on a real server: playing with the channel buttons (the tests ra
 - **Who can do what.** Every route except `GET /v1/health` needs the person's own Jellyfin token; the container asks Jellyfin who it belongs to (`/Users/Me`, remembered for one minute under a hash; a refused token is remembered for ten seconds so made-up tokens do not become a flood of requests to Jellyfin). Making and changing channels is for administrators only. The token is never written to disk or to the log, and a value that does not look like a Jellyfin token is never passed on.
 - **What is stored.** `/data/modules.db` holds the channels (their rules, the lists of titles and the schedule) and the Match rooms (votes, for at most 7 days). No passwords, no tokens.
 - **Channels are for the whole server, but a guide is read by each person.** A channel is made by an administrator from what *that* administrator can see, and everybody who can sign in sees its guide. For each person the container asks Jellyfin, with that person's own token, which of the titles on show their account may see (a library hidden from them, an age limit). A title they may not see is a generic *Program not available* slot: the times stay (so the shape of the schedule does), but no name, picture, id or synopsis. What Jellyfin said is remembered for five minutes, so a change of rights shows up within that time; if Jellyfin cannot answer, the titles stay hidden until it can. The definition of a channel (its sources and what they are called) is only given to administrators.
-- **Match only deals what everybody may see, when it can know.** With the optional API key the container also asks what each person in the room (and the host, whose screen shows the cards and plays the winner) may see, and never deals a title hidden from any of them; if Jellyfin cannot say it asks to try again instead of dealing. Without the key it only knows the library of the person who asks, so the people in a room should be able to open the same libraries.
+- **Match only deals what everybody may see.** With the API key the container asks what each person in the room (and the host, whose screen shows the cards and plays the winner) may see, and never deals a title hidden from any of them; if Jellyfin cannot say it asks to try again instead of dealing. The ids go to Jellyfin in batches of 50. Without the key a Match on phones is not allowed (a Match on one device only shows the host's own library). When nobody agrees and no films are left, the people choose a favourite among the last cards instead of getting stuck.
 - **Match rooms** are only readable by their members and host; a code opens a room only while it is in the lobby (nobody can join a Match that already started), and a person who tries too many wrong codes in a minute has to wait.
-- **The optional API key** (`JELLYFIN_API_KEY`) lets the container refresh channels by night, and look at what the other people of a Match may see and have watched. Give it a key made for this (Dashboard > API keys) and keep the container off the internet; without it everything still works.
+- **The optional API key** (`JELLYFIN_API_KEY`) lets the container refresh channels by night, and look at what the other people of a Match on phones may see and have watched (a Match on phones needs it). Give it a key made for this (Dashboard > API keys) and keep the container off the internet; without it the rest still works.
 - **Exposure.** Keep it on your network, or behind the web image's `/modules/` proxy (one address, HTTPS from your own reverse proxy). It asks for tokens, not cookies, so by default any site may call it from a browser; `JELLYFLIX_ORIGINS` narrows that. A caller that sends more than 20 tokens Jellyfin refuses in a minute waits a minute (HTTP 429) before the container asks Jellyfin about another one; people already signed in are not affected. Callers are told apart by their address: behind the web image's proxy every request comes from that proxy, so set `JELLYFLIX_TRUST_PROXY=1` there (the proxy writes `X-Forwarded-For` itself) and do not publish the container's port, or anybody could write that header. Jellyfin's answer about a token is remembered for a minute, so a session revoked in Jellyfin, or an administrator who stops being one, keeps working here for up to a minute. The Docker image runs as a normal user, with a read-only disk and no extra privileges.
 
 ## API
@@ -139,5 +151,7 @@ npm test          # unit and API tests (Node's own test runner)
 npm run typecheck
 npm run dev       # restarts on changes
 ```
+
+`contract/examples/` holds example answers of the container (channels, a channel's window, Match rooms). The tests compare what the container answers with them by shape, and the TV app's tests read the same files with its own parsers, so an answer that changes must be followed on the TV. After changing an answer on purpose: `UPDATE_EXAMPLES=1 npm test`, then commit the files. The container's version is the one in `package.json`.
 
 The schedule maker is a pure function (`server/src/modules/channels/engine.ts`) and the Match rules are another (`server/src/modules/match/machine.ts`); both are tested without a database or a network.

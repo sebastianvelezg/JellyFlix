@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { addToWatchLater, isEpisode, type Movie, type Session } from '../core'
 import { t } from '../i18n'
 import { openAddToPlaylist } from './AddToPlaylistDialog'
@@ -26,6 +27,26 @@ function DotsIcon() {
       <circle cx="19" cy="12" r="1.9" />
     </svg>
   )
+}
+
+/** The space kept between the menu and the edge of the window, and between the menu and its button (pixels). */
+const EDGE = 8
+const GAP = 6
+
+/**
+ * Where the menu goes: under its button (or over it when there is no room under), lined up with the button's corner, and always
+ * inside the window. The menu is drawn outside the row it belongs to (a row scrolls, and would cut the menu off), so it is placed
+ * in the window's own coordinates.
+ */
+export function placeMenu(button: DOMRect, size: { width: number; height: number }, corner: 'left' | 'right', view: { width: number; height: number }) {
+  const left = Math.max(EDGE, Math.min(corner === 'left' ? button.left : button.right - size.width, view.width - size.width - EDGE))
+  const below = view.height - button.bottom - GAP - EDGE
+  const above = button.top - GAP - EDGE
+  const under = size.height <= below || below >= above
+  const room = under ? below : above
+  const height = Math.min(size.height, Math.max(room, 96))
+  const top = under ? button.bottom + GAP : button.top - GAP - height
+  return { top, left, maxHeight: Math.max(room, 96) }
 }
 
 const item =
@@ -56,23 +77,54 @@ export function CardMenu({
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
+  const [place, setPlace] = useState<{ top: number; left: number; maxHeight: number } | null>(null)
   const { toggle, actionError } = useToggles(session, movie, onChange)
   const admin = useIsAdmin(session)
 
   // Opens with the first entry focused; a press or focus outside closes it.
   useEffect(() => {
     if (!open) return
-    menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
     const away = (e: Event) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (!root.current?.contains(target) && !menu.current?.contains(target)) setOpen(false)
+    }
+    // The menu is placed in the window, so it follows its button when something scrolls or the window changes size, and closes once
+    // the button is out of view.
+    const leave = (e: Event) => {
+      if (menu.current?.contains(e.target as Node)) return
+      const box = menu.current
+      const button = trigger.current?.getBoundingClientRect()
+      if (!box || !button) return
+      if (button.bottom < 0 || button.top > window.innerHeight || button.right < 0 || button.left > window.innerWidth) {
+        setOpen(false)
+        return
+      }
+      setPlace(placeMenu(button, { width: box.offsetWidth, height: box.scrollHeight }, corner, { width: window.innerWidth, height: window.innerHeight }))
     }
     document.addEventListener('pointerdown', away)
     document.addEventListener('focusin', away)
+    window.addEventListener('scroll', leave, true)
+    window.addEventListener('resize', leave)
     return () => {
       document.removeEventListener('pointerdown', away)
       document.removeEventListener('focusin', away)
+      window.removeEventListener('scroll', leave, true)
+      window.removeEventListener('resize', leave)
     }
-  }, [open])
+  }, [open, corner])
+
+  // Placed once it is on the page (its size is known then) and before it is painted, so it never shows in the wrong place.
+  useLayoutEffect(() => {
+    const box = menu.current
+    const button = trigger.current
+    if (!open || !box || !button) return
+    setPlace(placeMenu(button.getBoundingClientRect(), { width: box.offsetWidth, height: box.scrollHeight }, corner, { width: window.innerWidth, height: window.innerHeight }))
+  }, [open, corner])
+
+  // Opens with the first entry focused (it is in its place by then, so focusing it never moves the page).
+  useEffect(() => {
+    if (open && place) menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true })
+  }, [open, place])
 
   const close = (focusTrigger: boolean) => {
     setOpen(false)
@@ -113,13 +165,15 @@ export function CardMenu({
       >
         <DotsIcon />
       </button>
-      {open && (
+      {open &&
+        createPortal(
         <div
           ref={menu}
           role="menu"
           aria-label={t('Options for {name}', { name: movie.name })}
           onKeyDown={onKeyDown}
-          className={`absolute ${corner === 'left' ? 'left-0' : 'right-0'} top-full mt-1.5 w-max min-w-[10rem] max-w-[min(15rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-white/10 bg-[var(--color-surface-2)]/95 p-1 shadow-[0_18px_50px_-10px_rgba(0,0,0,0.85)] backdrop-blur-xl`}
+          style={place ? { top: place.top, left: place.left, maxHeight: place.maxHeight } : { top: 0, left: 0, visibility: 'hidden' }}
+          className="fixed z-[60] w-max min-w-[10rem] max-w-[min(15rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-[var(--radius-card)] border border-white/10 bg-[var(--color-surface-2)]/95 p-1 shadow-[0_18px_50px_-10px_rgba(0,0,0,0.85)] backdrop-blur-xl"
         >
           <button
             type="button"
@@ -224,8 +278,9 @@ export function CardMenu({
               <PencilIcon /> {t('Edit…')}
             </button>
           )}
-        </div>
-      )}
+        </div>,
+        document.body,
+        )}
       {actionError && (
         <p
           role="alert"

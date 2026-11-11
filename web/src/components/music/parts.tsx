@@ -125,10 +125,10 @@ export function AlbumCard({
   return (
     <div className="group relative w-full">
       <button type="button" onClick={() => onOpen(album)} aria-label={t('Open album {name}', { name: album.name })} className="block w-full text-left outline-none">
-        <Cover session={session} item={album} className={cardFrame} />
-        <p className="mt-2.5 truncate text-sm font-medium text-neutral-100">{album.name}</p>
+        <Cover session={session} item={album} className={`${cardFrame} shadow-[0_12px_28px_-16px_rgba(0,0,0,0.9)]`} />
+        <p className="mt-3 truncate text-sm font-semibold text-neutral-50">{album.name}</p>
       </button>
-      <p className="truncate text-xs text-neutral-500">
+      <p className="mt-0.5 truncate text-xs text-neutral-400">
         {onOpenArtist && album.artistId ? (
           <button type="button" className="hover:text-white hover:underline" onClick={() => onOpenArtist(album.artistId as string)}>
             {album.artist}
@@ -144,7 +144,7 @@ export function AlbumCard({
         onClick={() => void play(false)}
         aria-label={t('Play album {name}', { name: album.name })}
         title={t('Play')}
-        className="absolute bottom-[3.6rem] right-2 flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-white pl-0.5 text-black opacity-0 shadow-[0_6px_20px_-4px_rgba(0,0,0,0.6)] transition duration-200 hover:scale-110 focus-visible:translate-y-0 focus-visible:opacity-100 group-hover:translate-y-0 group-hover:opacity-100 disabled:opacity-60"
+        className="absolute bottom-[4rem] right-2 flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-white pl-0.5 text-black opacity-0 shadow-[0_6px_20px_-4px_rgba(0,0,0,0.6)] transition duration-200 hover:scale-110 focus-visible:translate-y-0 focus-visible:opacity-100 group-hover:translate-y-0 group-hover:opacity-100 disabled:opacity-60"
       >
         <PlayIcon />
       </button>
@@ -155,9 +155,9 @@ export function AlbumCard({
 export function ArtistCard({ session, artist, onOpen }: { session: Session; artist: Artist; onOpen: (artist: { id: string }) => void }) {
   return (
     <button type="button" onClick={() => onOpen(artist)} aria-label={t('Open artist {name}', { name: artist.name })} className="group block w-full text-center outline-none">
-      <Cover session={session} item={artist} round className={`mx-auto w-full ${cardFrame}`} />
-      <p className="mt-3 truncate text-sm font-medium text-neutral-100">{artist.name}</p>
-      <Subtext as="p" className="block text-xs text-neutral-500" text={t('Artist')} />
+      <Cover session={session} item={artist} round className={`mx-auto w-full ${cardFrame} shadow-[0_12px_28px_-16px_rgba(0,0,0,0.9)]`} />
+      <p className="mt-3.5 truncate text-sm font-semibold text-neutral-50">{artist.name}</p>
+      <Subtext as="p" className="mt-0.5 block text-xs text-neutral-400" text={t('Artist')} />
     </button>
   )
 }
@@ -165,11 +165,11 @@ export function ArtistCard({ session, artist, onOpen }: { session: Session; arti
 export function PlaylistCard({ session, playlist, onOpen }: { session: Session; playlist: Playlist; onOpen: (playlist: { id: string }) => void }) {
   return (
     <button type="button" onClick={() => onOpen(playlist)} aria-label={t('Open playlist {name}', { name: playlist.name })} className="group block w-full text-left outline-none">
-      <Cover session={session} item={playlist} className={cardFrame} />
-      <p className="mt-2.5 truncate text-sm font-medium text-neutral-100">{playlist.name}</p>
+      <Cover session={session} item={playlist} className={`${cardFrame} shadow-[0_12px_28px_-16px_rgba(0,0,0,0.9)]`} />
+      <p className="mt-3 truncate text-sm font-semibold text-neutral-50">{playlist.name}</p>
       <Subtext
         as="p"
-        className="block text-xs text-neutral-500"
+        className="mt-0.5 block text-xs text-neutral-400"
         text={playlist.trackCount == null ? t('Playlist') : playlist.trackCount === 1 ? t('Playlist · 1 song') : t('Playlist · {count} songs', { count: playlist.trackCount })}
       />
     </button>
@@ -223,7 +223,7 @@ export function TrackItem({
       session={session}
       track={track}
       number={number}
-      showCover={showCover && number == null}
+      showCover={showCover}
       showAlbum={showAlbum}
       isCurrent={playingId === track.id}
       isPlaying={playingId === track.id && status === 'playing'}
@@ -241,6 +241,24 @@ export function TrackItem({
   )
 }
 
+/**
+ * The names of the columns above a list of songs. The widths are those of the song rows below it: the number, the title, the album
+ * (a quarter), and then the room of the buttons and the heart, and the length.
+ */
+export function TrackHeader({ showAlbum = true }: { showAlbum?: boolean }) {
+  return (
+    <div aria-hidden="true" className="hidden items-center gap-3 border-b border-white/[.07] px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 md:flex pointer-coarse:hidden">
+      <span className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="w-8 text-center">#</span>
+        <span>{t('Title')}</span>
+      </span>
+      {showAlbum && <span className="w-1/4 min-w-0">{t('Album')}</span>}
+      <span className="w-[130px] shrink-0" />
+      <span className="w-12 shrink-0" />
+    </div>
+  )
+}
+
 /** A list of songs; pressing one plays it and queues the rest of the list after it. */
 export function TrackList({
   session,
@@ -248,6 +266,7 @@ export function TrackList({
   showAlbum = true,
   showCover = true,
   numbered = false,
+  header = false,
   onOpenAlbum,
 }: {
   session: Session
@@ -256,25 +275,31 @@ export function TrackList({
   showCover?: boolean
   /** Show the track number instead of a cover (album pages). */
   numbered?: boolean
+  /** Write the names of the columns above the songs. */
+  header?: boolean
   onOpenAlbum?: (albumId: string) => void
 }) {
   const music = useMusic()
   return (
-    <ul className="divide-y divide-white/[.05]">
-      {tracks.map((track, i) => (
-        <li key={`${track.id}-${i}`}>
-          <TrackItem
-            session={session}
-            track={track}
-            number={numbered ? (track.trackNumber ?? i + 1) : undefined}
-            showCover={showCover}
-            showAlbum={showAlbum}
-            onPlay={() => music.play(tracks, i)}
-            onOpenAlbum={onOpenAlbum}
-          />
-        </li>
-      ))}
-    </ul>
+    <>
+      {header && <TrackHeader showAlbum={showAlbum} />}
+      <ul className="divide-y divide-white/[.05]">
+        {tracks.map((track, i) => (
+          <li key={`${track.id}-${i}`}>
+            <TrackItem
+              session={session}
+              track={track}
+              // A numbered list is a list of an album (the number of the song, no cover); a list with a header is a table (its place in the list, and the cover).
+              number={header ? i + 1 : numbered ? (track.trackNumber ?? i + 1) : undefined}
+              showCover={showCover && (header || !numbered)}
+              showAlbum={showAlbum}
+              onPlay={() => music.play(tracks, i)}
+              onOpenAlbum={onOpenAlbum}
+            />
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 
@@ -307,6 +332,8 @@ function TrackRow({
 }) {
   const { favorite, failed, toggle: toggleFavorite } = useFavorite(session, track.id, track.favorite)
   const label = t('{title} by {artist}', { title: track.name, artist: track.artist })
+  // A table (a number and a cover): on a phone, where the buttons take the room, the number and the length are left out.
+  const table = showCover && number != null
   return (
     <div
       className={`group flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-white/[.05] focus-within:bg-white/[.05] ${isCurrent ? 'bg-[var(--color-accent)]/[.08]' : ''}`}
@@ -318,7 +345,7 @@ function TrackRow({
         aria-label={t('Play {label}', { label })}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] pointer-coarse:py-1.5"
       >
-        <span className="flex w-8 shrink-0 items-center justify-center text-sm tabular-nums text-neutral-500">
+        <span className={`w-8 shrink-0 items-center justify-center text-sm tabular-nums text-neutral-500 ${table ? 'hidden sm:flex' : 'flex'}`}>
           {isCurrent ? (
             <PlayingBars playing={isPlaying} />
           ) : (
@@ -370,7 +397,7 @@ function TrackRow({
       >
         <HeartIcon filled={favorite} />
       </button>
-      <span className="w-12 shrink-0 text-right text-sm tabular-nums text-neutral-500">{songLength(track.runtimeTicks)}</span>
+      <span className={`w-12 shrink-0 text-right text-sm tabular-nums text-neutral-500 ${table ? 'hidden sm:block' : ''}`}>{songLength(track.runtimeTicks)}</span>
     </div>
   )
 }

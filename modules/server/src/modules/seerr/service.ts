@@ -7,6 +7,9 @@ import { canRequest, detailOf, quotaOf, requestOf, requestStatusOf, titleOf } fr
 export const MIN_SEERR = [3, 3, 0] as const
 
 const IDENTITY_MS = 10 * 60_000
+/** How long "this account is not in Seerr" is remembered. */
+const UNKNOWN_MS = 60_000
+const NOT_IN_SEERR = 'Your Jellyfin account is not in Seerr yet. Ask an administrator to import you.'
 const HEALTH_MS = 60_000
 /** The app asks the manifest with a short patience, and the other modules must not disappear because Seerr is slow. */
 const HEALTH_TIMEOUT_MS = 1500
@@ -62,6 +65,7 @@ const older = (a: readonly number[], b: readonly number[]): boolean => {
 
 export function createSeerrService(client: SeerrClient, now: () => number = Date.now): SeerrService {
   const accounts = new Map<string, Account>()
+  const unknown = new Map<string, number>()
   const titles = new Map<string, { title: string; posterPath?: string; expires: number }>()
   const askedToRequest = limiter(REQUEST_LIMIT, now)
   const askedToSearch = limiter(SEARCH_LIMIT, now)
@@ -99,11 +103,19 @@ export function createSeerrService(client: SeerrClient, now: () => number = Date
   async function accountOf(user: AuthUser): Promise<Account> {
     const hit = accounts.get(user.id)
     if (hit && hit.expires > now()) return hit
+    // An account Seerr does not know is remembered for a minute, so typing a search does not ask Seerr again with every key.
+    const unknownUntil = unknown.get(user.id)
+    if (unknownUntil !== undefined && unknownUntil > now()) throw new HttpError(403, NOT_IN_SEERR)
     let found: { id?: unknown; permissions?: unknown }
     try {
       found = await client.get(`/user/jellyfin/${encodeURIComponent(user.id)}`)
     } catch (e) {
-      if (e instanceof HttpError && e.status === 404) throw new HttpError(403, 'Your Jellyfin account is not in Seerr yet. Ask an administrator to import you.')
+      if (e instanceof HttpError && e.status === 404) {
+        unknown.delete(user.id)
+        while (unknown.size >= MAX_PEOPLE) unknown.delete(unknown.keys().next().value as string)
+        unknown.set(user.id, now() + UNKNOWN_MS)
+        throw new HttpError(403, NOT_IN_SEERR)
+      }
       throw e
     }
     const seerrId = typeof found.id === 'number' && Number.isInteger(found.id) && found.id > 0 ? found.id : 0
@@ -155,8 +167,9 @@ export function createSeerrService(client: SeerrClient, now: () => number = Date
     },
 
     async search(user, query, page) {
-      const account = await accountOf(user)
+      // (The limit comes first: a search that is going to be refused costs Seerr nothing.)
       askedToSearch(user.id)
+      const account = await accountOf(user)
       const answer = await client.get<{ page?: unknown; totalPages?: unknown; results?: unknown }>('/search', { asUser: account.seerrId, query: { query, page } })
       const results = (Array.isArray(answer.results) ? answer.results : []).slice(0, 40).map((r) => titleOf(r)).filter((t) => t !== null)
       const pages = typeof answer.totalPages === 'number' && Number.isInteger(answer.totalPages) ? Math.min(Math.max(answer.totalPages, 1), 1000) : 1

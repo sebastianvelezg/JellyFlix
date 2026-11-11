@@ -110,10 +110,13 @@ class JellyfinRepository(context: Context) {
 
     private val jellyfin = createJellyfin {
         this.context = context.applicationContext
-        clientInfo = ClientInfo(name = "Jellyflix TV", version = "1.0.0")
+        clientInfo = ClientInfo(name = "Jellyflix TV", version = app.jellyflix.tv.BuildConfig.VERSION_NAME)
         apiClientFactory = http
         socketConnectionFactory = http
     }
+
+    /** The id the SDK gives this television (the same for every request it makes), for the few requests built by hand (a fixed name only if the SDK had none). */
+    private val deviceId: String get() = jellyfin.options.deviceInfo?.id ?: "jellyflix-tv"
 
     // One client per session, so a screen's dozen requests share the same connections instead of building a client each.
     private var cachedApi: Triple<String, String, ApiClient>? = null
@@ -816,7 +819,7 @@ class JellyfinRepository(context: Context) {
      */
     suspend fun playHistory(session: Session): PlayHistory? = coroutineScope {
         val queries = runCatching { playbackQueries(session.userId, todayLocal()) }.getOrNull() ?: return@coroutineScope null
-        val auth = "MediaBrowser Client=\"Jellyflix TV\", Device=\"TV\", DeviceId=\"jellyflix-tv\", Version=\"1.0.0\", Token=\"${session.accessToken}\""
+        val auth = "MediaBrowser Client=\"Jellyflix TV\", Device=\"TV\", DeviceId=\"$deviceId\", Version=\"${app.jellyflix.tv.BuildConfig.VERSION_NAME}\", Token=\"${session.accessToken}\""
         fun run(sql: String): QueryTable? = runCatching {
             val body = org.json.JSONObject().put("CustomQueryString", sql).put("ReplaceUserId", false).toString()
                 .toRequestBody("application/json".toMediaType())
@@ -1349,7 +1352,7 @@ class JellyfinRepository(context: Context) {
      */
     fun audioUrl(session: Session, song: Song): String =
         "${session.serverUrl}/Audio/${song.id}/universal" +
-            "?UserId=${session.userId}&DeviceId=jellyflix-tv&MaxStreamingBitrate=140000000" +
+            "?UserId=${session.userId}&DeviceId=$deviceId&MaxStreamingBitrate=140000000" +
             "&Container=mp3,aac,m4a,m4b,flac,ogg,opus,wav,webma&TranscodingContainer=ts&TranscodingProtocol=hls&AudioCodec=aac"
 
     suspend fun reportSongStarted(session: Session, song: Song) {

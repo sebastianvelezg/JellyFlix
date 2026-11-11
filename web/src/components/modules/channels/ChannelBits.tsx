@@ -11,10 +11,16 @@ import { useModulesClient } from '../ModulesProvider'
 export function ChannelLogo({
   channel,
   className = 'h-11 w-11 text-lg',
+  round = 'rounded-xl',
+  badge = true,
   preview,
 }: {
   channel: { id: string; number: number; color: string; imageVersion?: number }
   className?: string
+  /** The corners of the tile (a class of its own, so a big tile can be rounder). */
+  round?: string
+  /** Whether the number is shown in a corner of a picture (a card that writes the number elsewhere can turn it off). */
+  badge?: boolean
   /** A picture that is not saved yet (an address of its own), shown instead of the saved one. */
   preview?: string | null
 }) {
@@ -39,17 +45,19 @@ export function ChannelLogo({
   const src = preview ?? (loaded && loaded.key === key ? loaded.src : null)
   if (!src) {
     return (
-      <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-xl font-black tabular-nums text-white ${className}`} style={{ background: channel.color }}>
+      <span aria-hidden="true" className={`flex shrink-0 items-center justify-center font-black tabular-nums text-white ${round} ${className}`} style={{ background: channel.color }}>
         {channel.number}
       </span>
     )
   }
   return (
-    <span aria-hidden="true" className={`relative shrink-0 ${className}`}>
-      <img src={src} alt="" decoding="async" className="h-full w-full rounded-xl bg-white/5 object-cover" />
-      <span aria-hidden="true" className="absolute -bottom-1 -right-1 min-w-[1.25rem] rounded-md px-1 text-center text-[10px] font-black leading-4 tabular-nums text-white ring-1 ring-black/60" style={{ background: channel.color }}>
-        {channel.number}
-      </span>
+    <span aria-hidden="true" className={`relative shrink-0 ${round} ${className}`}>
+      <img src={src} alt="" decoding="async" className={`h-full w-full bg-white/5 object-cover ${round}`} />
+      {badge && (
+        <span aria-hidden="true" className="absolute -bottom-1 -right-1 min-w-[1.25rem] rounded-md px-1 text-center text-[10px] font-black leading-4 tabular-nums text-white ring-1 ring-black/60" style={{ background: channel.color }}>
+          {channel.number}
+        </span>
+      )}
     </span>
   )
 }

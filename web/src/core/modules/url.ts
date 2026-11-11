@@ -21,11 +21,14 @@ const hostOf = (address: string): string | null => {
 
 /** An address inside a home or office network (or this very device): somewhere a stranger's website cannot have put a listener. */
 function isLocalHost(host: string): boolean {
-  if (host === 'localhost' || host === '[::1]' || host.endsWith('.local') || host.endsWith('.lan') || host.endsWith('.home.arpa')) return true
+  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.lan') || host.endsWith('.home.arpa')) return true
+  // IPv6: this device (::1), a unique local address (fc00::/7, what a home router hands out) or a link-local one (fe80::/10).
+  if (host.startsWith('[')) return host === '[::1]' || /^\[f[cd][0-9a-f]{2}:/.test(host) || /^\[fe[89ab][0-9a-f]:/.test(host)
   const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
   if (!m) return false
   const [a, b] = [Number(m[1]), Number(m[2])]
-  return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31)
+  // 100.64.0.0/10 is the range Tailscale (and carrier-grade NAT) uses; 169.254.0.0/16 is link-local.
+  return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254)
 }
 
 /**

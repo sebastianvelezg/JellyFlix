@@ -30,6 +30,7 @@ export function PagedView<T extends { id: string }>({
   onTotal,
   summary,
   itemClassName,
+  listHeader,
 }: {
   /** Fetches items starting at `startIndex`. Wrap it in `useCallback`. */
   load: (startIndex: number) => Promise<PageOf<T>>
@@ -50,6 +51,8 @@ export function PagedView<T extends { id: string }>({
   summary?: (shown: number, total: number) => string
   /** Classes of each list item (e.g. `cv-card`, which makes a long grid cheap to scroll). */
   itemClassName?: string
+  /** Something between the summary and the list, e.g. the names of the columns of a table. */
+  listHeader?: ReactNode
 }) {
   const [state, setState] = useState<State<T>>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -153,6 +156,7 @@ export function PagedView<T extends { id: string }>({
           {summary(state.items.length, state.total)}
         </p>
       )}
+      {listHeader}
       <ul className={className}>
         {state.items.map((item, i) => (
           <li key={item.id} className={itemClassName}>

@@ -1,5 +1,7 @@
 # Plan: módulos opcionales para Jellyflix
 
+> **Documento histórico (en español).** Es el plan con el que se diseñó el contenedor de módulos; las ramas que menciona ya están fusionadas y lo construido se describe en [`modules/README.md`](../modules/README.md) y en el [changelog](../CHANGELOG.md). Se conserva como registro de las decisiones.
+
 > Documento de planificación y diseño de los módulos opcionales. Vive en la rama `feature/modules-container` (creada desde `main`, release 1.3.2).
 > **Estado (2026-11-06):** construidos y revisados (seguridad, rendimiento, pruebas) el contenedor `modules/` (Fase 0), **Canales / Retro TV** y **Match**, en la web **y en la app de TV**. Pendiente: **Tube**, **Wrapped**, otros módulos, relleno/rejilla de Canales (3c) e imagen publicada en ghcr. Guía de prueba y de seguridad: `modules/README.md`.
 > Cambios respecto al plan original: SQLite con `node:sqlite` (sin dependencias), el contenedor no necesita API key, Match avisa por sondeo cada 2,5 s (no SSE) y en la TV Match es solo pantalla (QR). Al final hay una lista de decisiones abiertas (sección 11).

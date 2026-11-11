@@ -1,9 +1,9 @@
 {
   "name": "jellyflix-modules",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Jellyflix Modules: an optional container with extra modules (retro TV channels, Match) for Jellyflix",
+  "description": "Jellyflix Modules: an optional container with extra modules (retro TV channels, Match, Seerr) for Jellyflix",
   "license": "MIT",
   "engines": {
     "node": ">=24"

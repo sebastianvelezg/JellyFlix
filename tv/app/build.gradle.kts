@@ -23,8 +23,8 @@ android {
         // Google TV on the TCL C6K runs Android 12 or newer; 28 keeps older boxes working too.
         minSdk = 28
         targetSdk = 37
-        versionCode = 29
-        versionName = "1.7.2"
+        versionCode = 30
+        versionName = "1.8.0"
     }
 
     androidResources {
@@ -61,6 +61,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }
@@ -86,15 +87,16 @@ dependencies {
 
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.ui)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
     implementation(libs.jellyfin.core)
-    // The Jellyfin SDK logs through slf4j, which Android does not ship.
+    // The Jellyfin SDK logs through slf4j, which Android does not ship. Nothing here reads those logs, so they go nowhere.
     implementation(libs.slf4j.api)
-    implementation(libs.logback.android)
+    implementation(libs.slf4j.nop)
     implementation(libs.kotlinx.coroutines.android)
     // Draws the QR code of a Match invitation (it makes the picture on the device; nothing is sent anywhere).
     implementation(libs.zxing.core)

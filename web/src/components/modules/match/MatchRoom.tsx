@@ -292,7 +292,11 @@ export function MatchRoom({ session, id, go, onLeave }: { session: Session; id: 
           <ScreenRound session={session} view={view} title={t('Choose your favourite')} text={t('Everybody chooses a favourite on their own phone.')} />
         ) : (
           <section aria-label={t('Choose your favourite')} className="space-y-3">
-            <p className="text-center text-sm text-neutral-300">{t('You all liked these. Choose your favourite; if you choose different ones, chance decides.')}</p>
+            <p className="text-center text-sm text-neutral-300">
+              {view.lastLiked.length > 0
+                ? t('You all liked these. Choose your favourite; if you choose different ones, chance decides.')
+                : t('Nobody agreed and there are no more films. Choose your favourite of these; if you choose different ones, chance decides.')}
+            </p>
             {view.myPick ? (
               <WaitingForOthers view={view} text={waiting.length > 0 ? t('Waiting for {names} to choose…', { names: waiting.map((m) => m.name).join(', ') }) : t('Counting the votes…')} />
             ) : (
