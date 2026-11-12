@@ -59,14 +59,14 @@ describe('settings backup', () => {
     expect(readAppearance()).toMatchObject({ theme: { canvas: 'black', accent: 'ocean' }, posterSize: 'comfortable' })
   })
   it('cleans up the player, interface and library choices too, so a file edited by hand cannot break them', () => {
-    writeUiPrefs({ lastChannel: { id: 'c1', name: 'News' } })
+    writeUiPrefs({ lastChannel: { id: 'c1', name: 'News' }, lastRetroChannel: 'retro1' })
     const parsed = parseSettings(
       JSON.stringify({
         app: 'jellyflix',
         version: 1,
         settings: {
           'jellyflix.player': { volume: 'loud', muted: 'yes', subtitleSize: 'giant', autoplayCountdown: 7, skipActions: { intro: 'auto', recap: 'explode' }, subtitleLanguage: 42, maxBitrateMbps: 10, __proto__: { polluted: true } },
-          'jellyflix.ui': { language: 'xx', autoRotateBanner: false, lastChannel: { id: 'evil', name: 'x' } },
+          'jellyflix.ui': { language: 'xx', autoRotateBanner: false, lastChannel: { id: 'evil', name: 'x' }, lastRetroChannel: 'evil' },
           'jellyflix.browse': { sort: 'drop table', filter: 'watched', libraryId: '"><img>', advanced: { decade: 1995 } },
         },
       }),
@@ -79,7 +79,7 @@ describe('settings backup', () => {
     expect(player.skipActions).toEqual({ intro: 'auto', recap: 'ask', outro: 'ask', preview: 'ask' })
     expect(JSON.parse(localStorage.getItem('jellyflix.player') ?? '{}').polluted).toBeUndefined()
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
-    expect(readUiPrefs()).toMatchObject({ language: 'auto', autoRotateBanner: false, lastChannel: null })
+    expect(readUiPrefs()).toMatchObject({ language: 'auto', autoRotateBanner: false, lastChannel: null, lastRetroChannel: null })
     expect(readBrowsePrefs()).toEqual({ sort: 'title', filter: 'watched', advanced: {} })
   })
 })

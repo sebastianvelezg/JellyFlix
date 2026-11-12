@@ -17,7 +17,7 @@ import { showToast, Toaster } from './components/toast'
 import { HomePage } from './components/HomePage'
 import { BottomNav, Header, type NavTab } from './components/Header'
 import { MiniPlayer } from './components/music/MiniPlayer'
-import { RemoteProvider } from './components/remote/RemoteProvider'
+import { RemoteProvider, USER_DATA_CHANGED } from './components/remote/RemoteProvider'
 import { ModulesProvider, useModules } from './components/modules/ModulesProvider'
 import { SyncPlayProvider, useSyncPlay } from './components/syncplay/SyncPlayProvider'
 import { TogetherButton } from './components/syncplay/TogetherDialog'
@@ -49,6 +49,10 @@ import {
 } from './core'
 import { connectFromBrowser, preconnectTo, quickConnectFromBrowser } from './platform/web/browser'
 import { webSessionStore } from './platform/web/storage'
+import { ADD_ACCOUNT, PROFILES_CHANGED, SWITCH_ACCOUNT } from './platform/web/profileEvents'
+import { profileRemoved, profileSignedIn, storedOf, type Profile } from './core'
+import { readProfiles, writeProfiles } from './platform/web/profiles'
+import { WhoIsWatching } from './components/profiles/WhoIsWatching'
 import { t, tr } from './i18n'
 
 import { loadPlayer, PlayerLoading, PlayerRoute, playKey, queueOf } from './components/PlayerRoute'
@@ -90,12 +94,28 @@ function PageLoading() {
   )
 }
 
+/**
+ * Whether the app opens on "Who is watching?": two or more accounts are kept, the person wants to be asked, and this tab has not chosen
+ * one yet (a reload of a tab that did goes on as it was).
+ */
+function mustChoose(): boolean {
+  const known = readProfiles()
+  if (!known.ask || known.profiles.length < 2) return false
+  try {
+    return sessionStorage.getItem(CHOSEN) === null && sessionStorage.getItem('jellyflix.session') === null
+  } catch {
+    return false
+  }
+}
+
+/** Set in the tab when the person chose an account (or signed in) there: a reload goes on as it was instead of asking again. */
+const CHOSEN = 'jellyflix.accountChosen'
 const EXPIRED = tr('Your session expired or was signed out elsewhere. Please sign in again.')
 
 /** What this browser remembers about the person who used it (the searches, the last channel), so the next account does not see it. */
 function forgetTraces(): void {
   clearRecentSearches()
-  writeUiPrefs({ lastChannel: null })
+  writeUiPrefs({ lastChannel: null, lastRetroChannel: null })
 }
 
 /**
@@ -106,16 +126,59 @@ function forgetTraces(): void {
  */
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
-  const [restoring, setRestoring] = useState(true)
+  const [restoring, setRestoring] = useState(() => !mustChoose())
   const [notice, setNotice] = useState<string | null>(null)
   const { route, navigate, back } = useRoute()
   // Changing the language starts the screens afresh (the session, the music and what was read are kept).
   const language = useLanguage()
   const [overrides, setOverrides] = useState<Record<string, Movie>>({})
   const [playbackVersion, setPlaybackVersion] = useState(0)
+  // The accounts kept on this browser, and whether "Who is watching?" is on the screen (instead of the sign-in form).
+  const [book, setBookState] = useState(readProfiles)
+  const [choosing, setChoosing] = useState(mustChoose)
+  const setBook = useCallback((next: ReturnType<typeof readProfiles>) => {
+    writeProfiles(next)
+    setBookState(next)
+  }, [])
+  useEffect(() => {
+    const reread = () => setBookState(readProfiles())
+    window.addEventListener(PROFILES_CHANGED, reread)
+    return () => window.removeEventListener(PROFILES_CHANGED, reread)
+  }, [])
+
+  // "Continue watching" and the other rows follow what the account does on other devices: the server says when the watch data changes.
+  useEffect(() => {
+    if (!session) return
+    let timer: number | undefined
+    let missed = false
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') {
+        missed = true
+        return
+      }
+      window.clearTimeout(timer)
+      // A burst (a device reports its position every few seconds) becomes one refresh.
+      timer = window.setTimeout(() => setPlaybackVersion((v) => v + 1), 2500)
+    }
+    const back = () => {
+      if (document.visibilityState === 'visible' && missed) {
+        missed = false
+        refresh()
+      }
+    }
+    window.addEventListener(USER_DATA_CHANGED, refresh)
+    document.addEventListener('visibilitychange', back)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener(USER_DATA_CHANGED, refresh)
+      document.removeEventListener('visibilitychange', back)
+    }
+  }, [session])
 
   const expire = useCallback(() => {
-    void webSessionStore.clear()
+    void webSessionStore.load().then((stored) => {
+      if (stored) setBook(profileRemoved(readProfiles(), stored))
+    }).finally(() => void webSessionStore.clear())
     clearSwr()
     clearActivity()
     forgetTraces()
@@ -123,7 +186,7 @@ export default function App() {
     setSession(null)
     setNotice(t(EXPIRED))
     setOverrides({})
-  }, [])
+  }, [setBook])
 
   // Open the connection to the server while the page is still starting.
   const serverUrl = session?.serverUrl
@@ -136,6 +199,8 @@ export default function App() {
   // request it refuses with 401 ends the session as well).
   useEffect(() => {
     let cancelled = false
+    // (A browser that opens with several accounts kept asks who is watching first: see `mustChoose`.)
+    if (mustChoose()) return
     resumeSession(webSessionStore, { onUnauthorized: expire })
       .then((resumed) => {
         if (cancelled) return
@@ -194,8 +259,56 @@ export default function App() {
     navigate(next, options)
   }
 
+  /** Leaves the account in use (it stays kept on this browser) and shows "Who is watching?". */
+  const switchAccount = useCallback(async () => {
+    setSession(null)
+    setNotice(null)
+    setOverrides({})
+    clearSwr()
+    clearActivity()
+    forgetTraces()
+    setStorageOwner(null)
+    navigate({ page: 'home' }, { replace: true })
+    try {
+      sessionStorage.removeItem(CHOSEN)
+    } catch {
+      // Without session storage the next start simply asks again.
+    }
+    await webSessionStore.clear()
+    setBookState(readProfiles())
+    setChoosing(true)
+  }, [navigate])
+
+  /** Opens an account of the picker: its saved sign-in becomes the session of this tab. */
+  const openProfile = useCallback(async (profile: Profile) => {
+    webSessionStore.persistent = true
+    await webSessionStore.save(storedOf(profile))
+    try {
+      sessionStorage.setItem(CHOSEN, '1')
+    } catch {
+      // The same.
+    }
+    // A fresh start of the app for that person: nothing of the account before it stays in memory.
+    window.location.reload()
+  }, [])
+
+  useEffect(() => {
+    const toPicker = () => void switchAccount()
+    const toForm = () => {
+      void switchAccount().then(() => setChoosing(false))
+    }
+    window.addEventListener(SWITCH_ACCOUNT, toPicker)
+    window.addEventListener(ADD_ACCOUNT, toForm)
+    return () => {
+      window.removeEventListener(SWITCH_ACCOUNT, toPicker)
+      window.removeEventListener(ADD_ACCOUNT, toForm)
+    }
+  }, [switchAccount])
+
   const signOut = useCallback(async () => {
     const current = session
+    // The account leaves this browser too, and the others stay.
+    if (current) setBook(profileRemoved(readProfiles(), current))
     setSession(null)
     setNotice(null)
     setOverrides({})
@@ -206,7 +319,8 @@ export default function App() {
     navigate({ page: 'home' }, { replace: true })
     await webSessionStore.clear()
     if (current) await logout(current)
-  }, [session, navigate])
+    if (readProfiles().profiles.length > 0) setChoosing(true)
+  }, [session, navigate, setBook])
 
   if (restoring) {
     return (
@@ -216,8 +330,20 @@ export default function App() {
     )
   }
 
+  if (!session && choosing && book.profiles.length > 0) {
+    return <WhoIsWatching book={book} onBook={setBook} onPick={(profile) => void openProfile(profile)} onAdd={() => setChoosing(false)} />
+  }
+
   if (!session) {
     return (
+      <>
+      {book.profiles.length > 0 && (
+        <p className="gutter-x pt-6 text-center">
+          <button type="button" className="btn-ghost" onClick={() => setChoosing(true)}>
+            {t('Back to the accounts')}
+          </button>
+        </p>
+      )}
       <ConnectForm
         key={language}
         notice={notice}
@@ -230,11 +356,19 @@ export default function App() {
         onConnected={(next, keep) => {
           webSessionStore.persistent = keep
           void webSessionStore.save(toStoredSession(next))
+          // An account that stays signed in is kept in the list of this browser.
+          if (keep) setBook(profileSignedIn(readProfiles(), toStoredSession(next), Date.now()))
+          try {
+            sessionStorage.setItem(CHOSEN, '1')
+          } catch {
+            // The same.
+          }
           setNotice(null)
           setStorageOwner(next.userId)
           setSession(next)
         }}
       />
+      </>
     )
   }
 

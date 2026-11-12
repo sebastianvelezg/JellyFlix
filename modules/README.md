@@ -111,6 +111,8 @@ volumes:
 3. **Match.** It starts by asking how to play:
    - **On this device:** one person (or everybody around the screen) swipes here. Choose the genre, decade, length and whether series are included (tap the chips), and swipe. No code, nobody joins.
    - **Each on their phone:** choose what to watch, then *Open the lobby*. This screen shows a **QR code** and who has joined. Each person reads the QR with their phone (it opens Jellyflix, asks to sign in if needed, and joins by itself) and waits. When everybody is in, press *Start swiping* on the screen. Everybody swipes the same cards on their own phone; the screen shows the cards of the round and who has finished. When a round ends, what you all liked comes back for another round, until one is left; the screen then has *Play here* (the phones say the screen will play it, or can send it with *Play on…*) and a summary of how much you agreed and what each chose. The person who started it can also swipe on the screen (*I want to swipe on this device too*) or start the swiping from their own phone.
+   - **Couch mode (TV app):** choose *2 on this sofa* to *6 on this sofa* under *Who is playing*. Nobody needs a phone: each person takes a turn with the one remote (the TV asks to pass it on, and shows only that person's cards). When every seat has voted, the rounds go on like any other Match. The container keeps one seat for each person (the host's account plays them), so it needs no extra accounts.
+   - **When nobody agrees:** if several fresh sets of films go by without one that everybody liked (or the host presses *We cannot agree*), the Match ends with no winner and shows the **three films that came closest**, ready to play; *Another round* starts over.
 4. **Without the container.** Stop it (or open Jellyflix without the address): the Modules button disappears and nothing else changes.
 
 Not checked yet on a real server: playing with the channel buttons (the tests ran against the mock server), that leaving a channel mid-title does not leave it in *Continue watching* (the container puts the previous position back; it was not seen against Jellyfin itself), the Docker images, and the TV app (its Modules screens compile and have unit tests, but have not been tried on a screen).
@@ -139,7 +141,7 @@ All routes need `Authorization: MediaBrowser Token="<jellyfin token>"`, except `
 | `PUT /v1/channels/:id/image` `{ data: base64 }`, `DELETE /v1/channels/:id/image` | administrator | set or take away the picture (up to 150 kB and 1024 px, checked by what is inside it; never SVG) |
 | `POST/PUT/DELETE /v1/channels…`, `POST /v1/channels/preview`, `/auto`, `/:id/rebuild`, `/:id/refresh`, `GET /v1/channels/suggestions` | administrator | manage channels |
 | `GET /v1/seerr/me`, `GET /v1/seerr/search`, `GET /v1/seerr/title/:type/:id`, `GET/POST /v1/seerr/requests` | any user (acting as their Seerr user) | Seerr (only when turned on) |
-| `GET/POST /v1/match/rooms`, `POST /v1/match/join`, `POST /v1/match/rooms/:id/{swipe,pick,again}`, `GET/DELETE /v1/match/rooms/:id` | any user | Match |
+| `GET/POST /v1/match/rooms`, `POST /v1/match/join`, `POST /v1/match/rooms/:id/{swipe,pick,again,end}`, `GET/DELETE /v1/match/rooms/:id` | any user | Match (`end`: the host only; a couch Match takes `as` — a seat — in the body of swipe and pick and in the query of the read) |
 
 The types are in [`contract/index.ts`](contract/index.ts); the web app keeps a copy (`npm run contract:sync`, checked in CI).
 

@@ -113,9 +113,13 @@ data class MatchRoom(
     val filters: MatchFilters,
     val deck: List<MatchCard>,
     val winner: MatchCard?,
-    /** "agreement" or "coin". */
+    /** "agreement", "coin", or "none" (no agreement: there is no winner, only [finalists]). */
     val winnerBy: String?,
     val summary: MatchSummary?,
+    /** A Match that ended without agreement: the films that came closest, best first. */
+    val finalists: List<MatchCard> = emptyList(),
+    /** What the person this room is shown to still has to vote on (or choose from). */
+    val remaining: List<MatchCard> = emptyList(),
 ) {
     val isDone: Boolean get() = phase == "done"
 }
@@ -225,6 +229,8 @@ fun parseMatchRoom(o: JSONObject): MatchRoom {
         winner = o.optJSONObject("winner")?.let(::parseCard),
         winnerBy = o.optStringOrNull("winnerBy"),
         summary = o.optJSONObject("summary")?.let(::parseSummary),
+        remaining = o.optJSONArray("remaining")?.let { a -> (0 until a.length()).map { parseCard(a.getJSONObject(it)) } } ?: emptyList(),
+        finalists = o.optJSONArray("finalists")?.let { a -> (0 until a.length()).map { parseCard(a.getJSONObject(it)) } } ?: emptyList(),
     )
 }
 
@@ -353,21 +359,31 @@ class ModulesClient(
     // Match
     suspend fun matchOptions(): List<String> = getObject("/v1/match/options").getJSONArray("genres").let { a -> (0 until a.length()).map { a.getString(it) } }
     suspend fun myRooms(): List<MatchRoomSummary> = parseRoomSummaries(getArray("/v1/match/rooms"))
-    suspend fun createRoom(filters: MatchFilters, deckSize: Int): MatchRoom {
-        val body = JSONObject().put("mode", "phones").put("deckSize", deckSize)
+    /** [players]: couch mode, the names of the people on the sofa (the TV then holds a seat for each); empty: a Match for phones. */
+    suspend fun createRoom(filters: MatchFilters, deckSize: Int, players: List<String> = emptyList()): MatchRoom {
+        val body = JSONObject().put("mode", if (players.isEmpty()) "phones" else "local").put("deckSize", deckSize)
+        if (players.isNotEmpty()) body.put("players", JSONArray(players))
         filters.genre?.let { body.put("genre", it) }
         filters.decade?.let { body.put("decade", it) }
         filters.length?.let { body.put("length", it) }
         if (filters.series) body.put("series", true)
         return parseMatchRoom(postObject("/v1/match/rooms", body))
     }
+    /** A vote (or a choice of favourite) for a seat of a couch Match. */
+    suspend fun swipeAs(id: String, seat: String, cardId: String, like: Boolean): MatchRoom =
+        parseMatchRoom(postObject("/v1/match/rooms/$id/swipe", JSONObject().put("cardId", cardId).put("vote", if (like) "like" else "pass").put("as", seat)))
+    suspend fun pickAs(id: String, seat: String, cardId: String): MatchRoom =
+        parseMatchRoom(postObject("/v1/match/rooms/$id/pick", JSONObject().put("cardId", cardId).put("as", seat)))
     suspend fun startMatch(id: String): MatchRoom = parseMatchRoom(postObject("/v1/match/rooms/$id/start"))
     suspend fun playAgain(id: String): MatchRoom = parseMatchRoom(postObject("/v1/match/rooms/$id/again"))
+    /** The host gives up on agreeing: the Match ends and shows the films that came closest. */
+    suspend fun endMatch(id: String): MatchRoom = parseMatchRoom(postObject("/v1/match/rooms/$id/end"))
     suspend fun closeRoom(id: String) = delete("/v1/match/rooms/$id")
 
     /** The room as it is now, or null when it has not moved since [since]. */
-    suspend fun readRoom(id: String, since: Int?): MatchRoom? {
-        val o = getObject("/v1/match/rooms/$id" + if (since != null) "?since=$since" else "")
+    suspend fun readRoom(id: String, since: Int?, seat: String? = null): MatchRoom? {
+        val query = listOfNotNull(since?.let { "since=$it" }, seat?.let { "as=" + java.net.URLEncoder.encode(it, "UTF-8") }).joinToString("&")
+        val o = getObject("/v1/match/rooms/$id" + if (query.isNotEmpty()) "?$query" else "")
         return if (o.optBoolean("unchanged", false)) null else parseMatchRoom(o)
     }
 

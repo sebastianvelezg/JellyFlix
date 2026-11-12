@@ -24,7 +24,7 @@ const manifest = (over: Partial<Manifest> = {}): Manifest => ({
   version: '0.1.0',
   serverTime: 1000,
   user: { id: 'u', name: 'Ana', isAdmin: true },
-  modules: [{ id: 'channels', state: 'ready' }],
+  modules: [{ id: 'channels', version: 1, state: 'ready' }],
   serviceKey: false,
   ...over,
 })
@@ -83,6 +83,16 @@ describe('finding out whether a modules container is there', () => {
     expect(url).toBe('http://modules:8097/v1/manifest')
     expect((init.headers as Record<string, string>).authorization).toBe('MediaBrowser Token="secret-token"')
     expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves out a module whose answers are newer than the app understands, and keeps the rest', async () => {
+    const modules = [
+      { id: 'channels', version: 2, state: 'ready' },
+      { id: 'match', version: 1, state: 'ready' },
+      { id: 'seerr', state: 'ready' }, // an older container sends no revision: it counts as 1
+    ] as Manifest['modules']
+    const gate = await probeModules('http://modules:8097', 't', answer(manifest({ modules })))
+    expect(gate.status === 'ready' && gate.manifest.modules.map((m) => m.id)).toEqual(['match', 'seerr'])
   })
 
   it('treats anything that goes wrong as "absent", without an error', async () => {

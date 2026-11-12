@@ -11,8 +11,16 @@ export const MODULE_IDS: readonly ModuleId[] = ['channels', 'match', 'seerr']
 
 export type ModuleState = 'ready' | 'needs-setup' | 'error'
 
+/**
+ * The revision of each module's own answers. Bumped when that module changes in a way an older app would misread, without touching the
+ * others: an app that understands Retro TV revision 1 keeps using it while Match moves to 2. `API_VERSION` is for the container as a whole.
+ */
+export const MODULE_VERSIONS: Readonly<Record<ModuleId, number>> = { channels: 1, match: 2, seerr: 1 }
+
 export interface ModuleInfo {
   id: ModuleId
+  /** This module's revision (see `MODULE_VERSIONS`). A container older than this field leaves it out, and the app then assumes 1. */
+  version: number
   state: ModuleState
   /** For a state that is not "ready": what is wrong, in English (the app translates what it knows). */
   detail?: string
@@ -296,8 +304,10 @@ export interface MatchRoomView {
   /** At the end of a round: what everybody liked. */
   lastLiked: string[]
   winner?: MatchCard
-  /** "agreement": everybody chose it. "coin": tied choices were settled by chance. */
-  winnerBy?: 'agreement' | 'coin'
+  /** "agreement": everybody chose it. "coin": tied choices were settled by chance. "none": the people did not agree; there is no winner, only `finalists`. */
+  winnerBy?: 'agreement' | 'coin' | 'none'
+  /** When the Match ended without agreement: the films that came closest (most likes), best first, at most three. Empty if nobody liked any. */
+  finalists?: MatchCard[]
 }
 
 export interface MatchRoomSummary {
@@ -314,6 +324,11 @@ export interface MatchCreateRequest extends MatchFilters {
   deckSize?: number
   /** "local" (the default) or "phones": see {@link MatchMode}. */
   mode?: MatchMode
+  /**
+   * Couch mode (only for "local"): the names of the people on the sofa, 2 to 6, the first being whoever holds the remote and the account.
+   * They vote one after the other on the same screen; the container keeps a seat for each. Nothing else changes: the same rounds, the same winner.
+   */
+  players?: string[]
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

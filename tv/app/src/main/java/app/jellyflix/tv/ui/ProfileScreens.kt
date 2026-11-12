@@ -81,7 +81,10 @@ fun GateScreen(vm: AppViewModel) {
                 fixedServer = gate.server,
                 accountName = profile?.name,
                 onBack = if (vm.profiles.isEmpty) null else vm::backToChooser,
+                found = vm.foundServers.map { it.name to it.address },
             )
+            // Looking for servers on the network only when the server is to be typed.
+            if (gate.server == null) LaunchedEffect(Unit) { vm.discoverServers() }
         }
         // Between two accounts: nothing of the one leaving is drawn while its player says where it stopped.
         Gate.Switching, Gate.Open -> Box(Modifier.fillMaxSize())
@@ -94,6 +97,7 @@ fun GateScreen(vm: AppViewModel) {
 @Composable
 private fun ProfileChooser(vm: AppViewModel) {
     val profiles = vm.profiles.profiles
+    val manyServers = profiles.map { it.serverUrl.trimEnd('/').lowercase() }.distinct().size > 1
     var removing by remember { mutableStateOf<Profile?>(null) }
     val first = remember { FocusRequester() }
     val confirm = remember { FocusRequester() }
@@ -110,13 +114,15 @@ private fun ProfileChooser(vm: AppViewModel) {
             items(profiles, key = { it.id }) { profile ->
                 ProfileTile(
                     profile = profile,
+                    serverNote = if (manyServers) hostOf(profile.serverUrl) else null,
                     onOpen = { vm.choose(profile) },
                     onHold = { removing = profile },
                     modifier = if (profile.id == (vm.profiles.activeId ?: profiles.maxByOrNull { it.lastUsed }?.id)) Modifier.focusRequester(first) else Modifier,
                 )
             }
             if (vm.profiles.canAdd) {
-                item { AddTile(onClick = vm::addAccount) }
+                item { AddTile(stringResource(R.string.profiles_add), onClick = vm::addAccount) }
+                item { AddTile(stringResource(R.string.profiles_add_server), onClick = vm::addServer) }
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -155,14 +161,18 @@ private fun ProfileChooser(vm: AppViewModel) {
     }
 }
 
+/** The host of a server address, for a tile that has to say which server an account is on. */
+private fun hostOf(serverUrl: String): String = runCatching { java.net.URI(serverUrl).host }.getOrNull() ?: serverUrl
+
 /** A round picture (the account's own, or its initial when it has none), its name, and what is special about it. */
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
-private fun ProfileTile(profile: Profile, onOpen: () -> Unit, onHold: () -> Unit, modifier: Modifier = Modifier) {
+private fun ProfileTile(profile: Profile, serverNote: String?, onOpen: () -> Unit, onHold: () -> Unit, modifier: Modifier = Modifier) {
     val note = when {
         profile.needsSignIn -> stringResource(R.string.profiles_sign_in_again)
         profile.hasPin -> stringResource(R.string.profiles_locked)
-        else -> null
+        // With accounts on more than one server, each says which one.
+        else -> serverNote
     }
     Surface(
         onClick = onOpen,
@@ -196,8 +206,7 @@ private fun ProfileTile(profile: Profile, onOpen: () -> Unit, onHold: () -> Unit
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun AddTile(onClick: () -> Unit) {
-    val label = stringResource(R.string.profiles_add)
+private fun AddTile(label: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.width(150.dp),

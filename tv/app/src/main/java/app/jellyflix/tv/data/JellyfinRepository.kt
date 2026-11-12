@@ -48,6 +48,7 @@ import org.jellyfin.sdk.model.api.MediaStream
 import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.PersonKind
 import org.jellyfin.sdk.api.sockets.subscribe
+import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.jellyfin.sdk.model.api.ClientCapabilitiesDto
 import org.jellyfin.sdk.model.api.PlayCommand
 import org.jellyfin.sdk.model.api.PlayMessage
@@ -182,6 +183,8 @@ class JellyfinRepository(context: Context) {
     sealed interface RemoteMessage {
         class Play(val itemIds: List<UUID>, val startMs: Long, val command: PlayCommand) : RemoteMessage
         class State(val command: PlaystateCommand, val seekMs: Long?) : RemoteMessage
+        /** What the account has watched changed (on this TV or on another device). */
+        data object UserData : RemoteMessage
     }
 
     /** Tells the server this TV can be controlled and what it can play, so it shows up in other apps' "Play on" list. */
@@ -206,7 +209,8 @@ class JellyfinRepository(context: Context) {
         val states = socket.subscribe<PlaystateMessage>().map { message ->
             RemoteMessage.State(message.data?.command ?: PlaystateCommand.PLAY_PAUSE, message.data?.seekPositionTicks?.let { it / 10_000 })
         }
-        return merge(plays, states)
+        val userData = socket.subscribe<UserDataChangedMessage>().map { RemoteMessage.UserData }
+        return merge(plays, states, userData)
     }
 
     // ---- Browsing ---------------------------------------------------------------------------------------------
@@ -802,6 +806,12 @@ class JellyfinRepository(context: Context) {
             userId = userId(session),
             data = org.jellyfin.sdk.model.api.UpdateUserItemDataDto(playbackPositionTicks = ticks),
         )
+    }
+
+    /** The trailers of a title that are files on the server, ready to play. */
+    suspend fun localTrailers(session: Session, id: UUID): List<MediaItem> {
+        val api = api(session)
+        return api.libraryApi.getLocalTrailers(itemId = id, userId = userId(session)).content.map { toItem(api, it) }
     }
 
     suspend fun details(session: Session, id: UUID): MediaItem {
@@ -1727,6 +1737,8 @@ class JellyfinRepository(context: Context) {
             versions = versionOptions(dto),
             playsAs = playsAsBySource(dto),
             tmdbCollection = dto.providerIds?.get("TmdbCollection")?.takeIf { it.isNotBlank() },
+            localTrailers = dto.localTrailerCount ?: 0,
+            youtubeTrailer = dto.remoteTrailers.orEmpty().firstNotNullOfOrNull { Trailers.youtubeWatchUrl(it.url) },
             artist = artist,
             format = format,
             runtimeMs = dto.runTimeTicks?.div(10_000),

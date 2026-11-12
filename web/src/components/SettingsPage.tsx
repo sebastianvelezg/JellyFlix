@@ -34,6 +34,7 @@ import { SyncSettings } from './SyncSettings'
 import { openShortcuts } from './ShortcutsDialog'
 import { Card, Toggle } from './SettingsParts'
 import { KidsCard } from './KidsMode'
+import { AccountsCard } from './profiles/AccountsCard'
 import { openSetup } from './SetupWizard'
 import { SETTINGS_INDEX, searchSettings, type SettingEntry } from './settingsIndex'
 
@@ -347,6 +348,8 @@ export function SettingsPage({
             {t('Sign out')}
           </button>
         </Card>
+
+        <AccountsCard session={session} />
 
         <Card title={t('Interface')}>
           <Toggle

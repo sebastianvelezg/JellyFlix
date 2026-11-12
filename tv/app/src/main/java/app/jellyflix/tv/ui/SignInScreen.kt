@@ -58,6 +58,8 @@ fun SignInScreen(
     accountName: String? = null,
     /** Back to the picker of accounts, when there is one. */
     onBack: (() -> Unit)? = null,
+    /** Servers found on the home network (name and address): choosing one fills the address in. */
+    found: List<Pair<String, String>> = emptyList(),
 ) {
     var server by remember { mutableStateOf(fixedServer ?: initialServer) }
     var user by remember { mutableStateOf(accountName.orEmpty()) }
@@ -162,6 +164,20 @@ fun SignInScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }),
             )
+            if (fixedServer == null && found.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(stringResource(R.string.signin_found), fontSize = 14.sp, color = Palette.TextDim)
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 6.dp),
+                    modifier = Modifier.width(560.dp),
+                ) {
+                    items(found.size) { index ->
+                        val (name, address) = found[index]
+                        Pill(name, onClick = { server = address }, selected = server.trimEnd('/') == address)
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
             if (!withPassword) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

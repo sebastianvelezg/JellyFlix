@@ -370,6 +370,62 @@ describe('match', () => {
     assert.equal(view.winner?.id, view.deck[0]!.id)
   })
 
+  it('couch mode: one remote plays a seat for each person on the sofa, and nobody else can', async () => {
+    const made = await call<MatchRoomView>('POST', '/v1/match/rooms', 'tok-admin', { deckSize: 4, players: ['Ana', 'Ben', 'Cy'] })
+    assert.equal(made.status, 200)
+    assert.deepEqual(made.body.members.map((m) => m.name), ['Ana', 'Ben', 'Cy'])
+    const seat = made.body.members[1]!.id
+    const id = made.body.id
+    // The host asks what a seat still has to vote on, and votes for it.
+    const view = await call<MatchRoomView>('GET', `/v1/match/rooms/${id}?as=${encodeURIComponent(seat)}`, 'tok-admin')
+    assert.equal(view.body.me, seat)
+    assert.equal(view.body.remaining.length, made.body.deck.length)
+    const voted = await call<MatchRoomView>('POST', `/v1/match/rooms/${id}/swipe`, 'tok-admin', { cardId: made.body.deck[0]!.id, vote: 'like', as: seat })
+    assert.equal(voted.status, 200)
+    assert.equal(voted.body.me, seat)
+    assert.equal(voted.body.remaining.length, made.body.deck.length - 1)
+    // The host's own votes are not touched, and a person who is not the host cannot play a seat.
+    const own = await call<MatchRoomView>('GET', `/v1/match/rooms/${id}`, 'tok-admin')
+    assert.equal(own.body.remaining.length, made.body.deck.length)
+    const stranger = await call('POST', `/v1/match/rooms/${id}/swipe`, 'tok-ben', { cardId: made.body.deck[0]!.id, vote: 'like', as: seat })
+    assert.equal(stranger.status, 403)
+    // A seat that does not exist cannot be played either.
+    const missing = await call('POST', `/v1/match/rooms/${id}/swipe`, 'tok-admin', { cardId: made.body.deck[0]!.id, vote: 'like', as: 'nobody#9' })
+    assert.equal(missing.status, 403)
+  })
+
+  it('couch mode finishes like any room once every seat has voted, and the host closes it for everybody', async () => {
+    const made = await call<MatchRoomView>('POST', '/v1/match/rooms', 'tok-admin', { deckSize: 4, players: ['Ana', 'Ben'] })
+    const seats = made.body.members.map((m) => m.id)
+    const liked = made.body.deck[0]!.id
+    let last: MatchRoomView | undefined
+    for (const seat of seats) {
+      for (const card of made.body.deck) {
+        const answer = await call<MatchRoomView>('POST', `/v1/match/rooms/${made.body.id}/swipe`, 'tok-admin', { cardId: card.id, vote: card.id === liked ? 'like' : 'pass', as: seat })
+        assert.equal(answer.status, 200)
+        last = answer.body
+      }
+    }
+    assert.equal(last?.phase, 'done')
+    assert.equal(last?.winner?.id, liked)
+    await call('DELETE', `/v1/match/rooms/${made.body.id}`, 'tok-admin')
+    assert.equal((await call('GET', `/v1/match/rooms/${made.body.id}`, 'tok-admin')).status, 404)
+  })
+
+  it("the host can end a Match without agreement and keep the films that came closest; nobody else can", async () => {
+    const started = await phonesRoom({ deckSize: 4 })
+    await swipeAs('tok-admin', started.id, started.deck[0]!.id, "like")
+    const denied = await call("POST", `/v1/match/rooms/${started.id}/end`, 'tok-ben')
+    assert.equal(denied.status, 403)
+    const ended = await call<MatchRoomView>("POST", `/v1/match/rooms/${started.id}/end`, 'tok-admin')
+    assert.equal(ended.body.phase, "done")
+    assert.equal(ended.body.winnerBy, "none")
+    assert.equal(ended.body.winner, undefined)
+    assert.deepEqual(ended.body.finalists?.map((c) => c.id), [started.deck[0]!.id])
+    const seen = await room('tok-ben', started.id)
+    assert.equal(seen.winnerBy, "none")
+  })
+
   it('only deals the films that fit the filters, and says what they were', async () => {
     const options = await call<{ genres: string[] }>('GET', '/v1/match/options', 'tok-ben')
     assert.deepEqual(options.body.genres, ['Action', 'Comedy', 'Drama'])

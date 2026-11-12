@@ -41,7 +41,13 @@ val SUBTITLE_SEARCH_LANGUAGES: List<Pair<String, String>> = listOf(
 /** Which language to search first: the one of the subtitles chosen last, else the viewer's own ([deviceLanguage] is a two-letter code), else English. */
 fun defaultSearchLanguage(remembered: String?, deviceLanguage: String): String {
     if (SUBTITLE_SEARCH_LANGUAGES.any { it.first == remembered }) return remembered!!
-    return if (deviceLanguage == "es") "spa" else "eng"
+    return when (deviceLanguage) {
+        "es" -> "spa"
+        "pt" -> "por"
+        "fr" -> "fra"
+        "de" -> "deu"
+        else -> "eng"
+    }
 }
 
 /**

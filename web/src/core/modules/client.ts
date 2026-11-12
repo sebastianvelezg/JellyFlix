@@ -1,4 +1,4 @@
-import { API_VERSION, type Manifest } from './contract'
+import { API_VERSION, MODULE_VERSIONS, type Manifest } from './contract'
 
 /** The versions of the modules API this app understands. */
 export const SUPPORTED_API: readonly number[] = [API_VERSION]
@@ -91,7 +91,9 @@ export async function probeModules(baseUrl: string | null, token: string, fetchI
     const manifest = await client.get<Manifest>('/v1/manifest')
     if (typeof manifest?.api !== 'number' || !Array.isArray(manifest.modules)) return { status: 'absent' }
     if (!SUPPORTED_API.includes(manifest.api)) return { status: 'incompatible', api: manifest.api, version: String(manifest.version ?? '') }
-    return { status: 'ready', manifest, client: createModulesClient(baseUrl, token, fetchImpl), skew: manifest.serverTime - Math.floor(nowMs() / 1000) }
+    // A module whose answers changed past what this app understands is left out; the others keep working. (An older container sends no revision: 1.)
+    const understood = manifest.modules.filter((m) => (typeof m.version === 'number' ? m.version : 1) <= (MODULE_VERSIONS[m.id] ?? 0))
+    return { status: 'ready', manifest: { ...manifest, modules: understood }, client: createModulesClient(baseUrl, token, fetchImpl), skew: manifest.serverTime - Math.floor(nowMs() / 1000) }
   } catch {
     return { status: 'absent' }
   }

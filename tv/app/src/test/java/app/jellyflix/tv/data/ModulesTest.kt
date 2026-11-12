@@ -141,6 +141,22 @@ class ModulesTest {
     }
 
     @Test
+    fun `a Match that ended without agreement has no winner and keeps its finalists`() {
+        val room = parseMatchRoom(
+            JSONObject(
+                """{"id":"r","code":"ABCDE","mode":"phones","hostId":"h","hostName":"Ana","version":9,"phase":"done","round":3,"me":"h",
+                    "members":[{"id":"d","name":"Ben","done":true}],"filters":{},"deck":[],"winnerBy":"none",
+                    "finalists":[{"id":"0123abcd0123456789ab0123456789ab","name":"Close one","kind":"Movie","genres":[]},{"id":"1123abcd0123456789ab0123456789ab","name":"Close two","kind":"Series","genres":[]}]}""",
+            ),
+        )
+        assertTrue(room.isDone)
+        assertEquals(null, room.winner)
+        assertEquals("none", room.winnerBy)
+        assertEquals(listOf("Close one", "Close two"), room.finalists.map { it.name })
+        assertTrue(room.finalists[1].isSeries)
+    }
+
+    @Test
     fun `a program of a title this account may not see is read as unavailable, with no id to play`() {
         val shown = parseProgram(JSONObject("""{"start":10,"end":20,"itemId":"","title":"Program not available","type":"Movie","runtime":10,"unavailable":true}"""))
         assertTrue(shown.unavailable)

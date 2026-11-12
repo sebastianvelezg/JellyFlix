@@ -25,7 +25,7 @@ A change that breaks one of these will not be merged, however good it is:
 4. **The apps never transcode.** They tell Jellyfin what the device can play and use what it answers.
 5. **Both apps stay equivalent.** If you change a rule (how the home banner is chosen, how a stream is requested) check the other app and change both, or say in the pull
    request why not.
-6. **Every language together.** Every user-visible text exists in English and in the web app's other languages (Spanish, Portuguese, French and German, in `web/src/i18n/`), and in English and Spanish on the TV. Tests fail when a text is missing or a `{placeholder}` differs.
+6. **Every language together.** Every user-visible text exists in English and in Spanish, Portuguese, French and German, on the web (`web/src/i18n/`) and on the TV (`tv/app/src/main/res/values-*`). Tests fail when a text is missing or a `{placeholder}` differs.
 
 ## Setting up
 
@@ -83,8 +83,8 @@ Each app's README has its features, how to host or install it, its architecture 
 
 - **Web:** the English text is the key. Add a file next to `web/src/i18n/es.ts` with the same shape, register it in `web/src/i18n/index.ts` (`LANGUAGES`, `dictionaries`), and
   run the tests: one checks that every text used in the code has an entry.
-- **TV:** copy `tv/app/src/main/res/values/strings.xml` to `values-xx/strings.xml` (`xx` is the language code), translate the values, and add the code to `localeFilters` in
-  `tv/app/build.gradle.kts`.
+- **TV:** copy `tv/app/src/main/res/values/strings.xml` to `values-xx/strings.xml` (`xx` is the language code), translate the values, add the code to `localeFilters` in
+  `tv/app/build.gradle.kts` and to the list in `StringsParityTest` (it fails when a text is missing or a `%1$s` differs).
 
 ## Commits and pull requests
 

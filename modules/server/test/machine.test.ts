@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { MatchCard } from '../../contract/index.ts'
-import { addMember, advance, newRoom, pick, removeMember, restart, RuleError, startRound, startSwiping, viewFor, vote, type RoomData } from '../src/modules/match/machine.ts'
+import { addMember, advance, endWithoutAgreement, hasFinalists, newRoom, pick, removeMember, restart, RuleError, startRound, startSwiping, viewFor, vote, type RoomData } from '../src/modules/match/machine.ts'
 
 const card = (id: string): MatchCard => ({ id, name: id, kind: 'Movie', genres: [] })
 const deck = (...ids: string[]): MatchCard[] => ids.map(card)
@@ -146,5 +146,54 @@ describe('Match rules', () => {
     assert.equal(again.phase, 'swipe')
     assert.equal(again.round, 1)
     assert.equal(again.winner, undefined)
+  })
+})
+
+describe('A Match nobody could settle', () => {
+  it('keeps the films that came closest and ends after several rounds with nothing in common', () => {
+    let r = room(deck('a', 'b', 'c', 'd'))
+    // Round 1: they share no film (me a, b; ben c, d).
+    r = swipeAll(swipeAll(r, 'me', ['a', 'b']), 'ben', ['c', 'd'])
+    let step = advance(r)
+    assert.equal(step.kind, 'needs-fresh')
+    r = startRound(step.room, deck('e', 'f'))
+    r = swipeAll(swipeAll(r, 'me', ['e']), 'ben', ['f'])
+    step = advance(r)
+    assert.equal(step.kind, 'needs-fresh')
+    r = startRound(step.room, deck('g', 'h'))
+    r = swipeAll(swipeAll(r, 'me', []), 'ben', [])
+    step = advance(r)
+    assert.equal(step.kind, 'next')
+    assert.equal(step.room.phase, 'done')
+    assert.equal(step.room.winnerBy, 'none')
+    assert.equal(step.room.winner, undefined)
+    assert.equal(step.room.finalists?.length, 3)
+    const view = viewFor(step.room, 'me', 1)
+    assert.equal(view.winnerBy, 'none')
+    assert.equal(view.finalists?.length, 3)
+  })
+
+  it('lets the host end it at any time, with the most liked films first', () => {
+    let r = room(deck('a', 'b', 'c'))
+    r = vote(vote(r, 'me', 'b', 'like'), 'ben', 'b', 'like')
+    r = vote(r, 'me', 'a', 'like')
+    const ended = endWithoutAgreement(r)
+    assert.equal(ended.phase, 'done')
+    assert.deepEqual(ended.finalists?.map((c) => c.id), ['b', 'a'])
+    assert.throws(() => endWithoutAgreement(ended), RuleError)
+  })
+
+  it('shows no finalists when nobody liked anything', () => {
+    const ended = endWithoutAgreement(room(deck('a', 'b')))
+    assert.deepEqual(ended.finalists, [])
+    assert.equal(hasFinalists(room(deck('a', 'b'))), false)
+  })
+
+  it('starts clean again after a Match without winner', () => {
+    const ended = endWithoutAgreement(vote(room(deck('a', 'b')), 'me', 'a', 'like'))
+    const again = restart(ended, deck('x', 'y'))
+    assert.equal(again.phase, 'swipe')
+    assert.equal(again.finalists, undefined)
+    assert.equal(again.winnerBy, undefined)
   })
 })

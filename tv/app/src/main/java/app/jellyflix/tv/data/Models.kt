@@ -51,6 +51,9 @@ data class MediaItem(
     val parentId: UUID? = null,
     /** My rating: true is a thumb up, false a thumb down, null none. */
     val likes: Boolean? = null,
+    /** Trailers kept on the server (they play here) and the YouTube address of one the server only knows by link (only filled in when the full title is loaded). */
+    val localTrailers: Int = 0,
+    val youtubeTrailer: String? = null,
 ) {
     val isPlayable get() = kind == BaseItemKind.MOVIE || kind == BaseItemKind.EPISODE || kind == BaseItemKind.MUSIC_VIDEO || kind == BaseItemKind.TV_CHANNEL
 

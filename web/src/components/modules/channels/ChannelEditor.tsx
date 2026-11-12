@@ -21,6 +21,7 @@ import { useModulesClient } from '../ModulesProvider'
 import { ChannelLogo } from './ChannelBits'
 import { PictureError, shrinkPicture } from './imagePrep'
 import { LibraryPicker } from './LibraryPicker'
+import { coverage, daysKind, EVERY_DAY, shadowed, SLOTS, slotBlock, WEEKDAYS, WEEKEND, type SlotKey } from './slots'
 
 const COLORS = ['#4d8dff', '#e5484d', '#30a46c', '#f5a524', '#8e4ec6', '#12a594', '#e93d82', '#0091ff']
 
@@ -481,10 +482,38 @@ function RuleForm({ onAdd, onCancel }: { onAdd: (rule: RuleSource) => void; onCa
   )
 }
 
+/** The week at a glance: a row for each day, a cell for each hour, coloured by the block that covers it (empty: the channel draws from everything). */
+function WeekMap({ blocks }: { blocks: TimeBlock[] }) {
+  const grid = coverage(blocks)
+  const shades = ['bg-[var(--color-accent)]', 'bg-sky-400', 'bg-emerald-400', 'bg-amber-400', 'bg-fuchsia-400', 'bg-rose-400']
+  return (
+    <div role="img" aria-label={t('The week: which hours each block covers')} className="space-y-1">
+      {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+        <div key={day} className="flex items-center gap-2">
+          <span className="w-10 shrink-0 text-xs text-neutral-400">{weekday(day)}</span>
+          <div className="grid flex-1 grid-cols-24 gap-px" style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}>
+            {(grid[day] as number[]).map((block, hour) => (
+              <span key={hour} className={`h-3 rounded-[2px] ${block < 0 ? 'bg-white/10' : shades[block % shades.length]}`} title={`${String(hour).padStart(2, '0')}:00`} />
+            ))}
+          </div>
+        </div>
+      ))}
+      <p className="pl-12 text-[11px] text-neutral-500">{t('From 00:00 to 23:00. Grey: no block, so everything.')}</p>
+    </div>
+  )
+}
+
 /** The stretches of the week of a grid channel: which days, from when to when, and which of the channel's sources they draw from. */
 function Blocks({ def, onChange, onZone }: { def: ChannelDef; onChange: (blocks: TimeBlock[]) => void; onZone: (zone: string) => void }) {
   const update = (i: number, patch: Partial<TimeBlock>) => onChange(def.blocks.map((b, j) => (j === i ? { ...b, ...patch } : b)))
   const toggle = <T,>(list: T[], value: T): T[] => (list.includes(value) ? list.filter((x) => x !== value) : [...list, value])
+  const slotLabel: Record<SlotKey, string> = { morning: t('Mornings'), afternoon: t('Afternoons'), evening: t('Evenings'), night: t('Late night') }
+  const hidden = shadowed(def.blocks)
+  const dayName = (days: number[]): string => {
+    const kind = daysKind(days)
+    return kind === 'every' ? t('Every day') : kind === 'weekdays' ? t('Weekdays') : kind === 'weekend' ? t('Weekend') : [1, 2, 3, 4, 5, 6, 0].filter((d) => days.includes(d)).map(weekday).join(', ')
+  }
+  const sourceNames = (b: TimeBlock): string => (b.sources.length ? b.sources.map((i) => def.sources[i]?.name).filter(Boolean).join(', ') : t('everything'))
   return (
     <section aria-label={t('Weekly grid')} className="glass space-y-3 rounded-2xl p-4">
       <h3 className="text-base font-semibold text-white">{t('Weekly grid')}</h3>
@@ -493,8 +522,35 @@ function Blocks({ def, onChange, onZone }: { def: ChannelDef; onChange: (blocks:
         {t('Time zone')}
         <input className="field mt-1" value={def.timezone} onChange={(e) => onZone(e.target.value)} />
       </label>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t('Add a stretch of the day')}>
+        {SLOTS.map((slot) => (
+          <button key={slot.key} type="button" className="btn text-xs" onClick={() => onChange([...def.blocks, slotBlock(slot.key)])}>
+            + {slotLabel[slot.key]} ({slot.start}–{slot.end})
+          </button>
+        ))}
+      </div>
+      {def.blocks.length > 0 && <WeekMap blocks={def.blocks} />}
       {def.blocks.map((b, i) => (
         <div key={i} className="space-y-3 rounded-xl border border-white/10 p-3">
+          <p className="text-sm font-medium text-white">
+            {dayName(b.days)} · {b.start}–{b.end} · {sourceNames(b)}
+          </p>
+          {hidden[i] && (
+            <p role="status" className="text-xs text-amber-300">
+              {t('An earlier block already covers all of this one, so it is never used. Move it up or change its times.')}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Quick days')}>
+            <button type="button" className="btn-ghost text-xs" onClick={() => update(i, { days: [...EVERY_DAY] })}>
+              {t('Every day')}
+            </button>
+            <button type="button" className="btn-ghost text-xs" onClick={() => update(i, { days: [...WEEKDAYS] })}>
+              {t('Weekdays')}
+            </button>
+            <button type="button" className="btn-ghost text-xs" onClick={() => update(i, { days: [...WEEKEND] })}>
+              {t('Weekend')}
+            </button>
+          </div>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Days')}>
             {[1, 2, 3, 4, 5, 6, 0].map((d) => (
               <label key={d} className={`chip cursor-pointer ${b.days.includes(d) ? 'chip-accent' : ''}`}>

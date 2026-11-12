@@ -141,9 +141,12 @@ private fun Actions(vm: AppViewModel, state: DetailState, playButton: FocusReque
     // A title with several files (1080p and 4K): the one chosen below is the one that plays.
     val versions = item.versions
     val version = state.version ?: versions.firstOrNull()?.id
-    Row(
+    // The buttons wrap onto a second line when there are too many for the width (a trailer adds one).
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    androidx.compose.foundation.layout.FlowRow(
         modifier = Modifier.padding(top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Pill(playLabel, onClick = { vm.play(item, mediaSourceId = version) }, accent = true, modifier = Modifier.focusRequester(playButton))
         if (!isSeries && item.resumeMs > 0) {
@@ -157,6 +160,7 @@ private fun Actions(vm: AppViewModel, state: DetailState, playButton: FocusReque
             stringResource(if (item.favorite) R.string.remove_favorite else R.string.add_favorite),
             onClick = { vm.toggleFavorite(state) },
         )
+        if (item.localTrailers > 0 || item.youtubeTrailer != null) Pill(stringResource(R.string.trailer), onClick = { vm.playTrailer(item) })
         Pill(stringResource(R.string.rate_like), onClick = { vm.rate(state, true) }, selected = item.likes == true)
         Pill(stringResource(R.string.rate_dislike), onClick = { vm.rate(state, false) }, selected = item.likes == false)
     }

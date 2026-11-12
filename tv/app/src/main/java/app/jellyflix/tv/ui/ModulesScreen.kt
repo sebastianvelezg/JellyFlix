@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -102,7 +103,7 @@ private fun ModulesHome(vm: AppViewModel) {
                 title = stringResource(R.string.modules_retro_title),
                 text = stringResource(R.string.modules_retro_text),
                 action = stringResource(R.string.modules_retro_action),
-                onClick = { vm.modules.page = ModulesPage.Channels; vm.modules.loadChannels() },
+                onClick = { vm.modules.openChannels() },
                 modifier = Modifier.focusRequester(vm.contentEntry),
             )
             ModuleCard(
@@ -163,6 +164,14 @@ private fun ChannelsPage(vm: AppViewModel) {
         ) {
             Pill(stringResource(R.string.modules_on_now), onClick = { modules.guide = false }, selected = !modules.guide, modifier = Modifier.focusRequester(vm.contentEntry))
             Pill(stringResource(R.string.live_guide), onClick = { modules.guide = true }, selected = modules.guide)
+            modules.channels.firstOrNull { it.id == modules.lastChannelId }?.let { last ->
+                Pill(stringResource(R.string.live_last, last.name), onClick = { modules.tune(last) })
+            }
+            Pill(
+                stringResource(if (modules.autoTune) R.string.modules_auto_tune_on else R.string.modules_auto_tune_off),
+                onClick = { modules.chooseAutoTune(!modules.autoTune) },
+                selected = modules.autoTune,
+            )
         }
         when {
             !modules.channelsLoaded -> Hint(stringResource(R.string.loading))
@@ -321,6 +330,10 @@ private fun MatchSetup(vm: AppViewModel) {
             item { Pill(stringResource(R.string.match_films_only), { match.filters = f.copy(series = false) }, selected = !f.series) }
             item { Pill(stringResource(R.string.match_films_series), { match.filters = f.copy(series = true) }, selected = f.series) }
         }
+        ChoiceRow(stringResource(R.string.match_who)) {
+            item { Pill(stringResource(R.string.match_who_phones), { match.couch = 0 }, selected = match.couch == 0) }
+            items(listOf(2, 3, 4, 5, 6)) { n -> Pill(stringResource(R.string.match_who_couch, n), { match.couch = n }, selected = match.couch == n) }
+        }
         ChoiceRow(stringResource(R.string.match_size)) {
             items(listOf(6, 10, 16)) { n -> Pill(n.toString(), { match.deckSize = n }, selected = match.deckSize == n) }
         }
@@ -344,10 +357,91 @@ private fun ChoiceRow(label: String, content: androidx.compose.foundation.lazy.L
 
 @Composable
 private fun MatchRoomScreen(vm: AppViewModel, room: MatchRoom) {
-    when (room.phase) {
-        "lobby" -> MatchLobby(vm, room)
-        "done" -> MatchDone(vm, room)
+    val couch = room.mode == "local" && room.members.size >= 2
+    when {
+        room.phase == "lobby" -> MatchLobby(vm, room)
+        room.phase == "done" -> MatchDone(vm, room)
+        couch -> MatchCouch(vm, room)
         else -> MatchRound(vm, room)
+    }
+}
+
+/**
+ * Couch mode: everybody is on the sofa with one remote. Each person has a turn on the same screen; between turns the TV asks for the
+ * remote to be handed over, so nobody sees another's votes. When every seat has finished, the room goes on like any other.
+ */
+@Composable
+private fun MatchCouch(vm: AppViewModel, room: MatchRoom) {
+    val modules = vm.modules
+    val match = modules.match
+    val seat = room.members.firstOrNull { !it.done }
+    val seatNumber = room.members.indexOfFirst { it.id == seat?.id } + 1
+    LaunchedEffect(seat?.id, room.round, room.phase) {
+        if (seat != null) modules.loadSeat(room, seat.id)
+    }
+    Column(Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(
+            stringResource(if (room.phase == "pick") R.string.match_choosing_title else R.string.match_round, room.round),
+            fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Color.White,
+        )
+        when {
+            seat == null -> Text(stringResource(R.string.modules_working), fontSize = 17.sp, color = Palette.TextDim)
+            match.seatReady != seat.id -> {
+                // Hand the remote over.
+                Text(stringResource(R.string.match_couch_pass, seat.name), fontSize = 30.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text(stringResource(R.string.match_couch_turn, seatNumber, room.members.size), fontSize = 17.sp, color = Palette.TextDim)
+                Pill(stringResource(R.string.match_couch_ready), onClick = { match.seatReady = seat.id }, accent = true, modifier = Modifier.focusRequester(vm.contentEntry))
+            }
+            else -> {
+                val view = match.seatView
+                val mine = view?.takeIf { it.me == seat.id }
+                val card = mine?.remaining?.firstOrNull()
+                Text(stringResource(R.string.match_couch_turn_of, seat.name, seatNumber, room.members.size), fontSize = 17.sp, color = Palette.TextDim)
+                if (card == null) {
+                    Text(stringResource(R.string.modules_working), fontSize = 17.sp, color = Palette.TextDim)
+                } else if (room.phase == "pick") {
+                    Text(stringResource(R.string.match_choosing), fontSize = 17.sp, color = Palette.TextDim)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        itemsIndexed(mine.remaining, key = { _, c -> c.id }) { index, c ->
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Poster(vm, c, Modifier.width(150.dp).height(225.dp))
+                                Pill(
+                                    stringResource(R.string.match_couch_choose),
+                                    onClick = { modules.couchPick(room, seat.id, c) },
+                                    accent = index == 0,
+                                    modifier = if (index == 0) Modifier.focusRequester(vm.contentEntry) else Modifier,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Poster(vm, card, Modifier.width(240.dp).height(360.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(card.name, fontSize = 30.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                listOfNotNull(if (card.isSeries) stringResource(R.string.match_series) else null, card.year?.toString(), card.runtimeMinutes?.let { "$it min" }).joinToString(" · "),
+                                fontSize = 16.sp, color = Palette.TextDim,
+                            )
+                            card.overview?.takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 15.sp, color = Palette.TextDim, maxLines = 5, overflow = TextOverflow.Ellipsis) }
+                            Text(
+                                stringResource(R.string.match_couch_left, mine.remaining.size),
+                                fontSize = 14.sp, color = Palette.TextDim,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 10.dp)) {
+                                Pill(stringResource(R.string.match_couch_like), onClick = { modules.couchVote(room, seat.id, card, true) }, accent = true, modifier = Modifier.focusRequester(vm.contentEntry))
+                                Pill(stringResource(R.string.match_couch_pass_card), onClick = { modules.couchVote(room, seat.id, card, false) })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        match.error?.let { Text(it, fontSize = 15.sp, color = Color(0xFFFFB4B4)) }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Pill(stringResource(R.string.match_close), onClick = modules::closeMatch)
+            Pill(stringResource(R.string.match_cannot_agree), onClick = modules::endWithoutAgreement)
+        }
     }
 }
 
@@ -432,7 +526,10 @@ private fun MatchRound(vm: AppViewModel, room: MatchRoom) {
             items(room.deck, key = { it.id }) { card -> Poster(vm, card, Modifier.width(150.dp).height(225.dp)) }
         }
         MemberChips(room, marks = true)
-        Pill(stringResource(R.string.match_close), onClick = modules::closeMatch, modifier = Modifier.focusRequester(vm.contentEntry))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Pill(stringResource(R.string.match_close), onClick = modules::closeMatch, modifier = Modifier.focusRequester(vm.contentEntry))
+            if (room.hostId == room.me || room.mode == "local") Pill(stringResource(R.string.match_cannot_agree), onClick = modules::endWithoutAgreement)
+        }
     }
 }
 
@@ -446,8 +543,49 @@ private fun Poster(vm: AppViewModel, card: MatchCard, modifier: Modifier) {
     }
 }
 
+/** The Match ended without a film everybody liked: the ones that came closest, each one a button that plays it. */
+@Composable
+private fun MatchNoAgreement(vm: AppViewModel, room: MatchRoom) {
+    val modules = vm.modules
+    Column(Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(stringResource(R.string.match_no_agreement), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp, color = Palette.Accent)
+        Text(
+            stringResource(if (room.finalists.isEmpty()) R.string.match_no_finalists else R.string.match_finalists),
+            fontSize = 20.sp, color = Color.White,
+        )
+        if (room.finalists.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
+                itemsIndexed(room.finalists, key = { _, card -> card.id }) { index, card ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Poster(vm, card, Modifier.width(170.dp).height(255.dp))
+                        Pill(
+                            stringResource(if (card.isSeries) R.string.match_open_series else R.string.match_play),
+                            onClick = { modules.playFinalist(card) },
+                            accent = index == 0,
+                            modifier = if (index == 0) Modifier.focusRequester(vm.contentEntry) else Modifier,
+                        )
+                    }
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 6.dp)) {
+            Pill(
+                stringResource(R.string.match_another),
+                onClick = modules::anotherRound,
+                modifier = if (room.finalists.isEmpty()) Modifier.focusRequester(vm.contentEntry) else Modifier,
+            )
+            Pill(stringResource(R.string.match_close), onClick = modules::closeMatch)
+        }
+        modules.match.error?.let { Text(it, fontSize = 15.sp, color = Color(0xFFFFB4B4)) }
+    }
+}
+
 @Composable
 private fun MatchDone(vm: AppViewModel, room: MatchRoom) {
+    if (room.winnerBy == "none") {
+        MatchNoAgreement(vm, room)
+        return
+    }
     val modules = vm.modules
     val winner = room.winner
     Row(

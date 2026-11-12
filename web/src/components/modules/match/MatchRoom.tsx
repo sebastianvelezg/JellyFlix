@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '../../../core'
 import {
+  endMatch,
   isUnchanged,
   joinRoom,
   leaveRoom,
@@ -32,7 +33,7 @@ const HIDDEN_POLL_MS = 10_000
 /** Says what changed in the room since the last time it was looked at (somebody joined or finished, a new round, a winner). */
 function announceChanges(before: MatchRoomView, next: MatchRoomView): void {
   if (next.phase === 'done' && before.phase !== 'done') {
-    announce(next.winner ? t('It is a match: {title}', { title: next.winner.name }) : t('It is a match.'))
+    announce(next.winner ? t('It is a match: {title}', { title: next.winner.name }) : next.winnerBy === 'none' ? t('No agreement this time.') : t('It is a match.'))
     return
   }
   if (before.phase === 'lobby' && next.phase === 'swipe') {
@@ -313,6 +314,39 @@ export function MatchRoom({ session, id, go, onLeave }: { session: Session; id: 
             )}
           </section>
         ))}
+
+      {/* ---- the host can give up on agreeing ---- */}
+      {(view.phase === 'swipe' || view.phase === 'pick') && view.hostId === view.me && view.members.length > 0 && (
+        <div className="flex justify-center">
+          <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => void act(() => endMatch(client, id))}>
+            {t('We cannot agree: show the closest')}
+          </button>
+        </div>
+      )}
+
+      {/* ---- no agreement: the films that came closest ---- */}
+      {view.phase === 'done' && !view.winner && view.winnerBy === 'none' && (
+        <section aria-label={t('No agreement')} className="space-y-5 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[.25em] text-[var(--color-accent)]">{t('No agreement this time')}</p>
+          <p className="text-sm text-neutral-300">{(view.finalists ?? []).length > 0 ? t('Nobody liked the same film. These came closest:') : t('Nobody liked any film this time.')}</p>
+          <ul className="flex flex-wrap justify-center gap-4">
+            {(view.finalists ?? []).map((c) => (
+              <li key={c.id} className="w-36">
+                <button type="button" className="glass block w-full overflow-hidden rounded-xl text-left transition hover:ring-2 hover:ring-[var(--color-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" onClick={() => go(c.kind === 'Series' ? { page: 'show', id: c.id } : { page: 'movie', id: c.id })}>
+                  <Poster session={session} card={c} className="aspect-[2/3] w-full" />
+                  <span className="block truncate px-3 py-2 text-sm text-neutral-100">{c.name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {view.summary && <MatchSummaryCard summary={view.summary} chance={false} />}
+          <div className="flex justify-center">
+            <button type="button" className="btn" onClick={() => void act(() => playAgain(client, id))}>
+              {t('Another round')}
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* ---- the winner ---- */}
       {view.phase === 'done' && view.winner && (

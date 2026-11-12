@@ -21,6 +21,8 @@ export type RemoteMessage =
   | { kind: 'mute'; mute: boolean | 'toggle' }
   | { kind: 'message'; header: string; text: string }
   | { kind: 'keepAlive'; seconds: number }
+  /** Another device (or this one) changed what the account has watched: progress, watched marks, favorites. */
+  | { kind: 'userData' }
   /** Something about the group this device watches with (see `syncplay.ts`). */
   | { kind: 'sync'; message: SyncMessage }
 
@@ -119,6 +121,8 @@ export function parseRemoteMessage(raw: string): RemoteMessage | null {
           return null
       }
     }
+    case 'UserDataChanged':
+      return { kind: 'userData' }
     case 'ForceKeepAlive':
       return { kind: 'keepAlive', seconds: asNumber(message.Data) ?? 60 }
     case 'SyncPlayCommand':

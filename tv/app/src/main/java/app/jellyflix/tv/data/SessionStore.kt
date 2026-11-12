@@ -170,6 +170,19 @@ class SessionStore(context: Context, private val vault: TokenVault = KeystoreVau
             }
         }
 
+    /** Retro TV: the channel watched last by the account in use (its id). */
+    var lastRetroChannel: String?
+        get() = own("lastRetroChannel")?.let { prefs.getString(it, null) }
+        set(value) {
+            val key = own("lastRetroChannel") ?: return
+            prefs.edit { if (value == null) remove(key) else putString(key, value) }
+        }
+
+    /** Retro TV: opening the channels goes straight to the last one watched, as a television turns on. */
+    var retroAutoTune: Boolean
+        get() = prefs.getBoolean("retroAutoTune", true)
+        set(value) = prefs.edit { putBoolean("retroAutoTune", value) }
+
     /** The optional modules container (retro TV channels, Match): its address, and the web app's, for the QR code of a Match. Empty: not used. */
     var modulesAddress: String
         get() = prefs.getString("modulesAddress", "") ?: ""

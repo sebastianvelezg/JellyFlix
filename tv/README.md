@@ -3,7 +3,7 @@
 A native Android TV / Google TV client for your own Jellyfin server. Kotlin, Jetpack Compose for TV, Media3 (ExoPlayer) and the official Jellyfin Kotlin SDK. It talks only to the server you type in: no analytics, no other network calls,
 and no addresses or credentials in the source (the session is kept in the app's private storage on the device, its token sealed with a key from the Android key store).
 
-It is the sibling of the web client in [`../web`](../web/README.md) and follows the same look and the same rules: the same sections in the same order, the same themes, English and Spanish.
+It is the sibling of the web client in [`../web`](../web/README.md) and follows the same look and the same rules: the same sections in the same order, the same themes and the same five languages.
 What differs is how it is used: everything is built for a remote control and a TV seen from the sofa.
 
 <p align="center">
@@ -112,8 +112,11 @@ Settings → Appearance (the choices stay on the TV):
 
 ### Modules (optional)
 With the optional `jellyflix-modules` container running (see [`modules/`](../modules/README.md)) a **Modules** button appears in the top bar; without it the app asks for nothing and shows nothing. Set it up in **Settings > Modules**: the container's address (for example `http://192.168.1.10:8097`) and the web app's address (so the QR code of a Match opens it on a phone); both have a "use the suggested one" button built from the server's address.
-- **Retro TV**: channels made from your library, shown as a grid of what is on now and as a guide. Tuning in plays the title that is on, at the right minute. The player shows one glass panel with what is on, start over, previous / next program, go live, channel up/down (the remote's CH keys and Up / Down also change channel) and the guide of the channel over the picture; a card says what is on and next when the program changes, and the next one is prepared before the current one ends. Channels are made on the web app (administrators only).
-- **Match**: the TV is the screen only. It needs the Jellyfin API key in the modules container (that is how the container knows what each person may watch); without it the TV shows the container's message. It creates the room, shows a QR code and the people who joined, and when the host starts, everybody swipes on their phone; the TV shows the rounds and plays the winner.
+- **Finding the server**: the sign-in screen asks the home network which Jellyfin servers are there (a UDP broadcast on port 7359, the way Jellyfin's own apps do) and offers them, so no address has to be typed. Not every router passes broadcasts; typing the address always works. Several servers: *Add an account on another server* in "Who is watching?".
+- **Trailers**: the *Trailer* button on a title page plays a trailer kept on the server in the player; one the server only lists as a YouTube link opens in the YouTube app when the TV has it.
+- **Languages**: English, Spanish, Portuguese, French and German, following the language of the TV.
+- **Retro TV**: channels made from your library, shown as a grid of what is on now and as a guide. Tuning in plays the title that is on, at the right minute. The player shows one glass panel with what is on, start over, previous / next program, go live, channel up/down (the remote's CH keys and Up / Down also change channel) and the guide of the channel over the picture; a card says what is on and next when the program changes, and the next one is prepared before the current one ends. Channels are made on the web app (administrators only). Opening the channels tunes the last one watched (a switch beside the guide turns that off), and a *Last watched* button goes back to it.
+- **Match**: the TV is the screen only. It needs the Jellyfin API key in the modules container (that is how the container knows what each person may watch); without it the TV shows the container's message. It creates the room, shows a QR code and the people who joined, and when the host starts, everybody swipes on their phone; the TV shows the rounds and plays the winner. **Couch mode** (*Who is playing*: 2 to 6 on this sofa) needs no phones: each person takes a turn with the one remote and the TV asks to pass it on. A Match nobody can settle ends with the three films that came closest, each one ready to play.
 
 ### Settings
 In tabs (left and right move between the tabs, down goes into the open one):
@@ -130,7 +133,7 @@ In tabs (left and right move between the tabs, down goes into the open one):
 
 <p align="center"><img src="../docs/screenshots/tv-settings.jpg" alt="Settings, Playback" width="70%"></p>
 
-English and Spanish, following the TV's language.
+English, Spanish, Portuguese, French and German, following the TV's language (a test checks that every text exists in all five, with the same placeholders).
 
 ## Remote control
 
@@ -248,7 +251,7 @@ Stack: Kotlin, Jetpack Compose for TV (`androidx.tv:tv-material`), Media3 / ExoP
 - `AppViewModel` – tabs, a stack of pages, library paging, search, playback reporting, preferences and error handling. Repository calls run on `Dispatchers.IO`: the SDK reads each response on the calling thread, which must not be the main one.
   Every coroutine starts through `launchSafe`, which turns a failure into the error banner (and a 401 into the sign-in screen) without cancelling its siblings.
 - `music/MusicPlayer` – the music queue and its ExoPlayer, kept for the whole session. `WatchNext.kt` – the Google TV home screen row.
-- `res/values` and `res/values-es` – all texts; add every new text to both.
+- `res/values`, `res/values-es`, `-pt`, `-fr` and `-de` – all texts; add every new text to all five (a test fails when one is missing).
 
 **Speed on a TV.** The release build is minified by R8 (7 MB instead of 49 MB; R8 must see the whole app). Pictures are requested at the size they are drawn and cached (18 % of the heap plus 256 MB on disk). Lists do not ask the server to count (every list call sets
 `enableTotalRecordCount`, and a unit test fails if one forgets). At most four reads are on their way at once, what a screen is made of first and the slow extras last. Compose recomposes only what changes. Every focus request retries for about a second,

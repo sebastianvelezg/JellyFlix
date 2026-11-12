@@ -54,11 +54,18 @@ export interface RoomData {
   filters: MatchFilters
   history: RoundRecord[]
   winner?: MatchCard
-  winnerBy?: 'agreement' | 'coin'
+  winnerBy?: 'agreement' | 'coin' | 'none'
+  /** The cards that got the most likes in the rounds that ended without everybody agreeing (best first), kept for a Match that ends without a winner. */
+  near?: Array<{ card: MatchCard; likes: number }>
+  finalists?: MatchCard[]
 }
 
 /** After this many rounds of swiping, the ones left go straight to choosing a favourite. */
 export const MAX_SWIPE_ROUNDS = 4
+/** A room where, this many times, nobody liked the same film, ends without agreement (and shows the films that came closest). */
+export const MAX_EMPTY_ROUNDS = 3
+/** How many finalists a Match without agreement shows. */
+export const FINALISTS = 3
 
 /**
  * A new room. One for a single device starts at once, with its cards and the person who started it. One for phones starts in the lobby,
@@ -110,6 +117,31 @@ export function removeMember(room: RoomData, userId: string): RoomData {
 }
 
 export class RuleError extends Error {}
+
+/** The cards of the round in progress with the likes they have so far, and the best of the rounds before, most liked first. */
+function tally(room: RoomData): Array<{ card: MatchCard; likes: number }> {
+  const best = new Map<string, { card: MatchCard; likes: number }>()
+  for (const entry of room.near ?? []) best.set(entry.card.id, entry)
+  for (const card of room.deck) {
+    const likes = room.members.filter((m) => room.votes[m.id]?.[card.id] === 'like').length
+    const before = best.get(card.id)
+    if (likes > 0 && (!before || likes > before.likes)) best.set(card.id, { card, likes })
+  }
+  return [...best.values()].sort((a, b) => b.likes - a.likes)
+}
+
+/** Ends a Match nobody could settle: no winner, but the films that came closest are kept and shown. */
+export function endWithoutAgreement(room: RoomData): RoomData {
+  if (room.phase === 'lobby' || room.phase === 'done') throw new RuleError('There is nothing to end yet.')
+  const finalists = tally(room)
+    .slice(0, FINALISTS)
+    .map((entry) => entry.card)
+  const { winner: _winner, ...rest } = room
+  return { ...rest, phase: 'done', winnerBy: 'none', finalists, near: [] }
+}
+
+/** Whether any film got at least one like (so there is something to show as a finalist). */
+export const hasFinalists = (room: RoomData): boolean => tally(room).length > 0
 
 export function vote(room: RoomData, userId: string, cardId: string, value: MatchVote): RoomData {
   if (!isMember(room, userId)) throw new RuleError('You are not in this room.')
@@ -168,7 +200,13 @@ export function advance(room: RoomData): Step {
   if (liked.length === 1) {
     return { kind: 'next', room: { ...room, history, phase: 'done', winner: liked[0] as MatchCard, winnerBy: 'agreement', lastLiked } }
   }
-  if (liked.length === 0) return { kind: 'needs-fresh', room: { ...room, history, lastLiked } }
+  if (liked.length === 0) {
+    const kept = { ...room, history, lastLiked, near: tally(room).slice(0, 6) }
+    const empty = history.filter((r) => r.kind === 'swipe' && r.both === 0).length
+    // Several fresh sets in a row and still no film in common: the Match ends here, with the ones that came closest.
+    if (empty >= MAX_EMPTY_ROUNDS && hasFinalists(kept)) return { kind: 'next', room: endWithoutAgreement(kept) }
+    return { kind: 'needs-fresh', room: kept }
+  }
   const everythingLiked = liked.length === room.deck.length
   if (everythingLiked || room.round >= MAX_SWIPE_ROUNDS) {
     return { kind: 'next', room: { ...room, history, phase: 'pick', deck: liked, picks: {}, lastLiked } }
@@ -183,8 +221,8 @@ export function startRound(room: RoomData, deck: MatchCard[]): RoomData {
 
 /** Starts again from the beginning with a fresh set (after a winner). */
 export function restart(room: RoomData, deck: MatchCard[]): RoomData {
-  const { winner: _winner, winnerBy: _by, ...rest } = room
-  return { ...rest, round: 1, phase: 'swipe', deck, votes: {}, picks: {}, lastLiked: [], history: [], seen: [...room.seen, ...deck.map((c) => c.id)] }
+  const { winner: _winner, winnerBy: _by, finalists: _finalists, ...rest } = room
+  return { ...rest, near: [], round: 1, phase: 'swipe', deck, votes: {}, picks: {}, lastLiked: [], history: [], seen: [...room.seen, ...deck.map((c) => c.id)] }
 }
 
 /** How the Match went, for the screen at the end. */
@@ -233,5 +271,6 @@ export function viewFor(room: RoomData, userId: string, version: number): MatchR
     lastLiked: room.lastLiked,
     ...(room.winner ? { winner: room.winner } : {}),
     ...(room.winnerBy ? { winnerBy: room.winnerBy } : {}),
+    ...(room.winnerBy === 'none' ? { finalists: room.finalists ?? [] } : {}),
   }
 }

@@ -11,6 +11,7 @@ import { ChannelGuide } from './ChannelGuide'
 import { ChannelEditor } from './ChannelEditor'
 import { ManageChannels } from './ManageChannels'
 import { QuickChannels } from './QuickChannels'
+import { readUiPrefs, writeUiPrefs } from '../../../platform/web/prefs'
 import { favouritesFirst } from './guideLayout'
 import { programTitle } from './programText'
 
@@ -50,6 +51,10 @@ export function ChannelsPage({ session, go }: { session: Session; go: Navigate }
     return () => window.clearInterval(timer)
   }, [])
 
+  const watch = (id: string) => {
+    writeUiPrefs({ lastRetroChannel: id })
+    go({ page: 'channel', id })
+  }
   const changed = () => setVersion((v) => v + 1)
   const closeScreen = () => {
     setScreen(null)
@@ -84,6 +89,7 @@ export function ChannelsPage({ session, go }: { session: Session; go: Navigate }
           </button>
         ))}
       </div>
+      {tab !== 'manage' && state.status === 'ready' && <LastChannel channels={state.data.channels} onWatch={watch} />}
       {notice && (
         <p role="status" className="rounded-xl border border-white/10 bg-white/[.04] px-4 py-2 text-sm text-neutral-300">
           {notice}
@@ -112,13 +118,24 @@ export function ChannelsPage({ session, go }: { session: Session; go: Navigate }
                 )}
               </StateMessage>
             ) : tab === 'now' ? (
-              <NowList channels={state.data.channels.filter((c) => c.enabled)} now={state.data.now} favorites={favorites} onWatch={(id) => go({ page: 'channel', id })} />
+              <NowList channels={state.data.channels.filter((c) => c.enabled)} now={state.data.now} favorites={favorites} onWatch={watch} />
             ) : (
-              <ChannelGuide favorites={favorites} onWatch={(id) => go({ page: 'channel', id })} />
+              <ChannelGuide favorites={favorites} onWatch={watch} />
             ))}
         </>
       )}
     </div>
+  )
+}
+
+/** Back to the channel watched last, as a television turns on to the one it was left on. Not shown when that channel is gone or off. */
+function LastChannel({ channels, onWatch }: { channels: ChannelSummary[]; onWatch: (id: string) => void }) {
+  const last = channels.find((c) => c.enabled && c.id === readUiPrefs().lastRetroChannel)
+  if (!last) return null
+  return (
+    <button type="button" className="btn-primary" onClick={() => onWatch(last.id)}>
+      {t('Last watched: {channel}', { channel: last.name })}
+    </button>
   )
 }
 

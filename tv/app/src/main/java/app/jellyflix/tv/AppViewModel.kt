@@ -40,6 +40,7 @@ import app.jellyflix.tv.data.HomeLayout
 import app.jellyflix.tv.data.PlaylistEntry
 import app.jellyflix.tv.data.RemoteSubtitle
 import app.jellyflix.tv.data.SUBTITLE_SEARCH_LANGUAGES
+import app.jellyflix.tv.data.Trailers
 import app.jellyflix.tv.data.defaultSearchLanguage
 import app.jellyflix.tv.data.newSubtitleIndex
 import app.jellyflix.tv.data.playThroughFrom
@@ -424,6 +425,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 when (message) {
                     is JellyfinRepository.RemoteMessage.Play -> if (message.itemIds.isNotEmpty()) playRemote(message.itemIds, message.startMs)
                     is JellyfinRepository.RemoteMessage.State -> handleRemoteState(message)
+                    JellyfinRepository.RemoteMessage.UserData -> refreshContinueSoon()
                 }
             }
         }
@@ -867,6 +869,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Jellyfin servers that answered on the home network while the sign-in is open, so no address has to be typed. */
+    var foundServers by mutableStateOf<List<app.jellyflix.tv.data.DiscoveredServer>>(emptyList())
+        private set
+    private var discovering = false
+
+    fun discoverServers() {
+        if (discovering) return
+        discovering = true
+        launchApp {
+            try {
+                foundServers = app.jellyflix.tv.data.ServerDiscovery.find(getApplication())
+            } finally {
+                discovering = false
+            }
+        }
+    }
+
+    /** Adds an account on another server: leaves the one in use and asks for the server too. */
+    fun addServer() {
+        if (!profiles.canAdd) return
+        launchApp {
+            leave()
+            gate = Gate.SignIn(null, null)
+        }
+    }
+
     /** Adds another account of the same server: leaves the one in use and asks for the new one. */
     fun addAccount() {
         if (!profiles.canAdd) return
@@ -1146,6 +1174,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         launchSafe {
             home.upcoming = if (l.shows.isEmpty()) emptyList() else io { repo.upcoming(s) }
+        }
+    }
+
+    private var continueSoonJob: Job? = null
+
+    /**
+     * Another device stopped, finished or marked something: "Continue watching" is read again once the burst of notices is over. Not while
+     * a video plays here (this TV's own progress reports come back as notices too, and the rows are read when playback ends anyway).
+     */
+    private fun refreshContinueSoon() {
+        continueSoonJob?.cancel()
+        continueSoonJob = launchSafe {
+            delay(2500)
+            if (pages.lastOrNull() !is Page.Player) refreshContinue()
         }
     }
 
@@ -1604,6 +1646,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     var notice by mutableStateOf<String?>(null)
         private set
+
+    /**
+     * Plays a trailer of [item]: one kept on the server plays here like any video; otherwise a YouTube trailer is handed to the YouTube
+     * app when this TV has it (a TV has no browser to open a page in).
+     */
+    fun playTrailer(item: MediaItem) {
+        val s = session ?: return
+        launchSafe {
+            val local = if (item.localTrailers > 0) runCatching { io { repo.localTrailers(s, item.id) } }.getOrDefault(emptyList()) else emptyList()
+            if (local.isNotEmpty()) {
+                play(local.first(), startMs = 0)
+                return@launchSafe
+            }
+            val intent = item.youtubeTrailer?.let { Trailers.youtubeIntent(it) }
+            val opened = intent != null && runCatching {
+                getApplication<Application>().startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.isSuccess
+            if (!opened) notice = str(R.string.trailer_unavailable)
+        }
+    }
 
     fun dismissNotice() {
         notice = null

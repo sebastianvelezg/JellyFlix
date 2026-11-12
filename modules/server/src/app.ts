@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { API_VERSION, type Manifest, type ModuleInfo } from '../../contract/index.ts'
+import { API_VERSION, MODULE_VERSIONS, type Manifest, type ModuleId, type ModuleInfo } from '../../contract/index.ts'
 import { clientOf, createAuthenticator, tokenFrom } from './auth/auth.ts'
 import type { Config } from './config.ts'
 import type { Db } from './db/db.ts'
@@ -24,6 +24,13 @@ export interface AppDeps {
   seerrFetch?: (url: string, init?: RequestInit) => Promise<Response>
 }
 
+/** A module of the container: how it joins the router and, when it can be unwell or unset, how it says so in the manifest. */
+interface ModuleEntry {
+  id: ModuleId
+  register: () => void
+  status?: () => Promise<Pick<ModuleInfo, 'state' | 'detail'>>
+}
+
 export interface App {
   handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>
   channels: ChannelsService | undefined
@@ -34,21 +41,39 @@ export function createApp({ config, db, jellyfin, clock = nowSeconds, seerrFetch
   const authenticate = createAuthenticator(jellyfin)
 
   router.get('/v1/health', 'public', () => ({ status: 'ok', version: config.version, api: API_VERSION }))
-  // Seerr is a module of its own: it needs an address and a key, and it is only "ready" while Seerr answers and is new enough.
+  // Adding a module is adding one entry here (plus its id in the contract): how it joins the router and how it reports itself.
+  let channels: ChannelsService | undefined
   let seerr: SeerrService | undefined
-  if (config.modules.includes('seerr') && config.seerrUrl && config.seerrApiKey) {
-    seerr = createSeerrService(createSeerrClient(config.seerrUrl, config.seerrApiKey, seerrFetch))
-    registerSeerrRoutes(router, seerr)
-  }
-  const seerrInfo = async (): Promise<ModuleInfo> => {
-    if (!seerr) return { id: 'seerr', state: 'needs-setup', detail: 'SEERR_URL and SEERR_API_KEY are needed in the modules container.' }
-    const health = await seerr.health()
-    return health.ok ? { id: 'seerr', state: 'ready' } : { id: 'seerr', state: 'error', detail: health.detail }
-  }
+  const registry: ModuleEntry[] = [
+    {
+      id: 'channels',
+      register: () => {
+        channels = createChannelsService(db, jellyfin)
+        registerChannelRoutes(router, channels, clock)
+      },
+    },
+    { id: 'match', register: () => registerMatchRoutes(router, createMatchService(db, jellyfin), clock) },
+    {
+      // Seerr needs an address and a key, and it is only "ready" while Seerr answers and is new enough.
+      id: 'seerr',
+      register: () => {
+        if (!config.seerrUrl || !config.seerrApiKey) return
+        seerr = createSeerrService(createSeerrClient(config.seerrUrl, config.seerrApiKey, seerrFetch))
+        registerSeerrRoutes(router, seerr)
+      },
+      status: async () => {
+        if (!seerr) return { state: 'needs-setup', detail: 'SEERR_URL and SEERR_API_KEY are needed in the modules container.' }
+        const health = await seerr.health()
+        return health.ok ? { state: 'ready' } : { state: 'error', detail: health.detail }
+      },
+    },
+  ]
+  const on = registry.filter((entry) => config.modules.includes(entry.id))
+  for (const entry of on) entry.register()
 
   router.get('/v1/manifest', 'user', async (ctx): Promise<Manifest> => {
     const modules: ModuleInfo[] = []
-    for (const id of config.modules) modules.push(id === 'seerr' ? await seerrInfo() : { id, state: 'ready' })
+    for (const entry of on) modules.push({ id: entry.id, version: MODULE_VERSIONS[entry.id], ...((await entry.status?.()) ?? { state: 'ready' }) })
     return {
       api: API_VERSION,
       version: config.version,
@@ -58,13 +83,6 @@ export function createApp({ config, db, jellyfin, clock = nowSeconds, seerrFetch
       serviceKey: jellyfin.hasServiceKey,
     }
   })
-
-  let channels: ChannelsService | undefined
-  if (config.modules.includes('channels')) {
-    channels = createChannelsService(db, jellyfin)
-    registerChannelRoutes(router, channels, clock)
-  }
-  if (config.modules.includes('match')) registerMatchRoutes(router, createMatchService(db, jellyfin), clock)
 
   async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const cors = corsHeaders(req.headers.origin, config.origins)

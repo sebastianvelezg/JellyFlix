@@ -5,6 +5,8 @@ import { t, tr } from '../i18n'
 import { useAppearance, type NavStyle } from '../platform/web/appearance'
 import { addRecentSearch, clearRecentSearches, readRecentSearches } from '../platform/web/recentSearches'
 import { useLanguage } from './useLanguage'
+import { PROFILES_CHANGED, switchAccount } from '../platform/web/profileEvents'
+import { readProfiles } from '../platform/web/profiles'
 
 const SEARCH_DELAY_MS = 300
 
@@ -404,6 +406,14 @@ export function Header({
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // With two or more accounts kept on this browser, the header offers going to another one.
+  const [several, setSeveral] = useState(() => readProfiles().profiles.length > 1)
+  useEffect(() => {
+    const reread = () => setSeveral(readProfiles().profiles.length > 1)
+    window.addEventListener(PROFILES_CHANGED, reread)
+    return () => window.removeEventListener(PROFILES_CHANGED, reread)
+  }, [])
+
   const initial = (session.userName.trim()[0] ?? '?').toUpperCase()
 
   return (
@@ -446,6 +456,11 @@ export function Header({
             <span aria-hidden="true">{initial}</span>
           </button>
           {/* On a phone the search box needs the room; signing out is in Settings (the round button). */}
+          {!kids && several && (
+            <button type="button" className="btn-ghost max-lg:hidden" onClick={switchAccount}>
+              {t('Switch account')}
+            </button>
+          )}
           {!kids && (
             <button type="button" className="btn-ghost max-lg:hidden" onClick={onSignOut}>
               {t('Sign out')}
