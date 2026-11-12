@@ -2,7 +2,7 @@
 #   docker build -t jellyflix-modules .        (from this folder)
 # It has no dependencies to install: Node runs the TypeScript files as they are (type stripping) and keeps its data in SQLite (node:sqlite).
 # The base image is pinned by digest (the same one the web image builds with); Dependabot proposes updates to it.
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4
 
 ENV NODE_ENV=production \
     DATA_DIR=/data \
