@@ -23,7 +23,7 @@ import { PlayOnButton } from './remote/PlayOnButton'
 import { CheckIcon, HeartIcon, PlayIcon, RestartIcon, StarIcon, ThumbIcon } from './icons'
 import { RowCard } from './MovieCard'
 import { Row } from './Row'
-import { CastCard, DetailsSkeleton, Facts, PlayOptions, TitleHero, TrailerButton, type PlayPick } from './TitleParts'
+import { CastCard, DetailsSkeleton, Facts, PlayOptions, PlayVerdict, TitleHero, TrailerButton, type PlayPick } from './TitleParts'
 import { readVersionPref, writeVersionPref } from '../platform/web/prefs'
 import { detailsKey, swrKey, swrScope, useSwr } from './useSwr'
 import { useToggles } from './useToggles'
@@ -255,6 +255,7 @@ function DetailsContent({
             </p>
           )}
           <PlayOptions movie={movie} pick={pick} onChange={choose} />
+          <PlayVerdict session={session} movie={movie} pick={pick} />
           {actionError && (
             <p role="alert" className="alert-error mt-3 max-w-xl">
               {actionError}

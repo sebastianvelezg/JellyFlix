@@ -385,10 +385,12 @@ export interface UiPrefs {
   liveCategory: ChannelCategory
   /** Live TV: the channel watched last (its name is kept to show on a button without asking the server). */
   lastChannel: { id: string; name: string } | null
+  /** Retro TV: the channel watched last (its id), to offer going back to it. */
+  lastRetroChannel: string | null
 }
 
 const UI_KEY = 'jellyflix.ui'
-const UI_DEFAULTS: UiPrefs = { autoRotateBanner: true, language: 'auto', liveCategory: 'all', lastChannel: null }
+const UI_DEFAULTS: UiPrefs = { autoRotateBanner: true, language: 'auto', liveCategory: 'all', lastChannel: null, lastRetroChannel: null }
 
 export function readUiPrefs(): UiPrefs {
   return sanitizeUiPrefs(read(UI_KEY, UI_DEFAULTS))
@@ -403,6 +405,7 @@ export function sanitizeUiPrefs(value: unknown): UiPrefs {
     language: LANGUAGES.some(([code]) => code === p.language) ? (p.language as LanguageChoice) : 'auto',
     liveCategory: isChannelCategory(p.liveCategory) ? p.liveCategory : 'all',
     lastChannel: last && typeof last.id === 'string' && typeof last.name === 'string' && last.id ? { id: last.id, name: last.name } : null,
+    lastRetroChannel: typeof p.lastRetroChannel === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(p.lastRetroChannel) ? p.lastRetroChannel : null,
   }
 }
 

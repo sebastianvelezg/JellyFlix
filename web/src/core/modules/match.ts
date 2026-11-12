@@ -12,6 +12,8 @@ export const pickCard = (client: ModulesClient, roomId: string, cardId: string) 
 /** The host of a Match for phones starts the swiping, once the people are in. */
 export const startMatch = (client: ModulesClient, roomId: string) => client.post<MatchRoomView>(`/v1/match/rooms/${encodeURIComponent(roomId)}/start`)
 export const playAgain = (client: ModulesClient, roomId: string) => client.post<MatchRoomView>(`/v1/match/rooms/${encodeURIComponent(roomId)}/again`)
+/** The host gives up on agreeing: the Match ends and shows the films that came closest. */
+export const endMatch = (client: ModulesClient, roomId: string) => client.post<MatchRoomView>(`/v1/match/rooms/${encodeURIComponent(roomId)}/end`)
 export const leaveRoom = (client: ModulesClient, roomId: string) => client.del<{ ok: true }>(`/v1/match/rooms/${encodeURIComponent(roomId)}`)
 
 /** The room as it is now, or `unchanged` when it has not moved since `since`. */

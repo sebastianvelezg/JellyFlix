@@ -252,7 +252,7 @@ class LegacyMigration(
 
 /** Keys older versions kept for the one session; the data ones are owned by the account from now on ("<name>.<account id>"). */
 val LEGACY_SESSION_KEYS = listOf("server", "token", "tokenSealed", "userId", "userName")
-val ACCOUNT_OWNED_KEYS = listOf("seriesTracks", "lastChannelId", "lastChannelName", "visitSeen", "visitSince", "hidden", "sync")
+val ACCOUNT_OWNED_KEYS = listOf("seriesTracks", "lastChannelId", "lastChannelName", "lastRetroChannel", "visitSeen", "visitSince", "hidden", "sync")
 
 /** Null when there was no session to carry over. [all] is everything the old storage held. */
 fun migrateLegacySession(all: Map<String, *>, vault: TokenVault, now: Long): LegacyMigration? {

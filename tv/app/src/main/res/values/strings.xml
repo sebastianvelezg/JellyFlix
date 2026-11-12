@@ -678,4 +678,36 @@
     <string name="sync_section_playback">playback choices</string>
     <string name="sync_applied">Your settings were updated from another device.</string>
     <string name="sync_conflict">A newer copy of your settings from another device replaced your latest change.</string>
+
+    <!-- Trailers -->
+    <string name="trailer">Trailer</string>
+    <string name="trailer_unavailable">This trailer needs the YouTube app, which this TV does not have.</string>
+
+    <!-- Retro TV: the last channel -->
+    <string name="modules_auto_tune_on">Open on the last channel: on</string>
+    <string name="modules_auto_tune_off">Open on the last channel: off</string>
+
+    <!-- Match: no agreement -->
+    <string name="match_no_agreement">No agreement this time</string>
+    <string name="match_finalists">Nobody liked the same film. These came closest:</string>
+    <string name="match_no_finalists">Nobody liked any film this time.</string>
+    <string name="match_cannot_agree">We cannot agree: show the closest</string>
+
+    <!-- Match: couch mode -->
+    <string name="match_player_n">Player %1$d</string>
+    <string name="match_who">Who is playing</string>
+    <string name="match_who_phones">On their phones</string>
+    <string name="match_who_couch">%1$d on this sofa</string>
+    <string name="match_couch_pass">Pass the remote to %1$s</string>
+    <string name="match_couch_turn">Turn %1$d of %2$d. The others look away.</string>
+    <string name="match_couch_ready">I have the remote</string>
+    <string name="match_couch_turn_of">%1$s – turn %2$d of %3$d</string>
+    <string name="match_couch_left">%1$d films left for you</string>
+    <string name="match_couch_like">I would watch it</string>
+    <string name="match_couch_pass_card">Not this one</string>
+    <string name="match_couch_choose">My favourite</string>
+
+    <!-- Finding servers and several servers -->
+    <string name="signin_found">Found on your network</string>
+    <string name="profiles_add_server">Add an account on another server</string>
 </resources>

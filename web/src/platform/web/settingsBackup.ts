@@ -13,9 +13,10 @@ const ALLOWED = [APPEARANCE_KEY, 'jellyflix.ui', 'jellyflix.player', 'jellyflix.
 const SANITIZE: Record<(typeof ALLOWED)[number], (value: unknown) => object> = {
   [APPEARANCE_KEY]: sanitizeAppearance,
   'jellyflix.ui': (value) => {
-    // The last Live TV channel belongs to the device it was watched on, not to a settings file.
+    // The last Live TV and Retro TV channels belong to the device they were watched on, not to a settings file.
     const prefs: Partial<ReturnType<typeof sanitizeUiPrefs>> = sanitizeUiPrefs(value)
     delete prefs.lastChannel
+    delete prefs.lastRetroChannel
     return prefs
   },
   'jellyflix.player': sanitizePlayerPrefs,

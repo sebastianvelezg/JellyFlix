@@ -15,6 +15,7 @@ export interface SettingEntry {
 
 export const SETTINGS_INDEX: SettingEntry[] = [
   { tab: 'general', label: tr('Account'), keywords: 'user name server address sign out log out' },
+  { tab: 'general', label: tr('Accounts on this device'), keywords: 'profiles switch account who is watching pin family users' },
   { tab: 'general', label: tr('Rotate the featured banner'), keywords: 'home slideshow carousel' },
   { tab: 'general', label: tr('Your stats'), keywords: 'statistics history watched' },
   { tab: 'general', label: tr('Administration'), keywords: 'admin libraries users devices server', admin: true },

@@ -59,6 +59,7 @@ describe('parseRemoteMessage', () => {
 
   it('reads how often the server wants to hear from this device', () => {
     expect(parseRemoteMessage(message('ForceKeepAlive', 60))).toEqual({ kind: 'keepAlive', seconds: 60 })
+    expect(parseRemoteMessage(JSON.stringify({ MessageType: 'UserDataChanged', Data: { UserId: 'u', UserDataList: [] } }))).toEqual({ kind: 'userData' })
   })
 
   it('ignores what it does not know or cannot read', () => {

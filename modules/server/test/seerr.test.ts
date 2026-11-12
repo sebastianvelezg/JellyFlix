@@ -78,7 +78,7 @@ describe('the Seerr module', () => {
 
   it('is listed as ready while Seerr answers and is new enough, and says what is wrong otherwise', async () => {
     const ready = await app.call<Manifest>('GET', '/v1/manifest', 'tok-ben')
-    assert.deepEqual(ready.body.modules, [{ id: 'seerr', state: 'ready' }])
+    assert.deepEqual(ready.body.modules, [{ id: 'seerr', version: 1, state: 'ready' }])
 
     const stopped = await start({ ...base, modules: ['seerr'] })
     stopped.seerr.version = '3.2.0'

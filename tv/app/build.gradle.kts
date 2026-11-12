@@ -23,13 +23,13 @@ android {
         // Google TV on the TCL C6K runs Android 12 or newer; 28 keeps older boxes working too.
         minSdk = 28
         targetSdk = 37
-        versionCode = 30
-        versionName = "1.8.0"
+        versionCode = 31
+        versionName = "1.8.1"
     }
 
     androidResources {
         // The app speaks English and Spanish only; the libraries' other languages are dead weight.
-        localeFilters += listOf("en", "es")
+        localeFilters += listOf("en", "es", "pt", "fr", "de")
     }
 
     signingConfigs {

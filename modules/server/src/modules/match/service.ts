@@ -3,7 +3,7 @@ import { transaction, type Db } from '../../db/db.ts'
 import { HttpError, type AuthUser } from '../../http/router.ts'
 import type { JellyfinClient } from '../../jellyfin/client.ts'
 import { newId, newRoomCode, seededRandom, hashSeed, shuffled } from '../../util.ts'
-import { addMember, advance, newRoom, pick, removeMember, restart, RuleError, startRound, startSwiping, viewFor, vote, type RoomData } from './machine.ts'
+import { addMember, advance, endWithoutAgreement, hasFinalists, newRoom, pick, removeMember, restart, RuleError, startRound, startSwiping, viewFor, vote, type RoomData } from './machine.ts'
 
 const DEFAULT_DECK = 10
 const notEnough = (filters: MatchFilters): string =>
@@ -72,12 +72,18 @@ export interface MatchService {
   start(user: AuthUser, id: string, now: number): Promise<MatchRoomView>
   join(user: AuthUser, code: string, now: number): MatchRoomView
   mine(user: AuthUser): MatchRoomSummary[]
-  view(user: AuthUser, id: string, since: number | undefined): MatchRoomView | { unchanged: true; version: number }
-  swipe(user: AuthUser, id: string, cardId: string, value: MatchVote, now: number): Promise<MatchRoomView>
-  choose(user: AuthUser, id: string, cardId: string, now: number): Promise<MatchRoomView>
+  /** `as`: a seat of a couch Match (see `MatchCreateRequest.players`), asked about by the person who holds the remote. */
+  view(user: AuthUser, id: string, since: number | undefined, as?: string): MatchRoomView | { unchanged: true; version: number }
+  swipe(user: AuthUser, id: string, cardId: string, value: MatchVote, now: number, as?: string): Promise<MatchRoomView>
+  choose(user: AuthUser, id: string, cardId: string, now: number, as?: string): Promise<MatchRoomView>
   again(user: AuthUser, id: string, now: number): Promise<MatchRoomView>
+  /** The host gives up on agreeing: the Match ends and shows the films that came closest. */
+  end(user: AuthUser, id: string, now: number): MatchRoomView
   leave(user: AuthUser, id: string, now: number): void
 }
+
+/** A seat of a couch Match: not an account, but a place the host plays for (`<host id>#2`). */
+const isSeat = (id: string): boolean => id.includes('#')
 
 /** Wrong room codes per person: after a few in a minute the person waits (codes are short, and a code is all that opens a room). */
 function joinAttempts() {
@@ -185,18 +191,27 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
   const takesPart = (room: RoomData, userId: string): boolean => room.createdBy === userId || room.members.some((m) => m.id === userId)
 
   /** Everybody who sees the cards, but the person asking: the people who vote and the host (whose screen shows them and plays the winner). */
-  const othersOf = (room: RoomData, user: AuthUser): string[] => [...new Set([room.createdBy, ...room.members.map((m) => m.id)])].filter((id) => id !== user.id)
+  const othersOf = (room: RoomData, user: AuthUser): string[] =>
+    // (The seats of a couch Match are not Jellyfin accounts: they are the host's own, so there is nobody else to ask about.)
+    [...new Set([room.createdBy, ...room.members.map((m) => m.id)])].filter((id) => id !== user.id && !isSeat(id))
+
+  /** Who acts: the person asking, or a seat of a couch Match they hold the remote for. */
+  const actor = (user: AuthUser, room: RoomData, as: string | undefined): string => {
+    if (as === undefined || as === user.id) return user.id
+    if (room.mode !== 'local' || room.createdBy !== user.id || !isSeat(as) || !room.members.some((m) => m.id === as)) throw new HttpError(403, 'That seat is not yours to play.')
+    return as
+  }
 
   /** After a change: if the round is over, moves the room on (asking Jellyfin for a fresh set of cards when nobody agreed). */
-  async function settle(user: AuthUser, room: RoomData, now: number): Promise<MatchRoomView> {
+  async function settle(user: AuthUser, room: RoomData, now: number, viewer: string = user.id): Promise<MatchRoomView> {
     const step = advance(room)
     if (step.kind === 'next') {
       const version = save(step.room, now)
-      return viewFor(step.room, user.id, version)
+      return viewFor(step.room, viewer, version)
     }
     if (step.kind === 'waiting') {
       const version = save(step.room, now)
-      return viewFor(step.room, user.id, version)
+      return viewFor(step.room, viewer, version)
     }
     // Nobody liked the same film: a fresh set. If there is none to be had (nothing left that fits, or Jellyfin cannot say right now), the
     // last votes are kept all the same and the people choose a favourite among the cards of this round, so the room always finishes.
@@ -208,15 +223,21 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
     }
     // The room may have changed while Jellyfin answered.
     const { room: current, row } = load(room.id)
-    if (current.round !== room.round || current.phase !== 'swipe') return viewFor(current, user.id, row.version)
+    if (current.round !== room.round || current.phase !== 'swipe') return viewFor(current, viewer, row.version)
+    if (fresh.length === 0 && hasFinalists(step.room)) {
+      // Nothing new to suggest and no film in common: it ends here, with the films that came closest.
+      const ended = endWithoutAgreement(step.room)
+      const version = save(ended, now)
+      return viewFor(ended, viewer, version)
+    }
     if (fresh.length === 0) {
       const choosing: RoomData = { ...step.room, phase: 'pick', picks: {} }
       const version = save(choosing, now)
-      return viewFor(choosing, user.id, version)
+      return viewFor(choosing, viewer, version)
     }
     const next = startRound({ ...step.room }, fresh)
     const version = save(next, now)
-    return viewFor(next, user.id, version)
+    return viewFor(next, viewer, version)
   }
 
   const guard = <T>(work: () => T): T => {
@@ -250,7 +271,13 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
       if (deck.length < MIN_DECK) throw new HttpError(422, notEnough(filters))
       let code = newRoomCode()
       for (let tries = 0; tries < 20 && db.prepare('SELECT 1 FROM match_rooms WHERE code = ?').get(code); tries += 1) code = newRoomCode()
-      const room = newRoom({ id: newId(), code, creator: { id: user.id, name: user.name }, mode, deck, deckSize, filters })
+      let room = newRoom({ id: newId(), code, creator: { id: user.id, name: user.name }, mode, deck, deckSize, filters })
+      // Couch mode: one seat for each person on the sofa (the first is the host, who holds the remote).
+      const players = mode === 'local' && Array.isArray(request.players) ? request.players.filter((p): p is string => typeof p === 'string').map((p) => p.trim().slice(0, 30)).filter(Boolean) : []
+      if (players.length > 6) throw new HttpError(400, 'A couch Match has at most six people.')
+      if (players.length >= 2) {
+        room = { ...room, members: players.map((name, i) => ({ id: i === 0 ? user.id : `${user.id}#${i + 1}`, name })) }
+      }
       const version = save(room, now, true)
       return viewFor(room, user.id, version)
     },
@@ -295,21 +322,23 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
       return rows.map((row) => summary(JSON.parse(row.data) as RoomData, row.updated_at))
     },
 
-    view(user, id, since) {
+    view(user, id, since, as) {
       const { room, row } = load(id)
       if (!inRoom(user.id, id) || !takesPart(room, user.id)) throw new HttpError(403, 'You are not in this room.')
       if (since !== undefined && since === row.version) return { unchanged: true, version: row.version }
-      return viewFor(room, user.id, row.version)
+      return viewFor(room, actor(user, room, as), row.version)
     },
 
-    async swipe(user, id, cardId, value, now) {
+    async swipe(user, id, cardId, value, now, as) {
       const { room } = load(id)
-      return settle(user, guard(() => vote(room, user.id, cardId, value)), now)
+      const who = actor(user, room, as)
+      return settle(user, guard(() => vote(room, who, cardId, value)), now, who)
     },
 
-    async choose(user, id, cardId, now) {
+    async choose(user, id, cardId, now, as) {
       const { room } = load(id)
-      return settle(user, guard(() => pick(room, user.id, cardId)), now)
+      const who = actor(user, room, as)
+      return settle(user, guard(() => pick(room, who, cardId)), now, who)
     },
 
     async again(user, id, now) {
@@ -326,10 +355,17 @@ export function createMatchService(db: Db, jellyfin: JellyfinClient): MatchServi
       return viewFor(next, user.id, version)
     },
 
+    end(user, id, now) {
+      const { room } = load(id)
+      if (room.createdBy !== user.id) throw new HttpError(403, 'Only whoever started the Match can end it.')
+      const ended = guard(() => endWithoutAgreement(room))
+      return viewFor(ended, user.id, save(ended, now))
+    },
+
     leave(user, id, now) {
       const { room } = load(id)
-      // The host closes a Match for phones for everybody.
-      if (room.createdBy === user.id && room.mode === 'phones') {
+      // The host closes a Match for phones, or a couch Match, for everybody.
+      if (room.createdBy === user.id && (room.mode === 'phones' || room.members.some((m) => isSeat(m.id)))) {
         db.prepare('DELETE FROM match_rooms WHERE id = ?').run(id)
         return
       }

@@ -56,6 +56,9 @@ export function useRegisterPlayback(kind: PlaybackKind, controller: PlaybackCont
   }, [register, kind, controller])
 }
 
+/** Fired on `window` when the server says the account's watch data changed (see `App.tsx`, which refreshes its rows). */
+export const USER_DATA_CHANGED = 'jellyflix:user-data-changed'
+
 const FOLLOW_MS = 3000
 /** How often to look for a device that started playing while nothing is being followed. */
 const WATCH_MS = 15_000
@@ -247,6 +250,9 @@ export function RemoteProvider({ session, go, children }: { session: Session; go
           setNotice(message.header ? `${message.header}: ${message.text}` : message.text)
           return
         case 'keepAlive':
+          return
+        case 'userData':
+          window.dispatchEvent(new Event(USER_DATA_CHANGED))
           return
         case 'sync':
           for (const listener of syncListeners.current) listener(message.message)

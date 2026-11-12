@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import app.jellyflix.tv.data.ChannelWindow
 import app.jellyflix.tv.data.JOIN_NOTICE_SECONDS
 import app.jellyflix.tv.data.JellyfinRepository
+import app.jellyflix.tv.data.MatchCard
 import app.jellyflix.tv.data.MatchFilters
 import app.jellyflix.tv.data.MatchRoom
 import app.jellyflix.tv.data.MatchRoomSummary
@@ -88,6 +89,11 @@ class MatchUi {
     var rooms by mutableStateOf<List<MatchRoomSummary>>(emptyList())
     var room by mutableStateOf<MatchRoom?>(null)
     var setup by mutableStateOf(false)
+    /** Couch mode: how many people share the remote (0: the people vote on their own phones). */
+    var couch by mutableIntStateOf(0)
+    /** Couch mode: the seat whose turn it is as that seat sees the room, and the seat that has confirmed it is holding the remote. */
+    var seatView by mutableStateOf<MatchRoom?>(null)
+    var seatReady by mutableStateOf<String?>(null)
     var working by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
 }
@@ -223,19 +229,41 @@ class ModulesController(
     /** The container's clock now, in seconds. */
     private fun liveSeconds(): Long = System.currentTimeMillis() / 1000 + (ready?.skewSeconds ?: 0)
 
+    /** Retro TV: whether opening the channels goes straight to the last one watched, and which that was. */
+    var autoTune by mutableStateOf(store.retroAutoTune)
+        private set
+    var lastChannelId: String? by mutableStateOf(store.lastRetroChannel)
+        private set
+
+    fun chooseAutoTune(on: Boolean) {
+        autoTune = on
+        store.retroAutoTune = on
+    }
+
+    /** Opens the channels page and, when the viewer wants it, tunes the last channel at once (a channel that is gone just leaves the list). */
+    fun openChannels() {
+        page = ModulesPage.Channels
+        loadChannels()
+        if (autoTune) lastChannelId?.let { tune(it) }
+    }
+
+    fun tune(channel: ModuleChannel) = tune(channel.id)
+
     /** Tunes in: what is on, at the minute it is at. */
-    fun tune(channel: ModuleChannel) {
+    fun tune(channelId: String) {
         val client = ready?.client ?: return
         launch {
             setBusy(true)
             try {
-                val window = io { client.window(channel.id) }
+                val window = io { client.window(channelId) }
                 val on = window.programs.getOrNull(window.currentIndex)
                 if (on == null) {
                     notify(str(R.string.modules_channel_empty, emptyArray()))
                     return@launch
                 }
                 leaveChannel()
+                store.lastRetroChannel = window.id
+                lastChannelId = window.id
                 val view = ChannelViewing(window.id, window.number, window.name, window.color)
                 view.programs = window.programs
                 viewing = view
@@ -490,7 +518,10 @@ class ModulesController(
         match.error = null
         launch {
             try {
-                match.room = io { client.createRoom(match.filters, match.deckSize) }
+                val players = (1..match.couch).map { str(R.string.match_player_n, arrayOf(it)) }
+                match.seatView = null
+                match.seatReady = null
+                match.room = io { client.createRoom(match.filters, match.deckSize, players) }
                 match.setup = false
             } catch (e: ModulesException) {
                 match.error = e.message
@@ -514,8 +545,51 @@ class ModulesController(
         }
     }
 
+    /** Couch mode: reads the room as a seat sees it (what that person still has to vote on). */
+    fun loadSeat(room: MatchRoom, seatId: String) {
+        val client = ready?.client ?: return
+        launch {
+            try {
+                match.seatView = io { client.readRoom(room.id, null, seatId) }
+            } catch (e: ModulesException) {
+                match.error = e.message
+            }
+        }
+    }
+
+    /** Couch mode: one vote for the seat whose turn it is, then the room is read again for who has finished. */
+    fun couchVote(room: MatchRoom, seatId: String, card: MatchCard, like: Boolean) = couchAct(room) { client -> client.swipeAs(room.id, seatId, card.id, like) }
+
+    fun couchPick(room: MatchRoom, seatId: String, card: MatchCard) = couchAct(room) { client -> client.pickAs(room.id, seatId, card.id) }
+
+    private fun couchAct(room: MatchRoom, call: suspend (app.jellyflix.tv.data.ModulesClient) -> MatchRoom) {
+        val client = ready?.client ?: return
+        if (match.working) return
+        match.working = true
+        match.error = null
+        launch {
+            try {
+                match.seatView = io { call(client) }
+                io { client.readRoom(room.id, null) }?.let { match.room = it }
+            } catch (e: ModulesException) {
+                match.error = e.message
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                fail(e)
+            } finally {
+                match.working = false
+            }
+        }
+    }
+
     fun startSwiping() = roomAction { client, room -> client.startMatch(room.id) }
     fun anotherRound() = roomAction { client, room -> client.playAgain(room.id) }
+    fun endWithoutAgreement() = roomAction { client, room -> client.endMatch(room.id) }
+
+    /** A finalist of a Match that ended without agreement: a film plays, a series opens. */
+    fun playFinalist(card: MatchCard) {
+        if (card.isSeries) openById(card.itemUuid) else playById(card.itemUuid)
+    }
 
     private fun roomAction(call: suspend (app.jellyflix.tv.data.ModulesClient, MatchRoom) -> MatchRoom) {
         val client = ready?.client ?: return

@@ -14,10 +14,12 @@ Independent and open source. No accounts, no telemetry, no server of ours: it ta
 [![Docker](https://img.shields.io/badge/docker-ready-2496ed?logo=docker&logoColor=white)](web/README.md#host-it-for-your-devices)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-22c55e.svg)](CONTRIBUTING.md)
 
+[**What's new**](#-whats-new-in-181) ·
 [**A look around**](#-a-look-around) ·
 [**Features**](#-features) ·
 [**Play on…**](#-play-on-another-device) ·
 [**Make it yours**](#-make-it-yours) ·
+[**Accounts**](#-accounts-for-the-whole-house) ·
 [**Administration**](#%EF%B8%8F-for-server-administrators) ·
 [**Plugins**](#-plugins-and-integrations) ·
 [**Get started**](#-get-started) ·
@@ -45,10 +47,32 @@ a banner that mixes movies and series, rows that follow what you are watching, a
 - **Yours to shape.** Backgrounds, accent colours, poster size and the rows of the home page are all your choice, on both apps.
 - **Run your server from it.** Server administrators get tools to scan, fix, edit and manage, right where they watch (web app).
 
+## 🆕 What's new in 1.8.1
+
+The first round of what the audit of 1.8.0 left for later. The full list is in the [changelog](CHANGELOG.md).
+
+- **The TV speaks five languages** (English, Spanish, Portuguese, French, German), finds your Jellyfin server on the home network by itself and keeps accounts on more than one server.
+- **Accounts on the web too:** keep several accounts in one browser, choose *Who is watching?* when the app opens and lock one with a PIN.
+- **Know before you press Play:** the title page says if this device plays the file as it is or the server will convert it, and why. The TV has a **Trailer** button.
+- **"Continue watching" follows you:** stop a movie on one device and the row on the others updates by itself.
+- **Match** can end without a winner (it shows the three films that came closest) and has a **couch mode** on the TV: one remote, everybody takes a turn, no phones.
+- **Retro TV:** a much easier weekly grid ("cartoons in the morning, films at night", with a map of the week) and the TV opens on the last channel you watched.
+
 ## 📸 A look around
 
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/web-home.jpg" alt="Jellyflix Web: the home page with a featured banner and Discover something new"><br><sub><b>Web — Home:</b> a banner that mixes movies and series, and something new to try.</sub></td>
+<td width="50%"><img src="docs/screenshots/tv-home.jpg" alt="Jellyflix TV: the home screen with a featured banner"><br><sub><b>TV — Home:</b> the same banner, made for a remote.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/web-music-player.jpg" alt="Jellyflix Web: the full-screen music player with the cover, the controls, the queue and the sleep timer"><br><sub><b>Music player:</b> full screen, with the queue, lyrics and a sleep timer.</sub></td>
+<td><img src="docs/screenshots/tv-detail.jpg" alt="Jellyflix TV: a movie's page with Play, Trailer, how it will play and the cast"><br><sub><b>A title on the TV:</b> how it will play, a trailer and the cast.</sub></td>
+</tr>
+</table>
+
 <p align="center"><img src="docs/screenshots/web-themes.jpg" alt="The same home page of Jellyflix Web in six looks: true black with ocean, midnight with violet, dusk with rose, pine with emerald, cocoa with amber and charcoal with aqua" width="100%"></p>
-<p align="center"><sub>One page, six looks: each background and accent colour is a choice in Settings → Appearance, on the web and on the TV. The pictures below use a different one each.</sub></p>
+<p align="center"><sub>One page, six looks: each background and accent colour is a choice in Settings → Appearance, on the web and on the TV. The pictures in this page use a different one each.</sub></p>
 
 ## ✨ Features
 
@@ -95,7 +119,7 @@ Playlists of movies and episodes that play through, a one-click Watch later, fav
 
 **Sign in without typing**
 
-Quick Connect: a six-digit code you approve from another device, so no password on a TV remote.
+Quick Connect: a six-digit code you approve from another device, so no password on a TV remote. The TV even finds your server on the home network.
 
 </td>
 </tr>
@@ -139,9 +163,9 @@ A tiny Docker image (`amd64` and `arm64`), `docker compose up`, plain Node, or a
 </td>
 <td valign="top">
 
-**Five languages on the web, two on the TV**
+**Five languages, on both apps**
 
-The web app speaks English, Spanish, Portuguese, French and German; the TV app English and Spanish. Switchable in Settings, with a test that keeps every text translated. Accessibility is checked automatically (WCAG 2.1 A and AA).
+English, Spanish, Portuguese, French and German on the web and on the TV. The web switches in Settings, the TV follows the language of the TV, and a test keeps every text translated. Accessibility is checked automatically (WCAG 2.1 A and AA).
 
 </td>
 </tr>
@@ -165,6 +189,29 @@ Your channels with what is on each, a guide, favorites and the live stream your 
 **A menu that is yours**
 
 The buttons at the top can show icons and names, only icons or only names, in the order you want, and the ones you do not use can be turned off. The bar scrolls instead of cutting anything off.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Accounts for the house**
+
+Several accounts on one browser or one TV, a *Who is watching?* screen, an optional PIN for each, and accounts on more than one server.
+
+</td>
+<td valign="top">
+
+**Know before you press Play**
+
+"This device plays it as it is", or "the server will convert it, because the audio format is not supported". Trailers on both apps.
+
+</td>
+<td valign="top">
+
+**Retro TV and Match**
+
+Channels made from your own library, with a guide that remembers the last one you watched; and a game to choose what to watch together, on phones or around one remote.
 
 </td>
 </tr>
@@ -194,7 +241,14 @@ The buttons at the top can show icons and names, only icons or only names, in th
 | Live TV by kind (movies, sports, news…), back to the last channel | ✅ | ✅ |
 | Watch together (SyncPlay) | ✅ | — |
 | Like / dislike a title, titles under the posters, what a Continue watching card does | ✅ | ✅ |
-| Kids mode with a PIN, search in Settings, first-run setup, trailers | ✅ | — |
+| Kids mode with a PIN, search in Settings, first-run setup | ✅ | — |
+| Trailers | ✅ opens the trailer's own site | ✅ plays the ones kept on the server, or opens the YouTube app |
+| Says before Play if it plays as it is or will be converted, and why | ✅ | ✅ (*Plays as*, and the Info panel while playing) |
+| "Continue watching" updates when another device stops | ✅ | ✅ |
+| Several accounts, *Who is watching?* and a PIN for each | ✅ | ✅ |
+| Accounts on more than one server | ✅ | ✅ |
+| Finds your server on the home network | — | ✅ |
+| Languages | English, Spanish, Portuguese, French, German | the same five |
 | Screensaver with backdrops from your library | — | ✅ |
 | Appearance: backgrounds, accents, poster size, home rows, top menu (icons or names, order, hide) | ✅ (+ any colour) | ✅ |
 | Back up your look on the server | ✅ | ✅ |
@@ -202,8 +256,8 @@ The buttons at the top can show icons and names, only icons or only names, in th
 | Sign in with a code (Quick Connect) | ✅ (and approve a code) | ✅ |
 | Play on another device | ✅ controls and receives | ✅ receives |
 | Plugins page | ✅ run their tasks | ✅ read only |
-| Modules: Retro TV channels (watch, guide) | ✅ (+ set channels up) | ✅ |
-| Modules: Match with friends | ✅ on your phone or one screen | ✅ the screen only (QR code, plays the winner) |
+| Modules: Retro TV channels (watch, guide, back to the last channel) | ✅ (+ set channels up, with a weekly grid editor) | ✅ opens on the last channel |
+| Modules: Match with friends | ✅ on your phone or one screen; ends without a winner when nobody agrees | ✅ the screen (QR code, plays the winner), or **couch mode** with one remote |
 | Modules: Seerr (look up and request what the library does not have) | ✅ | — |
 | **Administration and the title editor** | ✅ | — |
 | Settings export and import, subtitle files from your device, installable (PWA) | ✅ | — |
@@ -214,8 +268,8 @@ The buttons at the top can show icons and names, only icons or only names, in th
 
 Extras that live in a small second container, [`jellyflix-modules`](modules/README.md), next to Jellyfin. Run it and a **Modules** button appears on the web and on the TV; leave it out and Jellyflix is exactly what it was: no button, no page, no request.
 
-- **Retro TV.** Channels made from your own library: a marathon of one anime, Saturdays of Marvel, horror at midnight. Nothing is broadcast and nothing runs while nobody watches: a channel is a schedule, and tuning in plays the title that is on, at the right minute, with the normal player. It has a guide, start over, previous and next program, go live and channel up and down. Administrators set channels up on the web (by hand, with rules or one per genre in one click); everybody watches, on the web and on the TV.
-- **Match.** Two or more people, each on their own phone and Jellyfin account, swipe the same films; what everybody liked goes on to the next round until one is left, and it plays on the screen. The TV shows a **QR code** and plays the winner. Filter by genre, decade, length and series, and see at the end how much you agreed.
+- **Retro TV.** Channels made from your own library: a marathon of one anime, Saturdays of Marvel, horror at midnight. Nothing is broadcast and nothing runs while nobody watches: a channel is a schedule, and tuning in plays the title that is on, at the right minute, with the normal player. It has a guide, start over, previous and next program, go live and channel up and down. Administrators set channels up on the web (by hand, with rules, one per genre in one click, or a weekly grid with mornings, afternoons, evenings and late nights); everybody watches, on the web and on the TV, and the TV opens on the last channel you watched.
+- **Match.** Two or more people, each on their own phone and Jellyfin account, swipe the same films; what everybody liked goes on to the next round until one is left, and it plays on the screen. The TV shows a **QR code** and plays the winner. Filter by genre, decade, length and series, and see at the end how much you agreed. If nobody can agree, it shows the three films that came closest. On the TV there is also a **couch mode**: two to six people share one remote and take turns, with no phones.
 
 - **Seerr** (off unless you turn it on). Look up movies and series your library does not have and ask for them, as yourself: your own Seerr account's permissions and quota apply. It is also offered from the search of the library ("Search “…” in Seerr"), apart from the results. Needs Seerr 3.3 or later.
 
@@ -254,6 +308,17 @@ Settings → **Appearance**, in both apps. The choices stay on the device; the w
 <td><img src="docs/screenshots/web-top-menu.jpg" alt="Web: Settings, Appearance, Top menu: show, hide and reorder the buttons at the top"><br><sub><b>Your menu:</b> show, hide and reorder the buttons at the top.</sub></td>
 </tr>
 </table>
+
+## 👨‍👩‍👧 Accounts for the whole house
+
+One browser or one TV, several people. Each keeps their own account, their own rows, searches and place in every title.
+
+- **Who is watching?** When the app opens with two or more accounts kept, it asks first. Switch later from the header (web) or from Settings.
+- **A PIN for each account** (4 to 6 digits) decides who may open it on that device. It is a lock for the sofa, not for the server: what an account may watch is still decided by Jellyfin, and for children the right tool is the age limit in Jellyfin (and Kids mode on the web).
+- **Several servers:** each saved account carries its own server, so a family member can keep an account on another Jellyfin.
+- On the TV, *Add an account on another server* and the servers found on the home network make it quick; on the web the accounts are kept only when you choose to stay signed in.
+
+<p align="center"><img src="docs/screenshots/web-accounts.jpg" alt="Web: Settings, Accounts on this device, with the switch to ask who is watching, a PIN and the buttons to switch or add an account" width="62%"></p>
 
 ## 🛠️ For server administrators
 
@@ -296,11 +361,15 @@ A fast, installable web app that talks directly from your browser to your Jellyf
 </tr>
 <tr>
 <td><img src="docs/screenshots/web-movies.jpg" alt="Web: the movies page with a banner, sort and filters"><br><sub><b>Movies:</b> a banner, sort, filters and an A–Z jump.</sub></td>
-<td><img src="docs/screenshots/web-details.jpg" alt="Web: a movie's page with synopsis, genres, audio and subtitle choices"><br><sub><b>A title:</b> what Play will give, your rating, trailers and Play on…</sub></td>
+<td><img src="docs/screenshots/web-details.jpg" alt="Web: a movie's page with synopsis, genres, audio and subtitle choices"><br><sub><b>A title:</b> what Play will give and whether it plays as it is, your rating, trailers and Play on…</sub></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/web-series.jpg" alt="Web: a series page with its seasons and episodes"><br><sub><b>Series:</b> seasons, episodes, progress and Mark season watched.</sub></td>
 <td><img src="docs/screenshots/web-music.jpg" alt="Web: the music page with a mix of the day, radios and albums to jump back into"><br><sub><b>Music:</b> made-for-you mixes, albums, artists, playlists and lyrics.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/web-music-player.jpg" alt="Web: the full-screen music player with the cover, the controls, the queue and the sleep timer"><br><sub><b>The player:</b> full screen, with the queue, lyrics and a visualizer.</sub></td>
+<td><img src="docs/screenshots/web-accounts.jpg" alt="Web: Settings, Accounts on this device"><br><sub><b>Accounts:</b> switch, add and lock with a PIN.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/web-books.jpg" alt="Web: the Books tab with covers, the kind of each book and its year"><br><sub><b>Books:</b> covers, A–Z and filters, like any other library.</sub></td>
@@ -344,7 +413,7 @@ A native app built for a remote control and a TV seen from the sofa: big targets
 <td><img src="docs/screenshots/tv-movies.jpg" alt="TV: the Movies page with its banner and sort choices"><br><sub><b>Movies:</b> a banner, sort and filters.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/tv-detail.jpg" alt="TV: a movie's page with how it will play, its collection and the cast"><br><sub><b>A title:</b> how it will play, its collection and the cast.</sub></td>
+<td><img src="docs/screenshots/tv-detail.jpg" alt="TV: a movie's page with how it will play, its collection and the cast"><br><sub><b>A title:</b> how it will play, a trailer, its collection and the cast.</sub></td>
 <td><img src="docs/screenshots/tv-series.jpg" alt="TV: the Series page, a grid of posters"><br><sub><b>Series:</b> a grid of posters, with more loading as you scroll.</sub></td>
 </tr>
 <tr>
@@ -392,7 +461,7 @@ These are rules of the project, not just how it behaves today. A contribution th
 - **No credentials or server addresses in the source.** Your password is sent once to your server and never stored; only a revocable session token is kept.
 - **No backend of ours.** The web app is static files and the TV app is a single APK. There is nothing to sign up for.
 - **Your server does the heavy lifting.** The apps never transcode.
-- **Both apps stay equivalent**, and every text exists in English and Spanish (and, on the web, in Portuguese, French and German).
+- **Both apps stay equivalent**, and every text exists in English, Spanish, Portuguese, French and German on both of them.
 
 ## ❓ FAQ
 
@@ -439,6 +508,12 @@ On the web app, yes: EPUB, PDF and comic archives (CBZ) open in its own reader, 
 </details>
 
 <details>
+<summary><b>Can several people share one TV or one browser?</b></summary>
+
+Yes. Each person keeps their own account (on the TV up to eight, on the web up to six), the app asks who is watching when it opens, and each account can have a PIN. The PIN only guards opening the account on that device; the server still decides what the account may watch.
+</details>
+
+<details>
 <summary><b>Is it on the Play Store / App Store?</b></summary>
 
 Not at the moment. The TV app is installed by sideloading and the web app is hosted by you.
@@ -452,14 +527,15 @@ No, only Jellyfin.
 
 ## 🛣️ What could come next
 
-Jellyflix 1.7 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
+Jellyflix 1.8 is complete for daily use. Ideas, in no particular order, and where a contribution would help most:
 
-- **Modules:** a "YouTube without YouTube" module (subscribe to channels, downloaded without ads), a yearly **Wrapped** of what you watched, and more; see the [module plan](docs/MODULES-PLAN.md).
-- **Playback:** recording and timers for live TV, watch together on the TV app.
+- **Modules:** a yearly **Wrapped** of what you watched, a library health report for administrators, a "YouTube without YouTube" module; see the [module plan](docs/MODULES-PLAN.md).
+- **Playback:** styled `.ass` subtitles on the TV, casting to Chromecast and AirPlay from the web, recording and timers for live TV, watch together on the TV app.
 - **Books:** a reader for the TV app, Mobi and RAR comics.
-- **Sign in:** find servers on the network, several servers and users.
-- **Reach:** Fire TV, more languages, a public demo of the web app.
+- **Reach:** a mobile app with downloads, Fire TV, a public demo of the web app.
 - **Quality:** a mock server the TV app can use, and testing on more physical TVs (HDR, 4K and frame-rate switching vary a lot between models).
+
+The plan for the 1.9 and 2.0 releases, with what is built and what is waiting, is in [docs/PLAN-1.9.md](docs/PLAN-1.9.md).
 
 Have an idea? [Open an issue](https://github.com/sebastianvelezg/JellyFlix/issues/new/choose).
 

@@ -13,7 +13,10 @@ class SubtitleSearchTest {
         assertEquals("fra", defaultSearchLanguage("fra", "es"))
         assertEquals("spa", defaultSearchLanguage(null, "es"))
         assertEquals("spa", defaultSearchLanguage("xxx", "es")) // a language the list does not have
-        assertEquals("eng", defaultSearchLanguage(null, "de"))
+        assertEquals("deu", defaultSearchLanguage(null, "de"))
+        assertEquals("por", defaultSearchLanguage(null, "pt"))
+        assertEquals("fra", defaultSearchLanguage(null, "fr"))
+        assertEquals("eng", defaultSearchLanguage(null, "ja"))
     }
 
     @Test

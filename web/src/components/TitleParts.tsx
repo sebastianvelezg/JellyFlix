@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
-import { personImageUrl, type MovieDetails, type Person, type Session } from '../core'
+import { useEffect, useState, type ReactNode } from 'react'
+import { describePlayback, negotiatePlayback, personImageUrl, type MovieDetails, type Person, type Session } from '../core'
+import { firstStreamOptions } from './player/prepareStream'
 import { ToolbarSelect } from './Toolbar'
 import { formatBitrate, formatBytes, formatDate } from './format'
 import { BackIcon, ExternalIcon } from './icons'
@@ -288,5 +289,43 @@ export function CastCard({ session, person, onSelect }: { session: Session; pers
       </p>
       {person.role && <Subtext as="p" className="block truncate text-xs text-neutral-500" text={person.role} />}
     </button>
+  )
+}
+
+/**
+ * Says, before Play is pressed, whether this device plays the file as it is or the server has to convert it (and why). It asks the
+ * server the same question the player asks, with the same device profile and settings; nothing starts. It stays quiet when the
+ * server cannot be asked, rather than guess.
+ */
+export function PlayVerdict({ session, movie, pick }: { session: Session; movie: MovieDetails; pick: PlayPick }) {
+  const [verdict, setVerdict] = useState<{ key: string; method: 'direct' | 'transcode'; reasons: string[] } | null>(null)
+  const mediaSourceId = movie.versions.length > 1 ? pick.versionId : undefined
+  const audioStreamIndex = pick.audio === 'auto' ? undefined : pick.audio
+  const key = `${movie.id}|${mediaSourceId ?? ''}|${audioStreamIndex ?? ''}`
+  const playable = !!movie.media
+  useEffect(() => {
+    if (!playable) return
+    let cancelled = false
+    negotiatePlayback(session, movie.id, { mediaSourceId, audioStreamIndex, ...firstStreamOptions() })
+      .then((plan) => {
+        if (!cancelled) setVerdict({ key, ...describePlayback(plan) })
+      })
+      .catch(() => {
+        if (!cancelled) setVerdict(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [session, movie.id, mediaSourceId, audioStreamIndex, key, playable])
+  if (!playable || !verdict || verdict.key !== key) return null
+  const reasons = verdict.reasons.map((reason) => t(reason)).join('; ')
+  return (
+    <p className="rise rise-3 mt-2 max-w-2xl text-sm text-neutral-400" data-testid="play-verdict">
+      {verdict.method === 'direct'
+        ? t('This device plays it as it is.')
+        : reasons
+          ? t('The server will convert it for this device: {reasons}.', { reasons })
+          : t('The server will convert it for this device.')}
+    </p>
   )
 }

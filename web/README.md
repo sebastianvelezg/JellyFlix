@@ -22,6 +22,7 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - **Discover something new**: a random movie (preferring unwatched), a series you have never started (its button plays episode 1, never a special) and a random album (or shuffle the whole library). Press **Another** for a different pick.
 - Rows that follow you: **Continue watching** (movies and episodes together), **Next up**, **Because you watched…** and **Because you liked…** (several rows, each from a different title), **New since your last visit**, **Coming up** (episodes about to air), **Watch later**, your playlists and favorites,
   the latest movies, collections, new series, new anime, new music videos, new books and new music.
+- The rows update by themselves when another device changes what you have watched (the app listens to the server's own notice and reads them again a moment later), so stopping a movie on the TV is enough.
 - **Surprise me** opens a random unwatched movie; "Top rated in *genre*" rows change on every visit.
 - Search across movies, series, episodes, collections, albums, artists and songs (press `/`), with recent searches and result filters.
 
@@ -45,7 +46,7 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
 - **Audio tracks** (switching keeps your position), **skip intro / recap / credits / preview** when the server has segments, **chapters**, **Next episode** with an *Up next* card (in the last 20 seconds of a long title, so you can jump to the next one during the credits) and autoplay, whose countdown (3 to 15 seconds, with a bar) is chosen in Settings.
 - **Second subtitle:** a second track shows above the first (a step smaller, in another colour) to learn a language or read a dub; it is chosen on its own page of the player's menu. **Skip by kind:** intros, recaps, credits and previews each have their own choice (a button, skip by itself, or nothing). The seek bar's labels can show the time played, left, the total, when it ends or nothing, with chapter marks you can turn off and an option to pause while dragging. An **Episodes** button lists the series' episodes by season without leaving the player, and a list of **converted sound** formats (AC-3, E-AC-3, FLAC) makes the server convert them for a receiver that stays silent.
 - **Cinema mode** (Settings → Playback, or the player's menu): the picture fades in from black and out at the very end, and the controls leave sooner, also while paused.
-- A **quality limit** and an explanation of how the video is playing and why the server converts it. Playlists and collections play through.
+- A **quality limit** and an explanation of how the video is playing and why the server converts it. The title page says it before you press Play ("This device plays it as it is", or "The server will convert it for this device: the audio format is not supported"): it asks the server the same question the player asks, with the same settings, and follows the version and audio you pick. Playlists and collections play through.
 - Progress is reported to Jellyfin (start, every ten seconds, pause, seek, stop); resume where you left off. Reporting failures never interrupt playback.
 - Keyboard: **Space/K** play/pause, **←/→ or J/L** ±10 s, **↑/↓** volume, **0–9** jump, **M** mute, **C** subtitles, **F** fullscreen, **N** next episode, **S** skip, **P** picture-in-picture, **Esc** back. Press `?` anywhere for the full list.
 
@@ -75,6 +76,8 @@ Its sibling is a native Android TV / Google TV app in [`../tv`](../tv/README.md)
   (for example LrcLib) and saves the result on the server (administrators only).
 - Songs the browser cannot play are converted by the server; an unplayable song is reported and skipped.
 
+<p align="center"><img src="../docs/screenshots/web-music-player.jpg" alt="The full-screen music player: the cover, the controls, the queue and the sleep timer" width="70%"></p>
+
 ### Organise
 - **Playlists** of movies and episodes (they live on the server, so the TV app sees them too), a one-click **Watch later**, and favorites.
 - **New since your last visit** (a pause of half an hour ends a visit; the time of the last visit stays in this browser) and **Coming up**.
@@ -92,6 +95,9 @@ Settings → Appearance, all stored on this device:
 ### Watch together and the household
 - **Watch together:** the people icon in the header starts a group or joins an open one, using Jellyfin's own **SyncPlay**. A title played in the group opens for everybody, waits until every device is ready and starts at one moment by the server's clock; pause, play and seek are shared. The server's administrator decides which accounts may use it.
 - **Kids mode** (Settings → General): a highest age rating and a PIN to leave. Titles above it, and titles with no rating, disappear from every list, search and suggestion; Settings, Administration, stats and Live TV stay shut until the PIN is typed. The PIN guards the app on this device; for a limit nobody can get round, also set the highest rating for the account in Administration.
+- **Accounts on this browser** (Settings → General → Accounts on this device, picture below): keep several accounts, choose who is watching when the app opens, switch from the header, and lock one with a PIN of 4 to 6 digits (kept as a salted hash; it needs https or localhost). An account is kept only when it stays signed in ("Keep me signed in", or the button in that card). The PIN decides who may open the account here; it is not encryption (the saved sign-in is in this browser's storage like any "keep me signed in") and it does not change what the account may watch.
+<p align="center"><img src="../docs/screenshots/web-accounts.jpg" alt="Settings, Accounts on this device" width="55%"></p>
+
 - **Search in Settings**, **cards** that can drop the titles under the posters and choose what a Continue watching card does, and a short **first-run setup** (language, look, subtitle language) that can be run again from Settings → About.
 
 ### Devices ("Play on…")

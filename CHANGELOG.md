@@ -5,6 +5,24 @@ Jellyflix Web and Jellyflix TV are released together and share one version numbe
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-11-11
+
+The first round of what the audit left for later: Portuguese, French and German on the TV, Match without a winner and in couch mode, accounts on the web, the weekly grid of Retro TV made easier, trailers and the last channel on the TV, and a TV that finds the server by itself. Container 0.4.0 (Match is revision 2 of its module).
+
+### Added
+- **The TV speaks Portuguese, French and German** besides English and Spanish. It follows the language of the TV; a test fails when a text is missing in one of the five languages. The subtitle search starts in the language of the TV.
+- **"Continue watching" follows your other devices at once.** When another device stops, finishes or marks a title, the web app and the TV read the row again a moment later (they listen to the notice Jellyfin already sends), without waiting for you to come back.
+- **Trailers on the TV.** A *Trailer* button on the title page: a trailer kept on the server plays in the TV player; one that the server only knows by a YouTube address opens in the YouTube app when the TV has it.
+- **The title page of the web app says how it will play,** before you press Play: "This device plays it as it is" or "The server will convert it for this device: the audio format is not supported". It asks the server what the player asks, and follows the version and audio you pick.
+- **Retro TV remembers the last channel.** On the TV, opening the channels tunes the last one watched at once (a switch beside the guide turns it off) and a *Last watched* button goes back to it; the web app shows the same button.
+- **Match can end without a winner.** When several fresh sets go by and nobody liked the same film (or the host presses *We cannot agree*), the Match shows the three films that came closest instead of dealing cards for ever. Match is now revision 2 of the module (an app that only knows revision 1 leaves Match out instead of misreading it).
+- **Couch mode for Match on the TV.** Two to six people share the remote: each takes a turn, the TV asks to pass it on, and nobody needs a phone.
+- **Retro TV: the weekly grid is easier.** One-press mornings, afternoons, evenings and late nights; every day, weekdays and weekend buttons; a map of the week showing which hours each block covers; and a warning for a block that an earlier one hides completely.
+- **Accounts on the web.** Keep several accounts on one browser, choose who is watching when the app opens, switch from the header or Settings, and lock an account with a PIN (4 to 6 digits, kept as a salted hash; it decides who may open the account here, not what it may watch). An account is only kept when it stays signed in.
+- **The TV finds your Jellyfin server by itself.** On the sign-in screen it asks the home network (a UDP broadcast on port 7359, which Jellyfin answers) and offers the servers that reply; choosing one fills in the address. It only asks the local network, ignores anything that is not a Jellyfin answer, and a TV that cannot do it simply shows nothing.
+- **The TV keeps accounts on more than one server.** *Add an account on another server* on "Who is watching?" (until now a new account had to be on the first server); with accounts on several servers each tile says which. The web app already did, since each saved account carries its server.
+- The modules manifest says the version of each module, so an app can keep using the ones it understands when another changes; the container registers its modules from one list.
+
 ## [1.8.0] - 2026-11-11
 
 A new look for Retro TV, music and books, and an audit of the web app, the TV app and the modules container with what it found fixed. Container 0.3.0 has a new migration (made by itself when it starts), and a Match on phones now needs the Jellyfin API key.

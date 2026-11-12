@@ -678,4 +678,36 @@
     <string name="sync_section_playback">opciones de reproducción</string>
     <string name="sync_applied">Tus ajustes se actualizaron desde otro dispositivo.</string>
     <string name="sync_conflict">Una copia más reciente de tus ajustes, de otro dispositivo, reemplazó tu último cambio.</string>
+
+    <!-- Trailers -->
+    <string name="trailer">Tráiler</string>
+    <string name="trailer_unavailable">Este tráiler necesita la app de YouTube, que esta TV no tiene.</string>
+
+    <!-- Retro TV: the last channel -->
+    <string name="modules_auto_tune_on">Abrir en el último canal: sí</string>
+    <string name="modules_auto_tune_off">Abrir en el último canal: no</string>
+
+    <!-- Match: no agreement -->
+    <string name="match_no_agreement">SIN ACUERDO ESTA VEZ</string>
+    <string name="match_finalists">Nadie eligió la misma película. Estas se quedaron cerca:</string>
+    <string name="match_no_finalists">A nadie le gustó ninguna película esta vez.</string>
+    <string name="match_cannot_agree">No nos ponemos de acuerdo: mostrar las más cercanas</string>
+
+    <!-- Match: couch mode -->
+    <string name="match_player_n">Jugador %1$d</string>
+    <string name="match_who">Quién juega</string>
+    <string name="match_who_phones">Cada uno en su móvil</string>
+    <string name="match_who_couch">%1$d en este sofá</string>
+    <string name="match_couch_pass">Pasa el mando a %1$s</string>
+    <string name="match_couch_turn">Turno %1$d de %2$d. Los demás miran a otro lado.</string>
+    <string name="match_couch_ready">Ya tengo el mando</string>
+    <string name="match_couch_turn_of">%1$s – turno %2$d de %3$d</string>
+    <string name="match_couch_left">Te quedan %1$d películas</string>
+    <string name="match_couch_like">La vería</string>
+    <string name="match_couch_pass_card">Esta no</string>
+    <string name="match_couch_choose">Mi favorita</string>
+
+    <!-- Finding servers and several servers -->
+    <string name="signin_found">Encontrados en tu red</string>
+    <string name="profiles_add_server">Añadir una cuenta de otro servidor</string>
 </resources>
