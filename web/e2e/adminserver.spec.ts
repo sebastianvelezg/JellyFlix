@@ -92,7 +92,8 @@ test('titles: the ones the server could not recognise, a batch with a preview an
   await batch.getByRole('button', { name: 'Preview' }).click()
   await batch.getByRole('button', { name: 'Start' }).click()
   await expect(batch.getByText('2 done, 0 left as they were, 0 failed.')).toBeVisible()
-  expect(mock.adminLog.filter((l) => l.startsWith('update'))).toEqual(['update m0004', 'update m0008'])
+  // The batch sends a few updates at a time, so the order they arrive in is not fixed.
+  expect(mock.adminLog.filter((l) => l.startsWith('update')).sort()).toEqual(['update m0004', 'update m0008'])
   const sent = mock.requests.filter((r) => r.method === 'POST' && r.path === '/Items/m0004').at(-1)?.body as { Tags: string[]; People?: unknown }
   expect(sent.Tags).toEqual(['Classic', 'Weekend']) // what it had stays
   expect(sent.People).toBeDefined()
